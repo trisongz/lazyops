@@ -1,0 +1,2 @@
+# lazyops
+ Lazy Python Functions
