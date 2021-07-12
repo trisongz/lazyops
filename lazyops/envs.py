@@ -30,7 +30,7 @@ class ThreadSafeHandler:
         self.handler = handler
         self.lock = threading.RLock()  if self.lock_mode == 'rlock' else threading.Lock()
 
-    def get(self, init_func: function = None, *args, **kwargs):
+    def get(self, init_func: Any = None, *args, **kwargs):
         if self.lock_mode == 'rlock': self.lock.acquire()
         with self.lock:
             if not self.handler:
@@ -134,7 +134,7 @@ class EnvChecker:
     def get_logger(self, name = 'LazyOps', *args, **kwargs):
         if not EnvChecker.loggers.get(name):
             EnvChecker.loggers[name] = ThreadSafeHandler()
-        return EnvChecker.loggers[name].get(setup_new_logger, *args, **kwargs)
+        return EnvChecker.loggers[name].get(setup_new_logger, name=name, *args, **kwargs)
     
 
 LazyEnv = EnvChecker()
