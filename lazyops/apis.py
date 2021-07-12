@@ -4,7 +4,8 @@ import aiohttp
 import asyncio
 
 from dataclasses import dataclass
-from dataclasses_json import dataclass_json
+from lazyclasses import lazyclass
+
 from typing import List, Dict, Any, Optional
 
 async def async_req(sess, url, decode_json=True, with_url=False, *args, **kwargs):
@@ -57,7 +58,7 @@ class LazySession:
 
 
 
-@dataclass_json
+@lazyclass
 @dataclass
 class LazyRoute:
     path: str
@@ -65,7 +66,7 @@ class LazyRoute:
     data_key: Optional[str] = 'inputs'
     params_key: Optional[str] = 'params'
     params: Optional[Dict[str, Any]] = None
-    prefix_payload: Optional[bool] = True
+    prefix_payload: Optional[str] = None
     is_async: Optional[bool] = False
     decode_json: Optional[bool] = True
 
@@ -81,7 +82,7 @@ class LazyRoute:
             self.path = '/' + self.path
         pc = {self.params_key: p} if self.params_key else p
         if data: pc[self.data_key] = data
-        if self.prefix_payload: pc = {'payload': pc}
+        if self.prefix_payload: pc = {self.prefix_payload: pc}
         return {'method': self.method, 'url': base_url + self.path, self.pkey: pc, 'decode_json': self.decode_json}
 
     @property
@@ -94,7 +95,7 @@ class LazyRoute:
 
 
 
-@dataclass_json
+@lazyclass
 @dataclass
 class LazyHeader:
     user: Optional[str] = None
@@ -112,7 +113,8 @@ class LazyHeader:
         return h
 
 
-@dataclass_json
+
+@lazyclass
 @dataclass
 class LazyAPIModel:
     url: str
@@ -139,7 +141,8 @@ class LazyAPIModel:
     def __call__(self, route, *args, **kwargs):
         return self.get(route, *args, **kwargs)
 
-@dataclass_json
+
+@lazyclass
 @dataclass
 class LazyAPIConfig:
     url: str
@@ -181,6 +184,4 @@ class LazyAPI:
         elif isinstance(config, str):
             config = LazyAPIConfig.from_json(config)
         return LazyAPI(config, *args, **kwargs)
-
-
 

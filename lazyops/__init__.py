@@ -6,6 +6,7 @@ warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 warnings.filterwarnings('ignore', message='RequestsDependencyWarning')
 
 lazyops_root = os.path.abspath(os.path.dirname(__file__))
+from .lazyclasses import lazyclass
 
 from .envs import LazyEnv, get_logger
 from .models import LazyData, LazyTime, LazyDate, LazyFormatter, LazyTimer
