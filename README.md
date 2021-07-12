@@ -1,7 +1,7 @@
 # lazyops
  A collection of Lazy Python Functions that aim to balance functionality, performance, and utility.
 
- ** Why **
+**Why**
 After the nth time of rewriting and/or copying existing functions, I figured it was easier to maintain them all in a single library.
 
 ### Dependencies
@@ -12,10 +12,14 @@ After the nth time of rewriting and/or copying existing functions, I figured it 
 - [dateparser](https://github.com/scrapinghub/dateparser): Makes working with natural query dates easier `5 days ago`.
 - [six](): Enables functionality in `retryable` decorator.
 
+---
+
 ### Installation
 Install directory from pypi
 
 `pip install --upgrade lazyops`
+
+---
 
 ### API Usage
 
