@@ -17,14 +17,12 @@ _TO = 2
 _PARSER = json.Parser()
 
 def _process_class(cls):
-
     _process_class_internal(cls)
     cls.from_dict = cls._lazyclasses_from_dict
     cls.to_dict = cls._lazyclasses_to_dict
 
     def from_json(cls, json_data):
         return cls.from_dict(_PARSER.parse(json_data))
-        #return cls.from_dict(json.loads(json_data))
 
     def to_json(self, *, separators=None, indent=None):
         if indent is None and separators is None: separators = (',', ':')
@@ -36,7 +34,6 @@ def _process_class(cls):
 
 
 def _process_class_internal(cls):
-
     # Delay the building of our from_dict method until it is first called.
     # This allows the compilation to reference classes defined later in
     # the module.
@@ -58,60 +55,33 @@ def _process_class_internal(cls):
 
 
 def _replace_from_dict(cls, from_dict='from_dict'):
-
     from_dict_src = _from_dict_source(cls)
-    from_dict_module = compile(
-        from_dict_src, '<lazyclass_generated_code>', 'exec'
-    )
-    from_dict_code = [
-        const for const in from_dict_module.co_consts
-        if isinstance(const, types.CodeType)
-    ][0]
-
+    from_dict_module = compile(from_dict_src, '<lazyclass_generated_code>', 'exec')
+    from_dict_code = [const for const in from_dict_module.co_consts if isinstance(const, types.CodeType)][0]
     the_globals = {
-        # use the defining modules globals
         **sys.modules[cls.__module__].__dict__,
-        # along with types we use for the conversion
         **referenced_types(cls)
     }
 
-    from_dict_func = types.FunctionType(
-        from_dict_code,
-        the_globals,
-        from_dict,
-    )
-
+    from_dict_func = types.FunctionType(from_dict_code, the_globals, from_dict)
     setattr(cls, from_dict, classmethod(from_dict_func))
 
 
 def _replace_to_dict(cls, to_dict='to_dict'):
-
     to_dict_src = _to_dict_source(cls)
-    to_dict_module = compile(
-        to_dict_src, '<lazyclass_generated_code>', 'exec'
-    )
-    to_dict_code = [
-        const for const in to_dict_module.co_consts
-        if isinstance(const, types.CodeType)
-    ][0]
-
-    to_dict_func = types.FunctionType(
-        to_dict_code,
-        sys.modules[cls.__module__].__dict__,
-        to_dict,
-    )
+    to_dict_module = compile(to_dict_src, '<lazyclass_generated_code>', 'exec')
+    to_dict_code = [const for const in to_dict_module.co_consts if isinstance(const, types.CodeType)][0]
+    to_dict_func = types.FunctionType(to_dict_code, sys.modules[cls.__module__].__dict__, to_dict,)
 
     setattr(cls, to_dict, to_dict_func)
 
 
 def _from_dict_source(cls):
-
     lines = [
         'def from_dict(cls, o):',
         '    args = []',
     ]
     for name, field_type in typing.get_type_hints(cls).items():
-
         # pop off the top layer of optional, since we are using o.get
         if typing.get_origin(field_type) == typing.Union: field_type = typing.get_args(field_type)[0]
 
@@ -136,11 +106,9 @@ def _to_dict_source(cls):
         'def to_dict(self):',
         '    result = {}',
     ]
-    # TODO: option for including Nones or not
     INCLUDE_NONES = False
 
     for name, field_type in typing.get_type_hints(cls).items():
-
         access = f'self.{name}'
         transform = expr_builder_to(field_type)
 
@@ -273,7 +241,6 @@ def referenced_types(cls):
     from datetime import date, datetime
 
     def extract_type(t):
-
         origin = typing.get_origin(t)
         if origin in [typing.Union, list]:
             type_arg = typing.get_args(t)[0]
@@ -291,6 +258,5 @@ def referenced_types(cls):
     types = {}
     for _, field_type in typing.get_type_hints(cls).items():
         t = extract_type(field_type)
-        if t is not None:
-            types[t.__name__] = t
+        if t is not None: types[t.__name__] = t
     return types

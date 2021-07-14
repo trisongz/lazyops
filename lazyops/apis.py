@@ -4,7 +4,7 @@ import aiohttp
 import asyncio
 
 from dataclasses import dataclass
-from lazyclasses import lazyclass
+from lazyops.lazyclasses import lazyclass
 
 from typing import List, Dict, Any, Optional
 

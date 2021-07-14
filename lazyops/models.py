@@ -1,3 +1,4 @@
+
 import time
 import dateparser
 
@@ -250,5 +251,3 @@ class LazyTimer:
         if name not in LazyTimer.timers:
             LazyTimer.timers[name] = LazyTime(t=t, *args, **kwargs)
         return LazyTimer.timers[name]
-
-
