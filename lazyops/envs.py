@@ -4,6 +4,7 @@ import signal
 import threading
 import logging
 from dataclasses import dataclass
+from functools import partialmethod
 from typing import Optional, Any, Dict, List
 
 try:
@@ -104,6 +105,9 @@ class LazyOpsLogger:
     def error(self, msg, *args, **kwargs):
         return self.logger.error(msg, *args, **kwargs)
     
+    def exception(self, msg, *args, **kwargs):
+        return self.logger.exception(msg, *args, **kwargs)
+    
     def __call__(self, msg, *args, **kwargs):
         return self.logger.info(msg, *args, **kwargs)
 
@@ -151,10 +155,21 @@ class EnvChecker:
     def killed(self):
         return not IsLazyAlive
     
+    @property
+    def is_threadsafe(self):
+        return bool(threading.current_thread() is threading.main_thread())
+    
+    @classmethod
+    def set_state(cls, state: bool):
+        global IsLazyAlive
+        IsLazyAlive = state
+    
+
+    set_alive = partialmethod(set_state, True)
+    set_dead = partialmethod(set_state, False)
+
     @classmethod
     def exit_handler(cls, signum, frame):
-        global IsLazyAlive
-        IsLazyAlive = False
         logger = EnvChecker.loggers['LazyWatch']
         logger.error("Received SIGINT or SIGTERM! Gracefully Exiting.")
         if EnvChecker.handlers:
@@ -164,17 +179,18 @@ class EnvChecker:
         if EnvChecker.threads:
             for thread in EnvChecker.threads:
                 thread.join()
-        sys.exit(0)
+        EnvChecker.set_dead()
+        #sys.exit(0)
 
     @classmethod
     def enable_watcher(cls):
         if EnvChecker.watcher_enabled:
             return
-        if threading.current_thread() is threading.main_thread():
-            EnvChecker.sigs['sigint'] = signal.signal(signal.SIGINT, EnvChecker.exit_handler)
-            EnvChecker.sigs['sigterm'] = signal.signal(signal.SIGTERM, EnvChecker.exit_handler)
-            EnvChecker.loggers['LazyWatch'] = EnvChecker.get_logger(name='LazyWatch')
-            EnvChecker.watcher_enabled = True
+        #if threading.current_thread() is threading.main_thread():
+        EnvChecker.sigs['sigint'] = signal.signal(signal.SIGINT, EnvChecker.exit_handler)
+        EnvChecker.sigs['sigterm'] = signal.signal(signal.SIGTERM, EnvChecker.exit_handler)
+        EnvChecker.loggers['LazyWatch'] = EnvChecker.get_logger(name='LazyWatch')
+        EnvChecker.watcher_enabled = True
 
     @classmethod
     def add_thread(cls, t):
@@ -202,18 +218,29 @@ class EnvChecker:
         if EnvChecker.watcher_enabled:
             if self.killed:
                 sys.exit(0)
-            if threading.current_thread() is threading.main_thread():
-                signal.signal(signal.SIGINT, EnvChecker.sigs['sigint'])
-                signal.signal(signal.SIGTERM, EnvChecker.sigs['sigterm'])
+            #if threading.current_thread() is threading.main_thread():
+            signal.signal(signal.SIGINT, EnvChecker.sigs['sigint'])
+            signal.signal(signal.SIGTERM, EnvChecker.sigs['sigterm'])
+        EnvChecker.set_dead()
 
 
     def watch(self):
         self.enable_watcher()
         return self
 
-
+        
 
 LazyEnv = EnvChecker()
 get_logger = LazyEnv.get_logger
 logger = get_logger()
 lazywatcher = LazyEnv.watch
+
+
+def lazywatch(name, *args, **kwargs):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            logger.info(f'Adding {name} to Exit Handlers')
+            LazyEnv.add_exit_handler(name, func)
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator

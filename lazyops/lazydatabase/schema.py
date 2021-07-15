@@ -1,5 +1,6 @@
 import sys
 import asyncio
+from functools import lru_cache
 from ._base import *
 from ._base import _lazydb_logger, _lazydb_picker
 
@@ -70,8 +71,6 @@ class PklDBCache(LazyDBCacheBase):
         with self.lock:
             try:
                 dbdata = fio.pklload(self.cache_filepath)
-                logger.info(dbdata)
-                logger.info(dbdata.items())
             except Exception as e:
                 logger.error(f'Failed to Restore DB {self._cachename}: {str(e)}')
                 logger.error(f'Copying DB to Backup')
@@ -208,10 +207,13 @@ CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 
 class LazyDBIndex:
-    def __init__(self, name, schema, hash_schema: Dict[str, str] = None):
+    def __init__(self, name, schema, hash_schema: Dict[str, str] = None, is_dev: bool = False):
         self.name = name
         self.base_schema = schema
         self.hash_schema = hash_schema
+        self.is_prod = not is_dev
+        if self.is_prod:
+            logger.info(f'[{self.index_name} Index] Production Mode Enabled. Removing Non-Hashed Values')
         self.create_schema()
         self.index = {}
         self.lookup = {}
@@ -225,26 +227,29 @@ class LazyDBIndex:
         self.schema_props = list(self.schema.schema()['properties'].keys())
         setattr(sys.modules[self.schema.__module__], self.schema.__name__, self.schema)
 
-    def validate_idx(self, id: int = None, dbid: str = None, *args, **kwargs):
-        if id and self.index.get(id):
-            return id
-        if dbid and self.lookup.get(dbid):
+    #@lru_cache(maxsize=50, typed=True)
+    def validate_idx(self, uid: int = None, dbid: str = None, *args, **kwargs):
+        if uid is not None and self.index.get(uid):
+            return uid
+        if dbid is not None and self.lookup.get(dbid):
             return self.lookup[dbid]
         return None
     
-    async def async_validate_idx(self, id: int = None, dbid: str = None, *args, **kwargs):
-        if id and self.index.get(id):
-            return id
-        if dbid and self.lookup.get(dbid):
+    async def async_validate_idx(self, uid: int = None, dbid: str = None, *args, **kwargs):
+        if uid is not None and self.index.get(uid):
+            return uid
+        if dbid is not None and self.lookup.get(dbid):
             return self.lookup[dbid]
         return None
 
-    def get_by_id(self, id: int = None, dbid: str = None, *args, **kwargs):
-        idx = self.validate_idx(id, dbid, *args, **kwargs)
-        if not idx:
+    #@lru_cache(maxsize=50, typed=True)
+    def get_by_id(self, uid: int = None, dbid: str = None, *args, **kwargs):
+        idx = self.validate_idx(uid=uid, dbid=dbid, *args, **kwargs)
+        if idx is None:
             return None
         return self.index.get(idx)
     
+    #@lru_cache(maxsize=50)
     def match_props(self, item, name, val, *args, **kwargs):
         item_data = jsonable_encoder(item)
         if not item_data.get(name):
@@ -265,6 +270,7 @@ class LazyDBIndex:
             return isinstance(item_data[name], NoneType)
         return item_data[name] == val
 
+    #@lru_cache(maxsize=50)
     def get_by_props(self, props: Dict[str, Any], forward=True, *args, **kwargs):
         if not props:
             return None
@@ -280,11 +286,13 @@ class LazyDBIndex:
         
         return None
 
-    def get(self, id: int = None, dbid: str = None, props: Dict[str, Any] = None, *args, **kwargs):
-        return self.get_by_props(props=props, *args, **kwargs) if props else self.get_by_id(id, dbid, *args, **kwargs)
+    #@lru_cache(maxsize=50)
+    def get(self, uid: int = None, dbid: str = None, props: Dict[str, Any] = None, *args, **kwargs):
+        logger.info(f'[{self.index_name} Index]: GET Request for UID: {uid}: DBID: {dbid}, Props: {props}, args: {args}, kwargs: {kwargs}')
+        return self.get_by_props(props=props, *args, **kwargs) if props is not None else self.get_by_id(uid=uid, dbid=dbid, *args, **kwargs)
     
-    async def async_get(self, id: int = None, dbid: str = None, props: Dict[str, Any] = None, *args, **kwargs):
-        return self.get_by_props(props=props, *args, **kwargs) if props else self.get_by_id(id, dbid, *args, **kwargs)
+    async def async_get(self, uid: int = None, dbid: str = None, props: Dict[str, Any] = None, *args, **kwargs):
+        return self.get_by_props(props=props, *args, **kwargs) if props else self.get_by_id(uid=uid, dbid=dbid, *args, **kwargs)
 
     def filter_items(self, item_list: List[Any], props: Dict[str, Any] = None, *args, **kwargs):
         res_list = []
@@ -299,7 +307,7 @@ class LazyDBIndex:
     def get_many(self, id_list: List[int] = None, dbid_list: List[int] = None, props: Dict[str, Any] = None, *args, **kwargs):
         if not id_list and not dbid_list:
             return None
-        get_res = [self.get(id=idx) for idx in id_list] if id_list else [self.get(dbid=dbid) for dbid in dbid_list]
+        get_res = [self.get(uid=idx) for idx in id_list] if id_list else [self.get(dbid=dbid) for dbid in dbid_list]
         get_res = [i for i in get_res if i]
         if props:
             get_res = self.filter_items(get_res, props, *args, **kwargs)
@@ -309,7 +317,7 @@ class LazyDBIndex:
         if not id_list and not dbid_list:
             return None
         get_list = id_list or dbid_list
-        tasks = [asyncio.ensure_future(self.async_get(id=idx)) for idx in get_list]
+        tasks = [asyncio.ensure_future(self.async_get(uid=idx)) for idx in get_list]
         all_tasks = await asyncio.gather(*tasks)
         get_res = [i for i in all_tasks if i]
         if props:
@@ -318,7 +326,7 @@ class LazyDBIndex:
 
     def create(self, data, *args, **kwargs):
         data = self.create_or_update_hash(data)
-        new_item = self.schema(id=self.get_idx(), dbid=self.get_dbid(), *args, **data, **kwargs)
+        new_item = self.schema(uid=self.get_idx(), dbid=self.get_dbid(), *args, **data, **kwargs)
         self.index[self.idx] = new_item
         self.lookup[self.current_id] = self.idx
         self.idx += 1
@@ -326,29 +334,29 @@ class LazyDBIndex:
     
     async def async_create(self, data, *args, **kwargs):
         data = self.create_or_update_hash(data)
-        new_item = self.schema(id=self.get_idx(), dbid=self.get_dbid(), *args, **data, **kwargs)
+        new_item = self.schema(uid=self.get_idx(), dbid=self.get_dbid(), *args, **data, **kwargs)
         self.index[self.idx] = new_item
         self.lookup[self.current_id] = self.idx
         self.idx += 1
         return new_item
         
-    def remove(self, id: int = None, dbid: str = None, *args, **kwargs):
-        rm_id = self.validate_idx(id, dbid, *args, **kwargs)
+    def remove(self, uid: int = None, dbid: str = None, *args, **kwargs):
+        rm_id = self.validate_idx(uid=uid, dbid=dbid, *args, **kwargs)
         if not rm_id:
             return None
         item = self.index.pop(rm_id, None)
         _ = self.lookup.pop(item.dbid)
         return rm_id
     
-    async def async_remove(self, id: int = None, dbid: str = None, *args, **kwargs):
-        rm_id = await self.async_validate_idx(id, dbid, *args, **kwargs)
+    async def async_remove(self, uid: int = None, dbid: str = None, *args, **kwargs):
+        rm_id = await self.async_validate_idx(uid=uid, dbid=dbid, *args, **kwargs)
         if not rm_id:
             return None
         item = self.index.pop(rm_id, None)
         _ = self.lookup.pop(item.dbid)
         return rm_id
     
-    def update(self, data: Union[UpdateSchemaType, Dict[str, Any]], id: int = None, dbid: str = None, prop_name: str = None, prop_val: Any = None, *args, **kwargs):
+    def update(self, data: Union[UpdateSchemaType, Dict[str, Any]], uid: int = None, dbid: str = None, prop_name: str = None, prop_val: Any = None, *args, **kwargs):
         item = self.get(id, dbid, prop_name=prop_name, prop_val=prop_val, *args, **kwargs)
         if not item:
             return None
@@ -358,13 +366,14 @@ class LazyDBIndex:
         for field in item_data:
             if field in update_data:
                 setattr(item, field, update_data[field])
-        idx = item.id
+        idx = item.uid
         item.updated = self.get_timestamp()
         self.index[idx] = item
+        #self.clear_caches()
         return self.index[idx]
     
-    async def async_update(self, data: Union[UpdateSchemaType, Dict[str, Any]], id: int = None, dbid: str = None, prop_name: str = None, prop_val: Any = None, *args, **kwargs):
-        item = await self.async_get(id, dbid, prop_name=prop_name, prop_val=prop_val, *args, **kwargs)
+    async def async_update(self, data: Union[UpdateSchemaType, Dict[str, Any]], uid: int = None, dbid: str = None, prop_name: str = None, prop_val: Any = None, *args, **kwargs):
+        item = await self.async_get(uid, dbid, prop_name=prop_name, prop_val=prop_val, *args, **kwargs)
         if not item:
             return None
         item_data = jsonable_encoder(item)
@@ -373,15 +382,26 @@ class LazyDBIndex:
         for field in item_data:
             if field in update_data:
                 setattr(item, field, update_data[field])
-        idx = item.id
+        idx = item.uid
         item.updated = self.get_timestamp()
         self.index[idx] = item
         return self.index[idx]
 
+    def clear_caches(self):
+        return
+        #self.get_by_id.cache_clear()
+        #self.get_by_props.cache_clear()
+        #self.match_props.cache_clear()
+        #self.validate_idx.cache_clear()
+
+    @property
+    def index_name(self):
+        return self.name.capitalize()
+
     @property
     def id_schema(self):
         return {
-            'id': (int, Field(default_factory=self.get_idx)),
+            'uid': (int, Field(default_factory=self.get_idx)),
             'dbid': (str, Field(default_factory=self.get_dbid)),
             'created': (str, Field(default_factory=self.get_timestamp)),
             'updated': (str, Field(default_factory=self.get_timestamp))
@@ -413,14 +433,16 @@ class LazyDBIndex:
         for field, hash_field in self.hash_schema.items():
             if data and data.get(field):
                 data[hash_field] = self.create_hash(val=data[field])
-                #logger.info(f'Hash Created for {field} = {hash_field}')
+                if self.is_prod:
+                    _ = data.pop(field)
             elif update_data and update_data.get(field):
                 item, updated = self.update_hash(prop=field, hash_prop=hash_field, new_val=update_data[field], do_verify=True, item=item)
                 if updated:
-                    logger.info(f'Updated Hashed Field: {field} = {hash_field}')
-                    setattr(item, field, update_data[field])
+                    logger.info(f'[{self.index_name} Index]: Updated Hashed Field: {field} = {hash_field}')
+                    if not self.is_prod:
+                        setattr(item, field, update_data[field])
                 else:
-                    logger.error(f'Failed Validation for Hash Field {field} = {hash_field}')
+                    logger.error(f'[{self.index_name} Index]: Failed Validation for Hash Field {field} = {hash_field}')
                 _ = update_data.pop(field)
         if data:
             return data
@@ -453,9 +475,9 @@ class LazyDBIndex:
         setattr(item, hash_prop, hash_results)
         return item, True
     
-    def __call__(self, method, *args, **kwargs):
+    def __call__(self, method, uid: int = None, dbid: str = None, *args, **kwargs):
         func = getattr(self, method)
-        return func(self, *args, **kwargs)
+        return func(uid=uid, dbid=dbid, **kwargs)
 
 
 
@@ -465,10 +487,13 @@ class LazyDBConfig:
     dbschema: Dict[str, Any]
     autosave: bool = True
     autouser: bool = True
+    is_dev: bool = True
     savefreq: float = 15.0
     seeddata: Optional[Dict[str, Any]] = None
     userconfigs: Optional[Dict[str, Any]] = None
     hashschema: Optional[Dict[str, Any]] = None
+    dbname: Optional[str] = None
+    
 
 @dataclass
 class LazyDBSaveMetrics:
@@ -482,7 +507,7 @@ class LazyDBSaveMetrics:
 class LazyAny(object):
     def __init__(self, data):
         for k,v in data.items():
-            self.__dict__[k] = v
+            setattr(self, k, v)
 
 
 # ID and DBID are auto-created
@@ -494,11 +519,13 @@ class LazyUserSchema(BaseModel):
     hash_password: str = None
 
     @classmethod
-    def get_schema(cls, config: Union[UpdateSchemaType, Dict[str, Any]] = None, *args, **kwargs):
+    def get_schema(cls, config: Union[UpdateSchemaType, Dict[str, Any]] = None, is_dev: bool = True, *args, **kwargs):
         schema_data = {}
         current_schema = LazyUserSchema.__fields__
         for field, vals in current_schema.items():
             schema_data[field] = (vals.type_, ...) if vals.required else (vals.type_, vals.default)
+        if not is_dev:
+            schema_data.pop('password')
         if not config:
             return schema_data
         new_schema = config if isinstance(config, dict) else config.dict(exclude_unset=True)
@@ -510,9 +537,10 @@ class LazyUserSchema(BaseModel):
     def get_hash_schema(cls):
         return {'password': 'hash_password'}
 
-class LazyDBBase(abc.ABC):
+class LazyDBBase:
     def __init__(self, dbcache: Any, config: LazyDBConfig):
         self.config = config
+        
         self.cache = dbcache
         self.alive = True
         self.lock = threading.RLock()
@@ -535,35 +563,41 @@ class LazyDBBase(abc.ABC):
     
     def setup_db_schema(self):
         self._db = {}
-        logger.info(f'Setting Up DB Schema')
+        self._base_schemas = {}
+        self.__class__.__name__ = 'LazyDB' if not self.config.dbname else f'{self.config.dbname}_LazyDB'
+        logger.info(f'Initializing {self.__class__.__name__}')
+        logger.info(f'[{self.dbname} Setup]: Setting Up DB Schema')
         if self.config.autouser:
-            logger.info(f'Creating Auto User Schema(s)')
+            logger.info(f'[{self.dbname} Setup]: Creating Auto User Schema(s)')
             if self.config.userconfigs:
                 for name, schema_config in self.config.userconfigs.items():
-                    schema = LazyUserSchema.get_schema(schema_config)
-                    self._db[name] = LazyDBIndex(name, schema, LazyUserSchema.get_hash_schema())
-                    logger.info(f'Creating Custom User Schema: {name}')
+                    schema = LazyUserSchema.get_schema(schema_config, is_dev=self.config.is_dev)
+                    self._db[name] = LazyDBIndex(name, schema, LazyUserSchema.get_hash_schema(), is_dev=self.config.is_dev)
+                    self._base_schemas[name] = self._db[name].schema
+                    logger.info(f'[{self.dbname} Setup]: Created Custom User Schema: {name}')
             else:
-                schema = LazyUserSchema.get_schema()
-                self._db['user'] = LazyDBIndex('user', schema, LazyUserSchema.get_hash_schema())
-                logger.info(f'Creating Default User Schema')
+                schema = LazyUserSchema.get_schema(is_dev=self.config.is_dev)
+                self._db['user'] = LazyDBIndex('user', schema, LazyUserSchema.get_hash_schema(), is_dev=self.config.is_dev)
+                self._base_schemas['user'] = self._db['user'].schema
+                logger.info(f'[{self.dbname} Setup]: Created Default User Schema')
 
         for name, schema in self.config.dbschema.items():
             hashschema = self.config.hashschema.get(name, None) if self.config.hashschema else None
-            self._db[name] = LazyDBIndex(name, schema, hashschema)
-            logger.info(f'New Schema Added for: {name}')
+            self._db[name] = LazyDBIndex(name, schema, hashschema, is_dev=self.config.is_dev)
+            self._base_schemas[name] = self._db[name].schema
+            logger.info(f'[{self.dbname} Setup]: Created DB Schema Added for: {name}')
     
     def migrate_db(self):
         if not self.config.seeddata:
-            logger.info('No SeedData Provided. Skipping Migration')
+            logger.info(f'[{self.dbname} Migrate]: No Seed Data Provided. Skipping Migration')
         for schema_name, index in  self._db.items():
             if index.idx == 0 and self.config.seeddata.get(schema_name):
-                logger.info(f'Running Migration for {schema_name}')
+                logger.info(f'[DB Migrate]: Running Migration for {schema_name}')
                 for item in self.config.seeddata[schema_name]:
                     i = self._db[schema_name].create(data=item)
-                    logger.info(f'Created Item [{schema_name}] = ID: {i.id}, DBID: {i.dbid}')
+                    logger.info(f'[{self.dbname} Migrate]: Created Item [{schema_name}] = ID: {i.uid}, DBID: {i.dbid}')
 
-        logger.info(f'Completed all Setup and Migration Tasks')
+        logger.info(f'[{self.dbname} Migrate]: Completed all Setup and Migration Tasks')
         self.save_db()
 
     def save_db(self):
@@ -573,22 +607,28 @@ class LazyDBBase(abc.ABC):
         dbdata = {'db': self._db, 'timer': self._alivetime, 'metrics': self.metrics}
         self.cache.save(dbdata)
 
+
+    # Create a Direct Accessible attribute
     def finalize_init(self):
         self.db = LazyAny(self._db)
-        # Create a Direct Accessible attribute
-        for name in self._db:
-            for method in ['get', 'create', 'remove', 'update']:
-                method_name = f'{name}_{method}'
-                method_func = (lambda method=method, *args, **kwargs: self._db[name](method=method, *args, **kwargs))
+        for name, index in self._db.items():
+            schema_name = f'{name}_schema'
+            setattr(self, schema_name, self._base_schemas[name])
+            for method_type in ['get', 'create', 'remove', 'update']:
+                method_name = f'{name}_{method_type}'
+                method_func = (lambda method_index=name, method_type=method_type, *args, **kwargs: self._db[method_index](method=method_type, *args, **kwargs))
                 setattr(self, method_name, method_func)
 
         self.env = LazyEnv
         if self.config.autosave:
-            self.env.enable_watcher()
-            self.t = threading.Thread(target=self.background)
-            self.t.start()
-            self.env.add_thread(self.t)
+            if self.env.is_threadsafe:
+                self.start_background()
+            else:
+                logger.warn(f'[{self.dbname} Finalize]: Currently not threadsafe. Call .start_background in main thread.')
 
+    @property
+    def dbname(self):
+        return self.__class__.__name__
     
     def validate_cls(self, clsname):
         return self._db.get(clsname, None)
@@ -613,8 +653,14 @@ class LazyDBBase(abc.ABC):
             return None
         return self._db[clsname].remove(*args, **kwargs)
     
+    def start_background(self):
+        self.env.enable_watcher()
+        self.t = threading.Thread(target=self.background, daemon=True)
+        self.t.start()
+        self.env.add_thread(self.t)
+    
     def background(self):
-        logger.info(f'DB AutoSaver Active. Saving Every: {self.config.savefreq} secs')
+        logger.info(f'[{self.dbname} Background]: DB AutoSaver Active. Saving Every: {self.config.savefreq} secs')
         microsleep = self.config.savefreq / 20
         while self.alive:
             for _ in range(20):
@@ -627,14 +673,16 @@ class LazyDBBase(abc.ABC):
             if not self.alive:
                 break
 
-    def __call__(self, clsname, method, *args, **kwargs):
+    def __call__(self, clsname, method, uid: int = None, dbid: str = None, *args, **kwargs):
         func = getattr(self, method)
-        return func(self, clsname, *args, **kwargs)
+        return func(self, clsname, uid=uid, dbid=dbid, *args, **kwargs)
 
 
 class LazyDB(LazyDBBase):
-    pass
+    def __init__(self, dbcache: Any, config: LazyDBConfig):
+        super().__init__(dbcache, config)
+    
 
 
-
+#LazyDBBase.register(LazyDB)
 
