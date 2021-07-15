@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from functools import partialmethod
 from typing import Optional, Any, Dict, List
-
+from .mp_utils import _CPU_CORES, _MAX_THREADS, _MAX_PROCS
 try:
     from google.colab import auth
     _colab = True
@@ -135,11 +135,15 @@ class EnvChecker:
     is_colab = _colab
     is_notebook = _notebook
     is_jpy = _notebook
+    cpu_cores = _CPU_CORES
+    max_threads = _MAX_THREADS
+    max_procs = _MAX_PROCS
     loggers: Optional[Dict[str, ThreadSafeHandler]] = {}
     handlers: Optional[Dict[str, Any]] = {}
     watcher_enabled: Optional[bool] = False
     threads: Optional[List[threading.Thread]] = []
     sigs: Optional[Dict[str, signal.signal]] = {}
+    
     
     @classmethod
     def get_logger(cls, name = 'LazyOps', *args, **kwargs):
@@ -186,7 +190,6 @@ class EnvChecker:
     def enable_watcher(cls):
         if EnvChecker.watcher_enabled:
             return
-        #if threading.current_thread() is threading.main_thread():
         EnvChecker.sigs['sigint'] = signal.signal(signal.SIGINT, EnvChecker.exit_handler)
         EnvChecker.sigs['sigterm'] = signal.signal(signal.SIGTERM, EnvChecker.exit_handler)
         EnvChecker.loggers['LazyWatch'] = EnvChecker.get_logger(name='LazyWatch')
@@ -197,9 +200,15 @@ class EnvChecker:
         EnvChecker.threads.append(t)
 
     @classmethod
+    def set_multiparams(cls, max_procs: int = None, max_threads: int = None):
+        if max_procs is not None: EnvChecker.max_procs = max_procs
+        if max_threads is not None: EnvChecker.max_threads = max_threads
+
+    @classmethod
     def add_exit_handler(cls, name, func):
         if name not in EnvChecker.handlers:
             EnvChecker.handlers[name] = func
+
 
     @classmethod
     def getset(cls, name, val=None, default=None, set_if_none=False):
@@ -218,7 +227,6 @@ class EnvChecker:
         if EnvChecker.watcher_enabled:
             if self.killed:
                 sys.exit(0)
-            #if threading.current_thread() is threading.main_thread():
             signal.signal(signal.SIGINT, EnvChecker.sigs['sigint'])
             signal.signal(signal.SIGTERM, EnvChecker.sigs['sigterm'])
         EnvChecker.set_dead()

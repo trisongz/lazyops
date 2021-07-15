@@ -13,6 +13,7 @@ from .models import LazyData, LazyTime, LazyDate, LazyFormatter, LazyTimer
 from .common import lazylibs, lazy_init, run_cmd, clone_repo, File
 from .utils import find_binary_in_path, timed_cache, latest_tf_ckpt, require_module
 from .utils import build_chunks, retryable, list_to_dict
+from .mp import lazy_parallelize, lazyproc, lazymultiproc, LazyProcs, LazyProc
 from .apis import LazyAPI, LazyAPIConfig
 
 lazyenv = LazyEnv
@@ -54,6 +55,11 @@ __all__ = [
     'lazyapi',
     'lazyapiconfig',
     'lazywatch',
-    'lazywatcher'
+    'lazywatcher',
+    'lazy_parallelize',
+    'lazyproc',
+    'lazymultiproc',
+    'LazyProcs',
+    'LazyProc'
 ]
 #from . import lazyrpc

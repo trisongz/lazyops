@@ -1,8 +1,10 @@
 import sys
 import asyncio
-from functools import lru_cache
+
 from ._base import *
 from ._base import _lazydb_logger, _lazydb_picker
+
+from lazyops import timed_cache
 
 logger = _lazydb_logger
 pkler = _lazydb_picker
@@ -227,7 +229,7 @@ class LazyDBIndex:
         self.schema_props = list(self.schema.schema()['properties'].keys())
         setattr(sys.modules[self.schema.__module__], self.schema.__name__, self.schema)
 
-    #@lru_cache(maxsize=50, typed=True)
+    @timed_cache(15, 512)
     def validate_idx(self, uid: int = None, dbid: str = None, *args, **kwargs):
         if uid is not None and self.index.get(uid):
             return uid
@@ -242,14 +244,14 @@ class LazyDBIndex:
             return self.lookup[dbid]
         return None
 
-    #@lru_cache(maxsize=50, typed=True)
+    @timed_cache(5)
     def get_by_id(self, uid: int = None, dbid: str = None, *args, **kwargs):
         idx = self.validate_idx(uid=uid, dbid=dbid, *args, **kwargs)
         if idx is None:
             return None
         return self.index.get(idx)
     
-    #@lru_cache(maxsize=50)
+    @timed_cache(15)
     def match_props(self, item, name, val, *args, **kwargs):
         item_data = jsonable_encoder(item)
         if not item_data.get(name):
@@ -286,7 +288,7 @@ class LazyDBIndex:
         
         return None
 
-    #@lru_cache(maxsize=50)
+    @timed_cache(5)
     def get(self, uid: int = None, dbid: str = None, props: Dict[str, Any] = None, *args, **kwargs):
         logger.info(f'[{self.index_name} Index]: GET Request for UID: {uid}: DBID: {dbid}, Props: {props}, args: {args}, kwargs: {kwargs}')
         return self.get_by_props(props=props, *args, **kwargs) if props is not None else self.get_by_id(uid=uid, dbid=dbid, *args, **kwargs)
@@ -682,7 +684,4 @@ class LazyDB(LazyDBBase):
     def __init__(self, dbcache: Any, config: LazyDBConfig):
         super().__init__(dbcache, config)
     
-
-
-#LazyDBBase.register(LazyDB)
 
