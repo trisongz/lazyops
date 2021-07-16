@@ -191,7 +191,6 @@ class LazyIOBase(object):
     def get_num_lines(self):
         return sum(1 for _ in File.tflines(self._filename))
 
-    @timed_cache(10)
     @property
     def filesize(self):
         self._ensure_open()
