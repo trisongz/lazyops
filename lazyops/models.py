@@ -251,3 +251,48 @@ class LazyTimer:
         if name not in LazyTimer.timers:
             LazyTimer.timers[name] = LazyTime(t=t, *args, **kwargs)
         return LazyTimer.timers[name]
+
+
+class LazyObject(dict):
+    def __init__(self, data, **kwargs):
+        for name, val in data.items():
+            self[name] = val
+        for name, val in kwargs.items():
+            self[name] = val
+
+    def getorset(self, name, value=None):
+        if name in self:
+            return self[name]
+        self[name] = value
+        return value
+
+    def getmany(self, names: List, return_first: bool = True):
+        results = {}
+        for name in names:
+            if name in self:
+                if return_first:
+                    return self[name]
+                results[name] = self[name]
+        return results
+
+    def __getattr__(self, name):
+        if name in self:
+            return self[name]
+        return None
+
+    def __setattr__(self, name, value):
+        self[name] = value
+
+    def __delattr__(self, name):
+        if name in self:
+            del self[name]
+    
+    @property
+    def keys(self):
+        return [k for k in self]
+
+    def __getitem__(self, key):
+        if isinstance(key, int):
+            name = self.keys[key]
+            return self[name]
+        return self[key]

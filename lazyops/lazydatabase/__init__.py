@@ -1,26 +1,29 @@
-from .schema import (
+from .backends import (
     LazyDBCacheBase,
     PklDBCache,
-    LazyDBIndex,
+)
+
+from .core import (
+    LazyDBModel, 
     LazyDBConfig,
     LazyDBBase,
     LazyDB
 )
 
-pkldb_cache = PklDBCache
-lazydb_index = LazyDBIndex
+pkldb_backend = PklDBCache
+lazydb_model = LazyDBModel
 lazydb_config = LazyDBConfig
 lazydb = LazyDB
 
 __all__ = [
     'LazyDBCacheBase',
     'PklDBCache',
-    'LazyDBIndex',
+    'LazyDBModel',
     'LazyDBConfig',
     'LazyDBBase',
     'LazyDB',
-    'pkldb_cache',
-    'lazydb_index',
+    'pkldb_backend',
+    'lazydb_model',
     'lazydb_config',
     'lazydb'
 ]

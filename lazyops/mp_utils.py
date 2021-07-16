@@ -4,7 +4,7 @@ import fileio
 import collections
 import platform
 import multiprocessing as multiproc
-
+import random
 from functools import reduce
 from itertools import chain, count, islice, takewhile
 
@@ -17,8 +17,6 @@ _MAX_THREADS = math.ceil(_CPU_CORES * 2)
 _SERIALIZER = fileio.src._pickler
 _PROTOCOL = _SERIALIZER.HIGHEST_PROTOCOL
 
-if platform.system() == "Darwin":
-    multiproc.set_start_method('spawn')
 
 
 def is_primitive(val):
@@ -163,3 +161,9 @@ def compose(*functions):
     :return: Single composed function
     """
     return reduce(lambda f, g: lambda x: f(g(x)), functions, lambda x: x)
+
+if __name__ == '__main__':
+    if platform.system() == "Darwin":
+        n = multiproc.get_context()
+        print(n)
+        multiproc.set_start_method('spawn')

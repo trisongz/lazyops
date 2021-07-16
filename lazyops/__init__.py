@@ -9,7 +9,7 @@ lazyops_root = os.path.abspath(os.path.dirname(__file__))
 from .lazyclasses import lazyclass
 
 from .envs import LazyEnv, get_logger, lazywatcher, lazywatch
-from .models import LazyData, LazyTime, LazyDate, LazyFormatter, LazyTimer
+from .models import LazyData, LazyTime, LazyDate, LazyFormatter, LazyTimer, LazyObject
 from .common import lazylibs, lazy_init, run_cmd, clone_repo, File
 from .utils import find_binary_in_path, timed_cache, latest_tf_ckpt, require_module
 from .utils import build_chunks, retryable, list_to_dict
@@ -38,6 +38,7 @@ __all__ = [
     'LazyDate',
     'LazyFormatter',
     'LazyTimer',
+    'LazyObject',
     'lazylibs',
     'lazy_init',
     'run_cmd',

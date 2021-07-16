@@ -2,12 +2,16 @@ import os
 import sys
 from setuptools import setup, find_packages
 
-version = '0.0.5'
+version = '0.0.6'
 binary_names = ['lazyops']
 pkg_name = 'lazyops'
 
 root = os.path.abspath(os.path.dirname(__file__))
-packages = find_packages(include=[pkg_name, "{}.*".format(pkg_name)])
+packages = find_packages(
+        include=[
+            pkg_name, "{}.*".format(pkg_name)
+        ]
+    )
 
 
 deps = {

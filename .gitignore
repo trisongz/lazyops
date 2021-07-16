@@ -10,3 +10,4 @@ build.sh
 *test.py
 *.egg-info*
 *.vscode
+*test_ops

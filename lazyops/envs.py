@@ -90,7 +90,9 @@ class LazyOpsLogger:
         logger.propagate = self.config.get('propagate', False)
         return logger
 
-    def get_logger(self):
+    def get_logger(self, module=None):
+        if module:
+            return self.logger.getChild(module)
         return self.logger
     
     def debug(self, msg, *args, **kwargs):
@@ -122,7 +124,7 @@ def setup_new_logger(name, log_level='info', quiet_loggers=None, clear_handlers=
         'logfile_file': None,
         'logfile_log_level': "debug",
         'logfile_log_color': False,
-        'log_line_template': f"%(color_on)s[{name}] %(funcName)-5s%(color_off)s: %(message)s",
+        'log_line_template': f"%(color_on)s[{name}] %(name)-5s %(funcName)-5s%(color_off)s: %(message)s",
         'clear_handlers': clear_handlers,
         'quiet_loggers': quiet_loggers,
         'propagate': propagate
@@ -146,9 +148,11 @@ class EnvChecker:
     
     
     @classmethod
-    def get_logger(cls, name = 'LazyOps', *args, **kwargs):
+    def get_logger(cls, name = 'LazyOps', module=None, *args, **kwargs):
         if not EnvChecker.loggers.get(name):
             EnvChecker.loggers[name] = ThreadSafeHandler()
+        if module:
+            return EnvChecker.loggers[name].get(setup_new_logger, name=name, *args, **kwargs).get_logger(module=module)
         return EnvChecker.loggers[name].get(setup_new_logger, name=name, *args, **kwargs)
     
     @property

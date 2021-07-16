@@ -8,7 +8,10 @@ from lazyops.lazyclasses import lazyclass
 
 from typing import List, Dict, Any, Optional
 
-async def async_req(sess, url, method='POST', decode_json=True, with_url=False, *args, **kwargs):
+
+
+async def async_req(url, method='POST', decode_json=True, with_url=False, sess=None, headers=None, *args, **kwargs):
+    if not sess: sess = await aiohttp.ClientSession(headers=headers)
     async with sess.request(method, url=url, *args, **kwargs) as resp:
         data = await resp.json() if decode_json else await resp
         if not with_url:
