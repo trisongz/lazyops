@@ -36,17 +36,21 @@ class Article:
         if self.extracted:
             return
         _init_newsplease()
-        data = _NP.from_url(self.url)
-        self.title = data.title
-        self.description = data.description
-        self.image_url = data.image_url
-        self.language = data.language
-        self.domain = data.source_domain
-        self.text = data.maintext
-        self.authors = data.authors
-        self.date_publish = data.date_publish
-        self.date_modify = data.date_modify
-        self.extracted = True
+        try:
+            data = _NP.from_url(self.url)
+            self.title = data.title
+            self.description = data.description
+            self.image_url = data.image_url
+            self.language = data.language
+            self.domain = data.source_domain
+            self.text = data.maintext
+            self.authors = data.authors
+            self.date_publish = data.date_publish
+            self.date_modify = data.date_modify
+            self.extracted = True
+        except Exception as e:
+            logger.error(f'Error Parsing URL: {self.url}.\n{str(e)}')
+
 
 
 @lazyclass
@@ -68,11 +72,13 @@ class GDELTArticle:
             return
         self.extraction = Article(url=self.url)
         self.extraction._run()
-        self.text = self.extraction.text
+        if self.extraction.extracted:
+            self.text = self.extraction.text
     
     async def async_parse(self):
         if self.extraction is not None:
             return
         self.extraction = Article(url=self.url)
         self.extraction._run()
-        self.text = self.extraction.text
+        if self.extraction.extracted:
+            self.text = self.extraction.text
