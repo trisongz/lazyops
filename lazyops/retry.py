@@ -4,9 +4,10 @@ import time
 import traceback
 import random
 
-# sys.maxint / 2, since Python 3.2 doesn't have a sys.maxint...
+# Borrowed from https://github.com/rholder/retrying
+
 MAX_WAIT = 1073741823
-# https://github.com/rholder/retrying/blob/master/retrying.py
+
 def _retry_if_exception_of_type(retryable_types):
     def _retry_if_exception_these_types(exception):
         return isinstance(exception, retryable_types)
@@ -72,11 +73,9 @@ class Retrying(object):
         # TODO add chaining of stop behaviors
         # stop behavior
         stop_funcs = []
-        if stop_max_attempt_number is not None:
-            stop_funcs.append(self.stop_after_attempt)
+        if stop_max_attempt_number is not None: stop_funcs.append(self.stop_after_attempt)
 
-        if stop_max_delay is not None:
-            stop_funcs.append(self.stop_after_delay)
+        if stop_max_delay is not None: stop_funcs.append(self.stop_after_delay)
 
         if stop_func is not None:
             self.stop = stop_func
@@ -90,17 +89,13 @@ class Retrying(object):
         # TODO add chaining of wait behaviors
         # wait behavior
         wait_funcs = [lambda *args, **kwargs: 0]
-        if wait_fixed is not None:
-            wait_funcs.append(self.fixed_sleep)
+        if wait_fixed is not None: wait_funcs.append(self.fixed_sleep)
 
-        if wait_random_min is not None or wait_random_max is not None:
-            wait_funcs.append(self.random_sleep)
+        if wait_random_min is not None or wait_random_max is not None: wait_funcs.append(self.random_sleep)
 
-        if wait_incrementing_start is not None or wait_incrementing_increment is not None:
-            wait_funcs.append(self.incrementing_sleep)
+        if wait_incrementing_start is not None or wait_incrementing_increment is not None: wait_funcs.append(self.incrementing_sleep)
 
-        if wait_exponential_multiplier is not None or wait_exponential_max is not None:
-            wait_funcs.append(self.exponential_sleep)
+        if wait_exponential_multiplier is not None or wait_exponential_max is not None: wait_funcs.append(self.exponential_sleep)
 
         if wait_func is not None:
             self.wait = wait_func
@@ -118,9 +113,7 @@ class Retrying(object):
             # this allows for providing a tuple of exception types that
             # should be allowed to retry on, and avoids having to create
             # a callback that does the same thing
-            if isinstance(retry_on_exception, (tuple)):
-                retry_on_exception = _retry_if_exception_of_type(
-                    retry_on_exception)
+            if isinstance(retry_on_exception, (tuple)): retry_on_exception = _retry_if_exception_of_type(retry_on_exception)
             self._retry_on_exception = retry_on_exception
 
         # retry on result filter
@@ -158,19 +151,15 @@ class Retrying(object):
         wait_incrementing_start and incrementing by wait_incrementing_increment
         """
         result = self._wait_incrementing_start + (self._wait_incrementing_increment * (previous_attempt_number - 1))
-        if result > self._wait_incrementing_max:
-            result = self._wait_incrementing_max
-        if result < 0:
-            result = 0
+        result = min(result, self._wait_incrementing_max)
+        result = max(result, 0)
         return result
 
     def exponential_sleep(self, previous_attempt_number, delay_since_first_attempt_ms):
         exp = 2 ** previous_attempt_number
         result = self._wait_exponential_multiplier * exp
-        if result > self._wait_exponential_max:
-            result = self._wait_exponential_max
-        if result < 0:
-            result = 0
+        result = min(result, self._wait_exponential_max)
+        result = max(result, 0)
         return result
 
     @staticmethod
@@ -194,8 +183,7 @@ class Retrying(object):
         start_time = int(round(time.time() * 1000))
         attempt_number = 1
         while True:
-            if self._before_attempts:
-                self._before_attempts(attempt_number)
+            if self._before_attempts: self._before_attempts(attempt_number)
 
             try:
                 attempt = Attempt(fn(*args, **kwargs), attempt_number, False)
@@ -206,8 +194,7 @@ class Retrying(object):
             if not self.should_reject(attempt):
                 return attempt.get(self._wrap_exception)
 
-            if self._after_attempts:
-                self._after_attempts(attempt_number)
+            if self._after_attempts: self._after_attempts(attempt_number)
 
             delay_since_first_attempt_ms = int(round(time.time() * 1000)) - start_time
             if self.stop(attempt_number, delay_since_first_attempt_ms):
@@ -243,13 +230,13 @@ class Attempt(object):
         If wrap_exception is true, this Attempt is wrapped inside of a
         RetryError before being raised.
         """
-        if self.has_exception:
-            if wrap_exception:
-                raise RetryError(self)
-            else:
-                six.reraise(self.value[0], self.value[1], self.value[2])
-        else:
+        if not self.has_exception:
             return self.value
+
+        if wrap_exception:
+            raise RetryError(self)
+        else:
+            six.reraise(self.value[0], self.value[1], self.value[2])
 
     def __repr__(self):
         if self.has_exception:

@@ -35,6 +35,7 @@ class LazyProcs:
         else:
             LazyProcs.inactive_procs[proc.name] = process
         LazyProcs.set_state()
+        return process
     
     @classmethod
     def kill_proc(cls, name: str):
@@ -61,17 +62,21 @@ def lazyproc(name: str = 'lazyproc', start: bool = True, daemon: bool = False):
     def wrapper_proc(func):
         def wrapped_proc(*args, **kwargs):
             proc = LazyProc(name, start=start, daemon=daemon, *args, **kwargs)
-            LazyProcs.add_proc(proc)
-            return func(*args, **kwargs)
+            proc = LazyProcs.add_proc(proc)
+            return proc
+            #return func(*args, **kwargs)
         return wrapped_proc
     return wrapper_proc
 
-def lazymultiproc(dataset = None, dataset_var: str = None, num_procs: int = 10):
+def lazymultiproc(dataset = None, dataset_callable = None, dataset_var: str = None, num_procs: int = 10):
     def wrapper_multiproc(func):
         def wrapped_parallelize(*args, **kwargs):
-            datavar = dataset or kwargs.get(dataset_var)
-            if datavar:
-                yield from lazy_parallelize(func, processes=num_procs, result=dataset, *args, **kwargs)
+            if dataset_callable:
+                yield from lazy_parallelize(func, processes=num_procs, result=dataset_callable(*args, **kwargs), *args, **kwargs)
+            else:
+                datavar = dataset or kwargs.get(dataset_var)
+                if datavar:
+                    yield from lazy_parallelize(func, processes=num_procs, result=dataset, *args, **kwargs)
             return func(*args, **kwargs)
         return wrapped_parallelize
     return wrapper_multiproc

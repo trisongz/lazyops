@@ -19,6 +19,7 @@ class GDELT:
     available_modes = ["artlist", "timelinevol", "timelinevolraw", "timelinetone", "timelinelang", "timelinesourcecountry"]
 
     def __init__(self, result_format: GDELTFormat = GDELTFormat.obj, json_parsing_max_depth: int = 100, *args, **kwargs) -> None:
+        if isinstance(result_format, str): result_format = GDELTFormat[result_format]
         self.max_depth_json_parsing = json_parsing_max_depth
         self._output_format = result_format
         self.sess = LazySession()

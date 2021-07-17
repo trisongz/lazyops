@@ -57,7 +57,7 @@ def lazy_init(name, lib_name=None, force=False, latest=False, verbose=False):
     return lazy_import(lib_name or name)
 
 
-def clone_repo(repo, path=None, absl=False):
+def clone_repo(repo, path=None, absl=False, add_to_syspath=True):
     path = path or ('/content' if LazyEnv.is_colab else File.curdir())
     if isinstance(repo, str): repo = repo.split(',')
     assert isinstance(repo, list), f'Repo must be a list or string: {type(repo)}'
@@ -70,6 +70,8 @@ def clone_repo(repo, path=None, absl=False):
             run_cmd(f'git clone {r} {clonepath}')
         except Exception as e:
             logger.error(f'Error Cloning {r}: {str(e)}')
+        if add_to_syspath:
+            sys.path.append(clonepath)
 
 
 @dataclass
