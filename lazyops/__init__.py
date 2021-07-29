@@ -16,7 +16,7 @@ from .utils import find_binary_in_path, timed_cache, latest_tf_ckpt, require_mod
 from .utils import build_chunks, retryable, list_to_dict
 from .mp import lazy_parallelize, lazyproc, lazymultiproc, LazyProcs, LazyProc
 from .apis import LazyAPI, LazyAPIConfig
-from .lazyio import LazyHFModel
+
 
 lazyenv = LazyEnv
 lazyitem = LazyData
@@ -30,6 +30,7 @@ fio = File
 lazyapi = LazyAPI
 lazyapiconfig = LazyAPIConfig
 
+from .lazyio import LazyHFModel
 
 __all__ = [
     'lazyclass',
