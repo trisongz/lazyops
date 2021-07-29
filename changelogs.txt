@@ -1,0 +1,3 @@
+v0.0.8 - July 28, 2021
+
+- Add API for LazyHFModel

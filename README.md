@@ -68,6 +68,11 @@ query dates easier `5 days ago`.
 
 ### LazyOps API Usage
 
+WIP often means documentation itself is WIP, while module is fully functional. 
+Feel free to dig into the source code or try it out in examples.
+
+Unfortunately documentation doesn't write itself... yet. And well. Lazyiness.
+
 - [LazyOps Core](#lazyops-core)
 - [LazyClassses](#lazyclasses)
 - [LazyAPI](#lazyapi)

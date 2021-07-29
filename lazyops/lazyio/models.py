@@ -503,6 +503,7 @@ class LazyIOPickle(LazyIOBase):
     
 
 LazyIOType = TypeVar("LazyIOType", str, LazyIOBase, LazyIOText, LazyIOJson, LazyIOJsonLines, LazyIOPickle)
+LazyIOPathLike = TypeVar("LazyIOPathLike", Union[str, gfile], Union[str, os.PathLike])
 
 class LazyIOMultiFile:    
     def __init__(
@@ -516,3 +517,172 @@ class LazyIOMultiFile:
                 pass
         pass
 
+# from transformers import AutoModelForSeq2SeqLM
+# model_dir = 'gs://xyz/path/'
+# pretrained_model = 't5-base'
+
+# loader = LazyHFModel(AutoModelForSeq2SeqLM, pretrained_model, model_dir, model_name=None, is_base_dir=True)
+# loader.load_model()
+# model = loader.model
+
+
+class LazyHFModel:
+    def __init__(self, model_cls, base_model: str, model_dir: Optional[str] = None, model_name: Optional[str] = None, is_base_dir: Optional[bool] = True, **kwargs):
+        self.model_cls = model_cls
+        self.base_model = base_model
+        self.base_dir = model_dir
+        self.is_base_dir = is_base_dir
+        if model_dir:
+            if not model_name: model_name = base_model.split('/', 1)[-1].strip()
+            self.model_dir = model_dir if not self.is_base_dir else File.join(model_dir, model_name)
+            File.makedirs(self.model_dir)
+        else:
+            self.model_dir = None
+        self._config = None
+        self._model = None
+        self._model_config_file = None
+        self._model_ckpt_file = None
+        self.kwargs = kwargs
+        self.logger = get_logger('LazyIO', module='HFModel')
+        self._testlib()
+
+    @property
+    def model_ckpt(self):
+        if not self.model_dir:
+            return None
+        if not self._model_ckpt_file:
+            for ckpt in ['model.bin', 'pytorch_model.bin']:
+                model_ckpt = File.join(self.model_dir, ckpt)
+                if File.exists(model_ckpt):
+                    self._model_ckpt_file = model_ckpt
+                    return self._model_ckpt_file
+            self._model_ckpt_file = File.join(self.model_dir, 'pytorch_model.bin')
+        return self._model_ckpt_file
+
+    @property
+    def model_exists(self):
+        return self.model_ckpt and File.exists(self.model_ckpt)
+
+    @property
+    def model_config_file(self):
+        if not self.model_dir:
+            return None
+        if not self._model_config_file:
+            for fname in ['config.json', 'model_config.json', 'model.json']:
+                config_path = File.join(self.model_dir, fname)
+                if File.exists(config_path):
+                    self._model_config_file = config_path
+                    return self._model_config_file
+        self._model_config_file = File.join(self.model_dir, 'config.json')
+        return self._model_config_file
+
+
+    @property
+    def model(self):
+        if self._model is None:
+            self.load_model()
+        return self._model
+    
+    @property
+    def config(self):
+        if self._config is None:
+            from transformers import AutoConfig
+            cfg_cls = AutoConfig.from_pretrained(self.base_model)
+            if self.model_exists and self.model_config_file:
+                self._config = cfg_cls.from_dict(File.jsonload(self.model_config_file))
+            else:
+                self._config = cfg_cls
+        return self._config
+
+    def save_model(self, model_name=None, save_config=True, state_dict=None):
+        # Wrapper function around HF Save
+        from transformers.modeling_utils import unwrap_model, get_parameter_dtype
+        model_ckpt = File.mod_fname(self.model_ckpt, model_name, ext='bin') if model_name else self.model_ckpt
+        model_to_save = unwrap_model(self._model)
+        dtype = get_parameter_dtype(model_to_save)
+        model_to_save.config.torch_dtype = str(dtype).split(".")[1]
+
+        # Attach architecture to the config
+        model_to_save.config.architectures = [model_to_save.__class__.__name__]
+        if save_config:
+            File.jsondump(model_to_save.config.to_dict(), self.model_config_file)
+        
+        if state_dict is None:
+            state_dict = model_to_save.state_dict()
+
+        if self._model._keys_to_ignore_on_save is not None:
+            state_dict = {k: v for k, v in state_dict.items() if k not in self._model._keys_to_ignore_on_save}
+        
+        File.torchsave(state_dict, model_ckpt)
+        self.logger.info(f'Saved Model: {model_to_save.__class__.__name__} to {model_ckpt}')
+
+
+    def load_model(self, cache=True, device=None):
+        device = device or self.get_device()
+        if self.model_exists:
+            state_dict = File.torchload(self.model_ckpt, device=device)
+            self._model = self.model_cls.from_pretrained(pretrained_model_name_or_path=None, state_dict=state_dict, config=self.config, **self.kwargs)
+            self.logger.info(f'Loaded Model: {self._model.__class__.__name__} from Ckpt: {self.model_ckpt}')
+        else:
+            self._model = self.model_cls.from_pretrained(pretrained_model_name_or_path=self.base_model, config=self.config, **self.kwargs)
+            self.logger.info(f'Loaded Model: {self._model.__class__.__name__} from Pretrained: {self.base_model}')
+            if cache:
+                self.save_model()
+    
+    def load_pipeline(self, task_name='sentiment-analysis', tokenizer=None, device='auto'):
+        from transformers import AutoTokenizer, pipeline
+        device_id = device
+        if device == 'auto':
+            device_id = -1 if self.get_device().type == 'cpu' else 0
+        if tokenizer:
+            tokenizer = AutoTokenizer.from_pretrained(tokenizer) if isinstance(tokenizer, str) else tokenizer
+        else:
+            tokenizer = AutoTokenizer.from_pretrained(self.base_model)
+        return pipeline(task=task_name, model=self.model, tokenizer=tokenizer, device=device_id)
+        
+    def _testlib(self):
+        try:
+            import transformers
+        except ImportError:
+            raise ValueError
+
+    def reset(self):
+        import torch
+        torch.cuda.empty_cache()
+        self._config = None
+        self._model = None
+        self._model_config_file = None
+        self._model_ckpt_file = None
+
+    @classmethod
+    def get_device(cls):
+        from fileio import torchdevice
+        return torchdevice
+    
+
+'''
+
+        # tokenizers is a mess so not supporting.
+        #self._init_tokenzer = init_tokenizer
+        #self._tokenizer = None
+        #self._tokenizer_file = None
+    @property
+    def tokenizer(self):
+        return self._tokenizer
+@property
+def tokenizer_file(self):
+    if not self.model_dir:
+        return None
+    if not self._tokenizer_file:
+        for tknzer in ['tokenizer.json', 'vocab.json']:
+            tknzer_file = File.join(self.model_dir, tknzer)
+            if File.exists(tknzer_file):
+                self._tokenizer_file = tknzer_file
+                return self._tokenizer_file
+        self._tokenizer_file = File.join(self.model_dir, 'tokenizer.json')
+    return self._tokenizer_file
+
+@property
+def tokenizer_exists(self):
+    return self.model_ckpt and File.exists(self.tokenizer_file)
+'''

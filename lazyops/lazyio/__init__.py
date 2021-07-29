@@ -7,6 +7,7 @@ from .models import (
     LazyIOJsonLines,
     LazyIOPickle,
     LazyIOType,
+    LazyHFModel,
 )
 
 
@@ -32,6 +33,7 @@ __all__ = [
     'LazyIOJsonLines',
     'LazyIOPickle',
     'LazyIOType',
+    'LazyHFModel',
     'lazypickler',
     'lazypkler',
     'lazyjson',
