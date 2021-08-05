@@ -2,7 +2,7 @@ import os
 import sys
 from setuptools import setup, find_packages
 
-version = '0.0.90'
+version = '0.0.91'
 binary_names = ['lazyops']
 pkg_name = 'lazyops'
 
