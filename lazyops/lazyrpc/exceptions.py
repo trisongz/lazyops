@@ -1,5 +1,6 @@
 from ._base import *
 from .models import component_name, rename_if_scope_child_component
+from fastapi import status
 
 class BaseError(Exception):
     CODE = None
@@ -158,33 +159,38 @@ class ErrorModel(BaseModel):
 
 class ParseError(BaseError):
     """Invalid JSON was received by the server"""
-    CODE = -32700
+    CODE = status.HTTP_422_UNPROCESSABLE_ENTITY
+    #CODE = -32700
     MESSAGE = "Parse error"
 
 
 class InvalidRequest(BaseError):
     """The JSON sent is not a valid Request object"""
-    CODE = -32600
+    #CODE = -32600
+    CODE = status.HTTP_400_BAD_REQUEST
     MESSAGE = "Invalid Request"
     error_model = ErrorModel
 
 
 class MethodNotFound(BaseError):
     """The method does not exist / is not available"""
-    CODE = -32601
+    #CODE = -32601
+    CODE = status.HTTP_405_METHOD_NOT_ALLOWED
     MESSAGE = "Method not found"
 
 
 class InvalidParams(BaseError):
     """Invalid method parameter(s)"""
-    CODE = -32602
+    #CODE = -32602
+    CODE = status.HTTP_424_FAILED_DEPENDENCY
     MESSAGE = "Invalid params"
     error_model = ErrorModel
 
 
 class InternalError(BaseError):
     """Internal JSON-RPC error"""
-    CODE = -32603
+    #CODE = -32603
+    CODE = status.HTTP_500_INTERNAL_SERVER_ERROR
     MESSAGE = "Internal error"
 
 
@@ -196,10 +202,19 @@ def errors_responses(errors: Sequence[Type[BaseError]] = None):
     if errors:
         cnt = 1
         for error_cls in errors:
-            responses[f'200{" " * cnt}'] = {
+            #responses[404] = {
+            #    'model': error_cls.get_resp_model(),
+            #    'description': error_cls.get_description(),
+            #}
+            responses[error_cls.CODE] = {
                 'model': error_cls.get_resp_model(),
                 'description': error_cls.get_description(),
             }
+            
+            #responses[f'200{" " * cnt}'] = {
+            #    'model': error_cls.get_resp_model(),
+            #    'description': error_cls.get_description(),
+            #}
             cnt += 1
     return responses
 

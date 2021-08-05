@@ -89,7 +89,8 @@ class JsonRpcContext:
         http_request: Request,
         background_tasks: BackgroundTasks,
         http_response: Response,
-        json_rpc_request_class: Type[JsonRpcRequest] = JsonRpcRequest
+        json_rpc_request_class: Type[JsonRpcRequest] = JsonRpcRequest,
+        method_route: Optional['MethodRoute'] = None,
     ):
         self.entrypoint: Entrypoint = entrypoint
         self.raw_request: Any = raw_request
@@ -97,6 +98,7 @@ class JsonRpcContext:
         self.background_tasks: BackgroundTasks = background_tasks
         self.http_response: Response = http_response
         self.request_class: Type[JsonRpcRequest] = json_rpc_request_class
+        self.method_route: Optional[MethodRoute] = method_route
         self._raw_response: Optional[dict] = None
         self.exception: Optional[Exception] = None
         self.is_unhandled_exception: bool = False
@@ -142,6 +144,8 @@ class JsonRpcContext:
     async def __aenter__(self):
         assert self.exit_stack is None
         self.exit_stack = await AsyncExitStack().__aenter__()
+        if sentry_sdk is not None:
+            self.exit_stack.enter_context(self._fix_sentry_scope())
         await self.exit_stack.enter_async_context(self._handle_exception(reraise=False))
         self.jsonrpc_context_token = _jsonrpc_context.set(self)
         return self
@@ -173,6 +177,23 @@ class JsonRpcContext:
 
         if self.exception is not None and self.is_unhandled_exception:
             logger.exception(str(self.exception), exc_info=self.exception)
+
+    def _make_sentry_event_processor(self):
+        def event_processor(event, _):
+            if self.method_route is not None:
+                event['transaction'] = sentry_transaction_from_function(self.method_route.func)
+            return event
+
+        return event_processor
+
+    @contextmanager
+    def _fix_sentry_scope(self):
+        hub = sentry_sdk.Hub.current
+        with sentry_sdk.Hub(hub) as hub:
+            with hub.configure_scope() as scope:
+                scope.clear_breadcrumbs()
+                scope.add_event_processor(self._make_sentry_event_processor())
+                yield
 
     async def enter_middlewares(self, middlewares: Sequence['JsonRpcMiddleware']):
         for mw in middlewares:
@@ -354,6 +375,7 @@ class MethodRoute(APIRoute):
     ) -> dict:
         async with JsonRpcContext(
             entrypoint=self.entrypoint,
+            method_route=self,
             raw_request=req,
             http_request=http_request,
             background_tasks=background_tasks,
@@ -714,6 +736,7 @@ class EntrypointRoute(APIRoute):
         for route in self.entrypoint.routes:  # type: MethodRoute
             match, child_scope = route.matches(http_request_shadow.scope)
             if match == Match.FULL:
+                ctx.method_route = route
                 # http_request is a transport layer and it is common for all JSON-RPC requests in a batch
                 return await route.handle_req(
                     http_request_shadow, background_tasks, sub_response, ctx,
@@ -823,6 +846,7 @@ class Entrypoint(APIRouter):
         **kwargs,
     ) -> None:
         name = name or func.__name__
+        #name = self.entrypoint_route.name + ' - ' + (name or func.__name__)
         route = self.method_route_class(
             self,
             self.entrypoint_route.path + '/' + name,

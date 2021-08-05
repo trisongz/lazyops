@@ -188,7 +188,7 @@ class EnvChecker:
             for thread in EnvChecker.threads:
                 thread.join()
         EnvChecker.set_dead()
-        #sys.exit(0)
+        sys.exit(0)
 
     @classmethod
     def enable_watcher(cls):

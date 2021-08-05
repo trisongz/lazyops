@@ -2,7 +2,7 @@ import os
 import sys
 from setuptools import setup, find_packages
 
-version = '0.0.81'
+version = '0.0.9'
 binary_names = ['lazyops']
 pkg_name = 'lazyops'
 
@@ -20,6 +20,7 @@ deps = {
         'requests',
         'dateparser',
         'aiohttp',
+        'asgiref',
         'six'
     ]
 }

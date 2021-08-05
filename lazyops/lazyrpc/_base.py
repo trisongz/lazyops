@@ -15,7 +15,7 @@ from collections import ChainMap
 from json import JSONDecodeError
 from types import FunctionType, CoroutineType
 from typing import List, Union, Any, Callable, Type, Optional, Dict, Sequence, Awaitable, Tuple
-from contextlib import AsyncExitStack, AbstractAsyncContextManager, asynccontextmanager
+from contextlib import AsyncExitStack, AbstractAsyncContextManager, asynccontextmanager, contextmanager
 
 # noinspection PyProtectedMember
 from pydantic import DictError
@@ -64,6 +64,13 @@ except ImportError:
                 return self
             value = obj.__dict__[self.func.__name__] = self.func(obj)
             return value
+
+try:
+    import sentry_sdk
+    from sentry_sdk.utils import transaction_from_function as sentry_transaction_from_function
+except ImportError:
+    sentry_sdk = None
+    sentry_transaction_from_function = None
 
 def sjson_loads(data, *args, **kwargs):
     try:

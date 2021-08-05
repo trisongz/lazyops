@@ -1,4 +1,5 @@
 from .models import (
+    LazyFile,
     LazyJson,
     LazyPickler,
     LazyIOBase,
@@ -8,6 +9,9 @@ from .models import (
     LazyIOPickle,
     LazyIOType,
     LazyHFModel,
+    gfile,
+    File,
+    json,
 )
 
 
@@ -15,7 +19,8 @@ lazypickler = LazyPickler
 lazypkler = LazyPickler
 lazyjson = LazyJson
 
-lazyfile = LazyIOBase
+#lazyfile = LazyIOBase
+lazyfile = LazyFile
 lazyiojson = LazyIOJson
 lazyjsonlines = LazyIOJsonLines
 lazyjlines = LazyIOJsonLines
@@ -25,6 +30,7 @@ lazypkl = LazyIOPickle
 
 
 __all__ = [
+    'LazyFile',
     'LazyJson',
     'LazyPickler',
     'LazyIOBase',
@@ -43,6 +49,9 @@ __all__ = [
     'lazyjlines',
     'lazyjl',
     'lazypickle',
-    'lazypkl'
+    'lazypkl',
+    'File',
+    'gfile',
+    'json'
 ]
 

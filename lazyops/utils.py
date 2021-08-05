@@ -1,10 +1,17 @@
 import os
 import sys
+from uuid import uuid4
 from datetime import datetime, timedelta
 from functools import lru_cache, wraps
 from lazyops.models import LazyData
 from lazyops.common import lazy_import, lazylibs
 from lazyops.retry import retryable
+
+def create_uuid(name=None, sep='-', strip=False):
+    uid = str(uuid4())
+    if name: uid = name + sep + uid
+    if strip: uid.replace(sep, '').strip().replace('-', '').strip()
+    return uid
 
 def latest_tf_ckpt(model_path):
     ckpt_mtg = lazy_import('tensorflow.python.training.checkpoint_management')

@@ -1,3 +1,4 @@
+from lazyops.cache.asyncish import lazy_async
 import os
 import warnings
 
@@ -13,8 +14,8 @@ from .envs import LazyEnv, get_logger, lazywatcher, lazywatch
 from .models import LazyData, LazyTime, LazyDate, LazyFormatter, LazyTimer, LazyObject
 from .common import lazylibs, lazy_init, run_cmd, clone_repo, File
 from .utils import find_binary_in_path, timed_cache, latest_tf_ckpt, require_module
-from .utils import build_chunks, retryable, list_to_dict
-from .mp import lazy_parallelize, lazyproc, lazymultiproc, LazyProcs, LazyProc
+from .utils import build_chunks, retryable, list_to_dict, create_uuid
+from .mp import lazy_parallelize, lazyproc, lazymultiproc, LazyProcs, LazyProc, async_to_sync
 from .apis import LazyAPI, LazyAPIConfig
 
 
@@ -29,6 +30,7 @@ ddate = LazyDate.date
 fio = File
 lazyapi = LazyAPI
 lazyapiconfig = LazyAPIConfig
+lazy_async = async_to_sync
 
 from .lazyio import LazyHFModel
 
@@ -65,6 +67,8 @@ __all__ = [
     'lazyproc',
     'lazymultiproc',
     'LazyProcs',
-    'LazyProc'
+    'LazyProc',
+    'lazy_async',
+    'async_to_sync'
 ]
 #from . import lazyrpc
