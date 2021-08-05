@@ -1,4 +1,3 @@
-from lazyops.cache.asyncish import lazy_async
 import os
 import warnings
 
