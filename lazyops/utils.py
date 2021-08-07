@@ -1,5 +1,7 @@
 import os
 import sys
+import asyncio
+import threading
 from uuid import uuid4
 from datetime import datetime, timedelta
 from functools import lru_cache, wraps
@@ -86,3 +88,52 @@ def require_module(name, *args, **kwargs):
             return f(*args, **kwargs)
         return wrapper
     return decorator
+
+class AsyncCacheable:
+    def __init__(self, co):
+        self.co = co
+        self.done = False
+        self.result = None
+        self.lock = asyncio.Lock()
+
+    def __await__(self):
+        with (yield from self.lock):
+            if self.done:
+                return self.result
+            self.result = yield from self.co.__await__()
+            self.done = True
+            return self.result
+
+class AsyncThreadSafeCacheable:
+    def __init__(self, co):
+        self.co = co
+        self.done = False
+        self.result = None
+        self.lock = threading.Lock()
+
+    def __await__(self):
+        while True:
+            if self.done:
+                return self.result
+            if self.lock.acquire(blocking=False):
+                self.result = yield from self.co.__await__()
+                self.done = True
+                return self.result
+            else:
+                yield from asyncio.sleep(0.005)
+
+def async_cache(seconds: int, maxsize: int = 128, threadsafe: bool = False):
+    def wrapper_cache(func):
+        func = lru_cache(maxsize=maxsize)(func)
+        func.lifetime = timedelta(seconds=seconds)
+        func.expiration = datetime.utcnow() + func.lifetime
+        @wraps(func)
+        def wrapped_func(*args, **kwargs):
+            if datetime.utcnow() >= func.expiration:
+                func.cache_clear()
+                func.expiration = datetime.utcnow() + func.lifetime
+            if not threadsafe:
+                return AsyncCacheable(func(*args, **kwargs))
+            return AsyncThreadSafeCacheable(func(*args, **kwargs))
+        return wrapped_func
+    return wrapper_cache
