@@ -2,6 +2,7 @@
 from functools import lru_cache, wraps
 from typing import List, Optional, Dict
 from asgiref.sync import async_to_sync
+from aiocache import cached as async_cache
 from .mp_utils import multiproc, _MAX_PROCS, lazy_parallelize
 
 class LazyProc:

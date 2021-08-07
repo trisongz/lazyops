@@ -20,6 +20,7 @@ deps = {
         'requests',
         'dateparser',
         'aiohttp',
+        'aiocache',
         'asgiref',
         'six'
     ]
