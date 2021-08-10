@@ -22,6 +22,9 @@ _logging_levels = {
     'warning': logging.WARNING,
     'error': logging.ERROR,
 }
+# Ignore Some Loggers
+logging.getLogger('aiocache').setLevel(logging.ERROR)
+
 
 class ThreadSafeHandler:
     def __init__(

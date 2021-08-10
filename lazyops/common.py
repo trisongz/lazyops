@@ -10,7 +10,7 @@ import threading
 from subprocess import check_output
 from dataclasses import dataclass
 from typing import Optional
-from fileio import File
+from fileio import File, PathIO
 
 from lazyops.envs import logger
 from lazyops.envs import LazyEnv

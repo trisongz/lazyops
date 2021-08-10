@@ -5,16 +5,17 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 warnings.filterwarnings('ignore', message='RequestsDependencyWarning')
 
+
 lazyops_root = os.path.abspath(os.path.dirname(__file__))
 from .lazyclasses import lazyclass
 
 
 from .envs import LazyEnv, get_logger, lazywatcher, lazywatch
 from .models import LazyData, LazyTime, LazyDate, LazyFormatter, LazyTimer, LazyObject
-from .common import lazylibs, lazy_init, run_cmd, clone_repo, File
+from .common import lazylibs, lazy_init, run_cmd, clone_repo, File, PathIO
 from .utils import find_binary_in_path, timed_cache, latest_tf_ckpt, require_module
 from .utils import build_chunks, retryable, list_to_dict, create_uuid
-from .mp import lazy_parallelize, lazyproc, lazymultiproc, LazyProcs, LazyProc, async_to_sync, async_cache
+from .mp import lazy_parallelize, lazyproc, lazymultiproc, LazyProcs, LazyProc, async_to_sync
 from .apis import LazyAPI, LazyAPIConfig
 
 
@@ -32,6 +33,9 @@ lazyapiconfig = LazyAPIConfig
 lazy_async = async_to_sync
 
 from .lazyio import LazyHFModel
+from . import lazyconfig
+
+from .serializers import async_cache
 
 __all__ = [
     'lazyclass',
@@ -69,6 +73,8 @@ __all__ = [
     'LazyProc',
     'lazy_async',
     'async_to_sync',
-    'async_cache'
+    'async_cache',
+    'PathIO',
+    'lazyconfig'
 ]
 #from . import lazyrpc
