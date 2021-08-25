@@ -4,7 +4,7 @@ import simdjson as json
 from lazyops.utils import timed_cache
 from lazyops.serializers import async_cache
 
-from ._base import lazyclass, dataclass, List, Union, Any
+from ._base import lazyclass, dataclass, List, Union, Any, Dict
 from .tfserving_pb2 import TFSModelConfig, TFSConfig
 
 jparser = json.Parser()
@@ -37,13 +37,13 @@ class TFSModelEndpoint(object):
         config: TFSModelConfig,
         ver: str = 'v1',
         sess: requests.Session = requests.Session(),
-        aiosess: aiohttp.ClientSession = None
+        headers: Dict[str, Any] = {},
         ):
         self.url = url
         self.config = config
         self.ver = ver
         self.sess = sess
-        self.aiosess = aiosess
+        self.headers = headers
         self.validate_endpoints()
     
 
@@ -88,18 +88,18 @@ class TFSModelEndpoint(object):
         ep = self.get_endpoint(label=label, ver=ver)
         return self.sess.get(ep + '/metadata', verify=False).json()
     
-    @async_cache
-    async def get_aio_metadata(self, label: str = None, ver: Union[str, int] = None):
-        ep = self.get_endpoint(label=label, ver=ver)
-        resp = await self.aiosess.get(ep + '/metadata', verify=False)
-        return resp.json()
+    async def get_aio_metadata(self, label: str = None, ver: Union[str, int] = None, **kwargs):
+        epoint = self.get_endpoint(label=label, ver=ver)
+        async with aiohttp.ClientSession(headers=self.headers) as sess:
+            async with sess.get(epoint + '/metadata', verify_ssl=False, **kwargs) as resp:
+                return await resp.json()
 
-    @async_cache
     async def aio_predict(self, data, label: str = None, ver: Union[str, int] = None, **kwargs):
         epoint = self.get_predict_endpoint(label=label, ver=ver)
         item = TFSRequest(data=data)
-        res = await self.aiosess.post(epoint, json=item.to_data(), verify=False)
-        return res.json()
+        async with aiohttp.ClientSession(headers=self.headers) as sess:
+            async with sess.post(epoint, json=item.to_data(), verify_ssl=False, **kwargs) as resp:
+                return await resp.json()
     
     @timed_cache(seconds=60)
     def predict(self, data, label: str = None, ver: Union[str, int] = None, **kwargs):
@@ -125,8 +125,10 @@ class TFServeModel:
         self.url = url
         self.configs = configs
         self.ver = ver
+        self.headers = {'Content-Type': 'application/json'}
+        if kwargs: self.headers.update(kwargs.get('headers'))
         self.sess = requests.Session()
-        self.aiosess = aiohttp.ClientSession()
+        self.sess.headers.update(self.headers)
         self.endpoints = {config.name: TFSModelEndpoint(url, config=config, ver=ver, sess=self.sess, aiosess=self.aiosess) for config in configs}
         self.default_model = kwargs.get('default_model') or configs[0].name
         self.available_models = [config.name for config in configs]
