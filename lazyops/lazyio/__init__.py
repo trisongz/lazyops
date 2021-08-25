@@ -12,8 +12,17 @@ from .models import (
     gfile,
     File,
     json,
+    PathIO,
+    PathIOLike,
 )
-
+from .async_ops import (
+    async_open,
+    aio_stat,
+    aio_remove,
+    aio_rename,
+    aio_mkdir,
+    stat_results
+)
 
 lazypickler = LazyPickler
 lazypkler = LazyPickler
@@ -52,6 +61,14 @@ __all__ = [
     'lazypkl',
     'File',
     'gfile',
-    'json'
+    'json',
+    'PathIO',
+    'PathIOLike',
+    'async_open',
+    'aio_stat',
+    'aio_remove',
+    'aio_rename',
+    'aio_mkdir',
+    'stat_results'
 ]
 

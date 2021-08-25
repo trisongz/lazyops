@@ -9,7 +9,7 @@ from pathlib import Path
 from enum import Enum
 from abc import ABCMeta
 from typing import Union, List, Any, TypeVar, Optional, Dict
-from fileio import File, gfile
+from fileio import File, gfile, PathIO, PathIOLike
 from tempfile import TemporaryFile, NamedTemporaryFile
 from io import BytesIO
 

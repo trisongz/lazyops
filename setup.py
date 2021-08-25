@@ -2,7 +2,7 @@ import os
 import sys
 from setuptools import setup, find_packages
 
-version = '0.0.92'
+version = '0.1.0'
 binary_names = ['lazyops']
 pkg_name = 'lazyops'
 
@@ -16,11 +16,12 @@ packages = find_packages(
 
 deps = {
     'main': [
-        'file-io>=0.1.15',
+        'file-io>=0.2.0',
         'requests',
         'dateparser',
         'aiohttp',
         'aiocache',
+        'aiofiles',
         'asgiref',
         'six'
     ]

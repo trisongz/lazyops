@@ -10,7 +10,9 @@ import threading
 from subprocess import check_output
 from dataclasses import dataclass
 from typing import Optional
-from fileio import File, PathIO
+from fileio import File, PathIO, PathIOLike
+from fileio.src import get_pathlike, autojson, read_json, read_jsonlines
+
 
 from lazyops.envs import logger
 from lazyops.envs import LazyEnv
