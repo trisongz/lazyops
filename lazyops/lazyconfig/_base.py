@@ -27,12 +27,14 @@ class TFSModelConfig:
     @property
     def default_label(self):
         if self.model_versions:
-            return self.model_versions[0].label
+            for ver in self.model_versions:
+                if ver.label is not None: return ver.label
         return None
 
     @property
     def default_version(self):
         if self.model_versions:
-            return str(self.model_versions[0].step)
+            for ver in self.model_versions:
+                if ver.label is not None: return str(ver.step)
         return None
     

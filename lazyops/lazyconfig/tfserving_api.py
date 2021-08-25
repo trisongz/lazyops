@@ -1,10 +1,13 @@
 import requests
 import aiohttp
-from lazyops import async_cache, timed_cache
-from lazyops.lazyio import LazyJson
+import simdjson as json
+from lazyops.utils import timed_cache
+from lazyops.serializers import async_cache
+
 from ._base import lazyclass, dataclass, List, Union, Any
 from .tfserving_pb2 import TFSModelConfig, TFSConfig
 
+jparser = json.Parser()
 
 
 @lazyclass
@@ -27,14 +30,22 @@ class TFSRequest:
         return {'inputs': self.data}
 
 
-@lazyclass
-@dataclass
-class TFSModelEndpoint:
-    url: str
-    config: TFSModelConfig
-    ver: str = 'v1'
-    sess: requests.Session = requests.Session()
-    aiosess: aiohttp.ClientSession = None
+class TFSModelEndpoint(object):
+    def __init__(
+        self, 
+        url: str,
+        config: TFSModelConfig,
+        ver: str = 'v1',
+        sess: requests.Session = requests.Session(),
+        aiosess: aiohttp.ClientSession = None
+        ):
+        self.url = url
+        self.config = config
+        self.ver = ver
+        self.sess = sess
+        self.aiosess = aiosess
+        self.validate_endpoints()
+    
 
     @property
     def default_endpoint(self):
@@ -75,31 +86,38 @@ class TFSModelEndpoint:
     @timed_cache(seconds=600)
     def get_metadata(self, label: str = None, ver: Union[str, int] = None):
         ep = self.get_endpoint(label=label, ver=ver)
-        return self.sess.get(ep + '/metadata').json()
+        return self.sess.get(ep + '/metadata', verify=False).json()
     
     @async_cache
     async def get_aio_metadata(self, label: str = None, ver: Union[str, int] = None):
         ep = self.get_endpoint(label=label, ver=ver)
-        resp = await self.aiosess.get(ep + '/metadata')
+        resp = await self.aiosess.get(ep + '/metadata', verify=False)
         return resp.json()
 
     @async_cache
     async def aio_predict(self, data, label: str = None, ver: Union[str, int] = None, **kwargs):
         epoint = self.get_predict_endpoint(label=label, ver=ver)
         item = TFSRequest(data=data)
-        res = await self.aiosess.post(epoint, json=item.to_data())
-        return res.json(loads=LazyJson.loads)
+        res = await self.aiosess.post(epoint, json=item.to_data(), verify=False)
+        return res.json()
     
     @timed_cache(seconds=60)
     def predict(self, data, label: str = None, ver: Union[str, int] = None, **kwargs):
         epoint = self.get_predict_endpoint(label=label, ver=ver)
         item = TFSRequest(data=data)
-        res = self.sess.post(epoint, json=item.to_data())
-        return res.json(loads=LazyJson.loads)
+        res = self.sess.post(epoint, json=item.to_data(), verify=False)
+        return res.json()
     
     @property
     def is_alive(self):
         return bool(self.get_metadata().get('model_spec'))
+    
+    def validate_endpoints(self):
+        for n, version in enumerate(self.config.model_versions):
+            r = self.get_metadata(label=version.label)
+            if r.get('error'): self.config.model_versions[n].label = None
+            r = self.get_metadata(ver=str(version.step))
+            if r.get('error'): self.config.model_versions[n].step = None
     
 
 class TFServeModel:
@@ -112,6 +130,8 @@ class TFServeModel:
         self.endpoints = {config.name: TFSModelEndpoint(url, config=config, ver=ver, sess=self.sess, aiosess=self.aiosess) for config in configs}
         self.default_model = kwargs.get('default_model') or configs[0].name
         self.available_models = [config.name for config in configs]
+        self.validate_models()
+
 
     def predict(self, data, model: str = None, label: str = None, ver: Union[str, int] = None, **kwargs):
         if model: assert model in self.available_models
@@ -141,3 +161,11 @@ class TFServeModel:
         configs = TFSConfig.from_config_file(filepath, as_obj=True)
         return TFServeModel(url=url, configs=configs, ver=ver, **kwargs)
     
+    def validate_models(self):
+        for model in list(self.available_models):
+            if not self.endpoints[model].is_alive:
+                self.available_models.remove(model)
+                _ = self.endpoints.pop(model)
+        if self.default_model not in self.available_models:
+            self.default_model = self.available_models[0]
+
