@@ -129,7 +129,7 @@ class TFServeModel:
         if kwargs: self.headers.update(kwargs.get('headers'))
         self.sess = requests.Session()
         self.sess.headers.update(self.headers)
-        self.endpoints = {config.name: TFSModelEndpoint(url, config=config, ver=ver, sess=self.sess, aiosess=self.aiosess) for config in configs}
+        self.endpoints = {config.name: TFSModelEndpoint(url, config=config, ver=ver, sess=self.sess, headers=self.headers) for config in configs}
         self.default_model = kwargs.get('default_model') or configs[0].name
         self.available_models = [config.name for config in configs]
         self.validate_models()
