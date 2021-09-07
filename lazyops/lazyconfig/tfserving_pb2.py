@@ -8,7 +8,11 @@ from google.protobuf import message as _message
 from google.protobuf import reflection as _reflection
 from google.protobuf import symbol_database as _symbol_database
 from google.protobuf.text_format import Merge
-from fileio.src import get_pathlike
+try:
+    from fileio.src import get_pathlike
+except:
+    from fileio import get_pathlike
+
 from ._base import TFSModelConfig, TFSModelVersion, List,  Union, Optional, Any, Dict
 from ._base import dataclass, lazyclass
 # @@protoc_insertion_point(imports)

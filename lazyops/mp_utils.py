@@ -14,7 +14,11 @@ _CPU_CORES = multiproc.cpu_count()
 _MAX_PROCS = math.ceil(_CPU_CORES * 1.5)
 _MAX_THREADS = math.ceil(_CPU_CORES * 2)
 
-_SERIALIZER = fileio.src._pickler
+try:
+    _SERIALIZER = fileio.src._pickler
+except:
+    _SERIALIZER = fileio.core.libs.PICKLE_FUNC
+    
 _PROTOCOL = _SERIALIZER.HIGHEST_PROTOCOL
 
 

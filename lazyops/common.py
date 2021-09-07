@@ -11,8 +11,10 @@ from subprocess import check_output
 from dataclasses import dataclass
 from typing import Optional
 from fileio import File, PathIO, PathIOLike
-from fileio.src import get_pathlike, autojson, read_json, read_jsonlines
-
+try:
+    from fileio.src import get_pathlike, autojson, read_json, read_jsonlines
+except ImportError:
+    from fileio import get_pathlike, read_json, read_jsonlines, autojson
 
 from lazyops.envs import logger
 from lazyops.envs import LazyEnv
