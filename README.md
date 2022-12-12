@@ -6,9 +6,9 @@
 
 **Deprecation Notice**
 
-  If you are looking for the previous version of `lazyops`, please see the `v1.0.x` tag. This is the last stable version of the previous implementation of `lazyops` prior to rework of the entire project.
+  If you are looking for the previous version of `lazyops`, please see the `v0.2.x` tag. This is the last stable version of the previous implementation of `lazyops` prior to rework of the entire project.
 
-  New APIs are implemented in `v1.1.x` and above.
+  New APIs are implemented in `v0.2.x` and above.
 
 ---
 
