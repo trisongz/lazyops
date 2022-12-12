@@ -3,6 +3,10 @@
 A collection Python modules and submodules focused on balancing functionality, 
 performance, utility and Lazyiness.
 
+**deprecation**
+
+This is the last stable version of the previous implementation of `lazyops` prior to rework of the entire project.
+
 ---
 
 ### Installation
