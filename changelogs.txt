@@ -1,8 +1,0 @@
-v0.0.9 - Aug 5, 2021
-- Modifications to LazyRPC
-- Lots of other fun stuff.
-
-v0.0.81 - July 28, 2021
-
-- Add API for LazyHFModel
-- Hotfix for importing LazyHFModel
