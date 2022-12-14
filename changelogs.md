@@ -1,3 +1,8 @@
+## v0.2.1 - Last Updated: Dec 14, 2022
+- Moved JSON serialization out of `lazyops.utils.helpers` -> `lazyops.utils.serialization`
+ - reimported into `lazyops.utils.helpers` to maintain backwards compatibility
+
+
 ## v0.2.0 - Last Updated: Dec 12, 2022
 - Refactor entire codebase to support new APIs
 - `lazyops.LazyLib` - Lazy Dependency Import Helper

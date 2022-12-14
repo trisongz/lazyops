@@ -1,22 +1,18 @@
 import time 
 import typing
 import random
-import json
 import inspect
 import functools
 import itertools
 import asyncio
-import datetime
-import dataclasses
 import contextlib
 from typing import Dict, Callable, List, Any
 from lazyops.utils.logs import default_logger
 
-
-try:
-    import numpy as np
-except ImportError:
-    np = None
+from lazyops.utils.serialization import (
+    object_serializer, object_deserializer,
+    ObjectEncoder, ObjectDecoder,
+)
 
 
 def timer(t: typing.Optional[float] = None, msg: typing.Optional[str] = None, logger = default_logger):
@@ -128,58 +124,3 @@ def split_into_batches(items: List[Any], n: int):
     k, m = divmod(len(items), n)
     return (items[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n))
 
-
-def object_serializer(obj: typing.Any) -> typing.Any:
-    if isinstance(obj, dict):
-        return {k: object_serializer(v) for k, v in obj.items()}
-
-    if isinstance(obj, bytes):
-        return obj.decode('utf-8')
-
-    if isinstance(obj, (str, list, dict, int, float, bool, type(None))):
-        return obj
-
-    if dataclasses.is_dataclass(obj):
-        return dataclasses.asdict(obj)
-
-    if hasattr(obj, 'dict'): # test for pydantic models
-        return obj.dict()
-    
-    if hasattr(obj, 'get_secret_value'):
-        return obj.get_secret_value()
-    
-    if hasattr(obj, 'as_posix'):
-        return obj.as_posix()
-    
-    if hasattr(obj, "numpy"):  # Checks for TF tensors without needing the import
-        return obj.numpy().tolist()
-    
-    if hasattr(obj, 'tolist'): # Checks for torch tensors without importing
-        return obj.tolist()
-    
-    if isinstance(obj, (datetime.date, datetime.datetime)):
-        return obj.isoformat()
-    
-    if np is not None:
-        if isinstance(obj, (np.int_, np.intc, np.intp, np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64)):
-            return int(obj)
-        
-        if isinstance(obj, (np.float_, np.float16, np.float32, np.float64)):
-            return float(obj)
-        
-    else:
-        # Try to convert to a primitive type
-        with contextlib.suppress(Exception):
-            return int(obj)
-        with contextlib.suppress(Exception):
-            return float(obj)
-
-    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
-
-
-class ObjectEncoder(json.JSONEncoder):
-    
-    def default(self, obj: typing.Any):   # pylint: disable=arguments-differ,method-hidden
-        with contextlib.suppress(Exception):
-            return object_serializer(obj)
-        return json.JSONEncoder.default(self, obj)

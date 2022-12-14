@@ -6,6 +6,10 @@ from lazyops.utils.imports import (
     resolve_missing,
     require_missing_wrapper,
 )
+from lazyops.utils.serialization import (
+    object_serializer, object_deserializer,
+    ObjectEncoder, ObjectDecoder,
+)
 from lazyops.utils.helpers import (
     timer,
     timed,
@@ -15,6 +19,4 @@ from lazyops.utils.helpers import (
     retryable,
     get_batches_from_generator,
     split_into_batches,
-    object_serializer,
-    ObjectEncoder,
 )
