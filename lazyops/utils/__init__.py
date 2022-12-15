@@ -4,6 +4,7 @@ from lazyops.utils.logs import default_logger as logger
 from lazyops.utils.lazylib import LazyLib
 from lazyops.utils.imports import (
     resolve_missing,
+    resolve_missing_custom,
     require_missing_wrapper,
 )
 from lazyops.utils.serialization import (

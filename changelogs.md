@@ -1,5 +1,15 @@
-## v0.2.3 - Last Updated: Dec 15, 2022
+## v0.2.4 - Last Updated: Dec 15, 2022
 - Hotfix to resolve issues with logging
+- Added additional config options
+  - `lazyops.configs.k8s.K8sSettings`
+  - `lazyops.configs.base.DefaultSettings`
+- Added additional import helpers
+  - `lazyops.imports._aiokeydb`
+  - `lazyops.imports._psutil`
+  - `lazyops.imports._torch`
+  - `lazyops.imports._k8s`
+  - `lazyops.imports._transformers`
+
 
 ## v0.2.2 - Last Updated: Dec 14, 2022
 - Minor formatting tweaks to logging events

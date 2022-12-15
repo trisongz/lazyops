@@ -160,11 +160,11 @@ class CustomizeLogger:
                 status = record['extra'].get('status')
                 color = STATUS_COLOR.get(status, FALLBACK_STATUS_COLOR)
                 kind_color = STATUS_COLOR.get(record.get('extra', {}).get('kind'), FALLBACK_STATUS_COLOR)
-                extra = '<light-blue>{extra[queue_name]}</>:<' + kind_color + '>{extra[kind]:<9}</><' + color + '>{extra[job_id]}</> '
+                extra = '<cyan>{extra[queue_name]}</>:<' + kind_color + '>{extra[kind]:<9}</><' + color + '>{extra[job_id]}</> '
 
             elif record['extra'].get('kind') and record['extra'].get('queue_name'):
                 kind_color = STATUS_COLOR.get(record.get('extra', {}).get('kind'), FALLBACK_STATUS_COLOR)
-                extra = '<light-blue>{extra[queue_name]}</>:<' + kind_color + '>{extra[kind]:<9}</> '
+                extra = '<cyan>{extra[queue_name]}</>:<' + kind_color + '>{extra[kind]:<9}</> '
 
         if 'result=tensor([' not in str(record['message']):
             return "<level>{level: <8}</> <green>{time:YYYY-MM-DD HH:mm:ss.SSS}</>: "\
