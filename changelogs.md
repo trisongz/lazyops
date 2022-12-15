@@ -1,3 +1,15 @@
+## v0.2.2 - Last Updated: Dec 14, 2022
+- Minor formatting tweaks to logging events
+- Add new helper methods to `lazyops.types.models.BaseModel`
+- add convenience default `BaseSettings` for cloud providers:
+    - Boto: `lazyops.configs.cloud.BotoSettings`
+    - AWS: `lazyops.configs.cloud.AwsSettings`
+    - GCP: `lazyops.configs.cloud.GcpSettings`
+- add a few import helpers to `lazyops.imports`
+    - `aiohttpx` - `lazyops.imports._aiohttpx` 
+    - `fileio` - `lazyops.imports._fileio`
+
+
 ## v0.2.1 - Last Updated: Dec 14, 2022
 - Moved JSON serialization out of `lazyops.utils.helpers` -> `lazyops.utils.serialization`
  - reimported into `lazyops.utils.helpers` to maintain backwards compatibility

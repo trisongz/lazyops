@@ -1,13 +1,18 @@
 import os
 import pathlib
 
-from typing import Any
+from typing import Any, Type, Tuple, Dict, List
 from pydantic import Field, validator
 from pydantic import BaseModel as _BaseModel
 from pydantic import BaseSettings as _BaseSettings
 from lazyops.types.formatting import to_snake_case
+from lazyops.types.classprops import classproperty
 
 class BaseSettings(_BaseSettings):
+
+    class Config:
+        env_prefix: str = ""
+        case_sensitive: bool = False
 
     def update_config(self, **kwargs):
         """
@@ -53,6 +58,39 @@ class BaseModel(_BaseModel):
         for k, v in kwargs.items():
             if not hasattr(self, k): continue
             setattr(self, k, v)
+
+
+    @classmethod
+    def create_one(
+        cls,
+        **kwargs
+    ) -> Tuple[Type['BaseModel'], Dict]:
+        """
+        Extracts the resource from the kwargs and returns the resource 
+        and the remaining kwargs
+        """
+        resource_fields = [field.name for field in cls.__fields__.values()]
+        resource_kwargs = {k: v for k, v in kwargs.items() if k in resource_fields}
+        return_kwargs = {k: v for k, v in kwargs.items() if k not in resource_fields}
+        resource_obj = cls.parse_obj(resource_kwargs)
+        return resource_obj, return_kwargs
+    
+    @classmethod
+    def create_many(cls, data: List[Dict]) -> List['BaseModel']:
+        return [cls.parse_obj(d) for d in data]
+    
+    @classproperty
+    def model_fields(cls) -> List[str]:
+        return [field.name for field in cls.__fields__.values()]
+    
+    def get_model_fields(self) -> List[str]:
+        return [field.name for field in self.__fields__.values()]
+
+    def replace(self, obj: Type['BaseModel']):
+        """Replace current attributes with `obj` attributes."""
+        for field in obj.model_fields:
+            if hasattr(self, field):
+                setattr(self, field, getattr(obj, field))
 
 
 class Schema(BaseModel):
