@@ -116,7 +116,7 @@ class InterceptHandler(logging.Handler):
         while frame.f_code.co_filename == logging.__file__:
             frame = frame.f_back
             depth += 1
-        log = logger.bind(request_id='app')
+        log = logger.bind(request_id=None)
         log.opt(
             depth=depth,
             exception=record.exc_info

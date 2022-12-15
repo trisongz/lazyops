@@ -1,3 +1,6 @@
+## v0.2.3 - Last Updated: Dec 15, 2022
+- Hotfix to resolve issues with logging
+
 ## v0.2.2 - Last Updated: Dec 14, 2022
 - Minor formatting tweaks to logging events
 - Add new helper methods to `lazyops.types.models.BaseModel`
