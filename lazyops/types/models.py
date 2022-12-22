@@ -7,6 +7,7 @@ from pydantic import BaseModel as _BaseModel
 from pydantic import BaseSettings as _BaseSettings
 from lazyops.types.formatting import to_snake_case, to_graphql_format
 from lazyops.types.classprops import classproperty
+from lazyops.utils.serialization import Json
 
 class BaseSettings(_BaseSettings):
 
@@ -120,7 +121,7 @@ class Schema(BaseModel):
     class Config:
         extra = 'allow'
         arbitrary_types_allowed = True
-        
+        json_dumps = Json.dumps
 
     def get(self, name, default: Any = None):
         return getattr(self, name, default)

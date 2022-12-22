@@ -1,3 +1,6 @@
+## v0.2.5-6 - Last Updated: Dec 21, 2022
+- Minor hotfixes
+
 ## v0.2.4 - Last Updated: Dec 15, 2022
 - Hotfix to resolve issues with logging
 - Added additional config options
