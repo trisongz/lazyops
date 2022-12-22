@@ -11,3 +11,5 @@ build.sh
 *.egg-info*
 *.vscode
 *test_ops
+tests/private_*
+!tests/

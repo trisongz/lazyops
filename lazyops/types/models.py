@@ -1,11 +1,11 @@
 import os
 import pathlib
 
-from typing import Any, Type, Tuple, Dict, List
+from typing import Any, Type, Tuple, Dict, List, Union, Optional
 from pydantic import Field, validator
 from pydantic import BaseModel as _BaseModel
 from pydantic import BaseSettings as _BaseSettings
-from lazyops.types.formatting import to_snake_case
+from lazyops.types.formatting import to_snake_case, to_graphql_format
 from lazyops.types.classprops import classproperty
 
 class BaseSettings(_BaseSettings):
@@ -44,13 +44,12 @@ class BaseSettings(_BaseSettings):
                 os.environ[self.Config.env_prefix + k.upper()] = str(v)
 
 
-
 class BaseModel(_BaseModel):
     class Config:
         extra = 'allow'
         arbitrary_types_allowed = True
         alias_generator = to_snake_case
-
+        
     def get(self, name, default: Any = None):
         return getattr(self, name, default)
     
@@ -91,6 +90,29 @@ class BaseModel(_BaseModel):
         for field in obj.model_fields:
             if hasattr(self, field):
                 setattr(self, field, getattr(obj, field))
+
+    def graphql(
+        self,
+        *,
+        include: Optional[Any] = None,
+        exclude: Optional[Any] = None,
+        by_alias: bool = False,
+        skip_defaults: Optional[bool] = None,
+        exclude_unset: bool = False,
+        exclude_defaults: bool = False,
+        exclude_none: bool = False,
+    ) -> Union[Dict, Any]:
+        """
+        Return the data in `graphql` format
+        """
+        data = self.dict(
+            include = include, exclude = exclude, \
+            by_alias = by_alias, skip_defaults = skip_defaults, \
+            exclude_unset = exclude_unset, exclude_defaults = exclude_defaults, \
+            exclude_none = exclude_none
+        )
+        return to_graphql_format(data)
+
 
 
 class Schema(BaseModel):

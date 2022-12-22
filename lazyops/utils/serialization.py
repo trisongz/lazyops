@@ -1,3 +1,4 @@
+import uuid
 import json
 import typing
 import codecs
@@ -82,6 +83,10 @@ def object_serializer(obj: typing.Any) -> typing.Any:
     if isinstance(obj, (datetime.date, datetime.datetime)) or hasattr(obj, 'isoformat'):
         return obj.isoformat()
     
+    # Convert UUIDs
+    if isinstance(obj, uuid.UUID):
+        return str(obj)
+
     if np is not None:
         if isinstance(obj, (np.int_, np.intc, np.intp, np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64)):
             return int(obj)
@@ -150,3 +155,15 @@ class ObjectDecoder(json.JSONDecoder):
     def __init__(self, *args, object_hook: typing.Optional[typing.Callable] = None, **kwargs):
         object_hook = object_hook or object_deserializer
         super().__init__(*args, object_hook = object_hook, **kwargs)
+
+
+class Json:
+
+    @staticmethod
+    def dumps(obj: typing.Dict[typing.Any, typing.Any], *args, default: typing.Dict[typing.Any, typing.Any] = None, cls: typing.Type[json.JSONEncoder] = ObjectEncoder, **kwargs) -> str:
+        return json.dumps(obj, *args, default = default, cls = cls, **kwargs)
+
+    @staticmethod
+    def loads(data: typing.Union[str, bytes], *args, **kwargs) -> typing.Union[typing.Dict[typing.Any, typing.Any], typing.List[str]]:
+        return json.loads(data, *args, **kwargs)
+
