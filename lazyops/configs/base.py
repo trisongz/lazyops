@@ -32,6 +32,7 @@ class DefaultSettings(BaseSettings):
     api_host: Optional[str] = None
     api_port: Optional[int] = None
     
+    app_home: Optional[str] = None
     app_name: Optional[str] = None
     app_host: Optional[str] = None
     app_port: Optional[int] = None
@@ -50,6 +51,7 @@ class DefaultSettings(BaseSettings):
     
     ## Debug Variables
     debug_enabled: Optional[bool] = None
+    gpg_key: Optional[str] = None
 
     ## Multithreading Variables
     max_workers: Optional[int] = None
@@ -146,6 +148,14 @@ class DefaultSettings(BaseSettings):
         return False
     
     @lazyproperty
+    def in_container(self) -> bool:
+        return any(
+            self.in_docker,
+            self.in_app,
+            self.gpg_key is not None,
+        )
+
+    @lazyproperty
     def in_k8s(self) -> bool:
         return self.k8s.in_cluster
     
@@ -155,7 +165,7 @@ class DefaultSettings(BaseSettings):
     
     @lazyproperty
     def in_app(self) -> bool:
-        return self.app_host is not None and self.app_port is not None
+        return (self.app_host is not None and self.app_port is not None) or (self.app_home and self.app_home == '/app')
     
     @lazyproperty
     def is_local(self) -> bool:

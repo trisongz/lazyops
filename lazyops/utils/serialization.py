@@ -11,6 +11,11 @@ try:
 except ImportError:
     np = None
 
+# try:
+#     import ruamel.yaml.scalarstring as yaml
+# except ImportError:
+#     yaml = None
+
 # Borrowed from httpx
 # Null bytes; no need to recreate these on each call to guess_json_utf
 _null = b"\x00"
@@ -86,6 +91,7 @@ def object_serializer(obj: typing.Any) -> typing.Any:
     # Convert UUIDs
     if isinstance(obj, uuid.UUID):
         return str(obj)
+
 
     if np is not None:
         if isinstance(obj, (np.int_, np.intc, np.intp, np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64)):

@@ -1,3 +1,6 @@
+## v0.2.7 - Last Updated: Jan 4, 2023
+- Add some validation checks to `lazyops.configs.base.DefaultSettings`
+
 ## v0.2.5-6 - Last Updated: Dec 21, 2022
 - Minor hotfixes
 
