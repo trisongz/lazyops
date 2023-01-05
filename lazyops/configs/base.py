@@ -173,7 +173,7 @@ class DefaultSettings(BaseSettings):
     
     @lazyproperty
     def is_remote(self) -> bool:
-        return self.in_k8s or self.in_api or self.in_docker
+        return self.in_k8s or self.in_api or self.in_docker or self.in_container
     
     """
     Huggingface Variables
