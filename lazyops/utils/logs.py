@@ -7,7 +7,7 @@ import atexit as _atexit
 from loguru import _defaults
 from loguru._logger import Core as _Core
 from loguru._logger import Logger as _Logger
-from typing import Any
+from typing import Any, Union
 
 # Use this section to filter out warnings from other modules
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = os.getenv('TF_CPP_MIN_LOG_LEVEL', '3')
@@ -126,15 +126,17 @@ class InterceptHandler(logging.Handler):
 class CustomizeLogger:
 
     @classmethod
-    def make_default_logger(cls, level: str = "INFO"):
+    def make_default_logger(cls, level: Union[str, int] = "INFO"):
         # todo adjust this later to use a ConfigModel
+        if isinstance(level, str):
+            level = level.upper()
         logger.remove()
         logger.add(
             sys.stdout,
             enqueue=True,
             backtrace=True,
             colorize=True,
-            level=level.upper(),
+            level=level,
             format=cls.logger_formatter,
         )
         logging.basicConfig(handlers=[InterceptHandler()], level=0)
