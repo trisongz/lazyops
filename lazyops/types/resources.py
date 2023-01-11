@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 __all__ = [
     'BaseResource',
     'ResourceType',
-    'ResourceResponse',
+    'ResponseResource',
     'ResponseResourceType',
 ]
 
@@ -101,7 +101,7 @@ ResourceType = Type[BaseResource]
 
 class ResponseResource(BaseResource):
     _input_obj: Optional[ResourceType] = None
-    _response: Optional[aiohttpx.Response] = None
+    _response: Optional['aiohttpx.Response'] = None
     _streamed_data: Optional[str] = None
 
     @property
@@ -128,7 +128,7 @@ class ResponseResource(BaseResource):
     def parse_from(
         cls,
         input_obj: ResourceType,
-        response: aiohttpx.Response,
+        response: 'aiohttpx.Response',
         **kwargs
     ) -> 'ResponseResourceType':
         """

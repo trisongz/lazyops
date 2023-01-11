@@ -43,6 +43,8 @@ class BaseSettings(_BaseSettings):
                 v.set_env()
             else:
                 os.environ[self.Config.env_prefix + k.upper()] = str(v)
+    
+    
 
 
 class BaseModel(_BaseModel):

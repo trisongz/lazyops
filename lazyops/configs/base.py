@@ -5,7 +5,7 @@ Base Configs
 """
 import pathlib
 import contextlib
-from typing import Optional, Union, TYPE_CHECKING
+from typing import Optional, Union, Dict, TYPE_CHECKING
 from lazyops.types.models import BaseSettings
 from lazyops.types.classprops import lazyproperty
 
@@ -24,6 +24,7 @@ from lazyops.imports._aiokeydb import (
 if TYPE_CHECKING:
     from lazyops.configs.cloud import BotoSettings, AwsSettings, GcpSettings, MinioSettings
     from lazyops.configs.k8s import K8sSettings
+    from lazyops.configs.client import ClientSettings
 
 
 class DefaultSettings(BaseSettings):
@@ -245,4 +246,32 @@ class DefaultSettings(BaseSettings):
         if not _aiokeydb_available:
             resolve_aiokeydb()
         return aiokeydb.KeyDBClient.get_settings()
+    
+    @lazyproperty
+    def client(self) -> 'ClientSettings':
+        from lazyops.configs.client import ClientSettings
+        return ClientSettings()
+    
+    """
+    Client Props / Methods
+    """
+
+    def get_client_headers(self) -> Dict[str, str]:
+        return self.client.get_headers()
+
+    @property
+    def default_client_name(self):
+        """
+        Returns the default API client name
+        """
+        if self.in_k8s: return 'cluster'
+        return 'local' if self.client.api_dev_mode else 'external'
+
+    @lazyproperty
+    def client_endpoint(self) -> str:
+        """
+        Returns the client endpoint
+        """
+        return self.client.endpoints[self.default_client_name] or self.client.endpoints['local']
+
     
