@@ -1133,3 +1133,38 @@ def format_doc(docstring, *args, **kwargs):
         obj.__doc__ = doc.format(*args, **kwargs)
         return obj
     return set_docstring
+
+
+def add_doc(docstring, *args, **kwargs):
+    """
+    Adds the docstring of the decorated object.
+
+    Parameters
+    ----------
+    docstring : str or object or None
+        The docstring that will replace the docstring of the decorated
+        object. If it is an object like a function or class it will
+        take the docstring of this object. If it is a string it will use the
+        string itself. One special case is if the string is ``None`` then
+        it will use the decorated functions docstring and formats it.
+    """
+
+    def set_docstring(obj):
+        if docstring is None:
+            # None means: use the objects __doc__
+            doc = obj.__doc__
+        elif isinstance(docstring, str):
+            # String: use the string that was given
+            doc = docstring
+        else:
+            # Something else: Use the __doc__ of this
+            doc = docstring.__doc__
+
+        if not doc:
+            # In case the docstring is empty it's probably not what was wanted.
+            raise ValueError('docstring must be a string or containing a '
+                             'docstring that is not empty.')
+
+        return obj
+
+    return set_docstring

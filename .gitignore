@@ -13,3 +13,4 @@ build.sh
 *test_ops
 tests/private_*
 !tests/
+!lazyops/types/asyncprop/cached.py
