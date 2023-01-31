@@ -724,6 +724,11 @@ class classproperty(property):
 
         return fget
 
+class lazyclassproperty(classproperty):
+    def __new__(cls, fget=None, doc=None):
+        return super().__new__(cls, fget, doc, lazy=True)
+
+
 
 class _CachedClassProperty(object):
     """Cached class property decorator.
@@ -1164,7 +1169,7 @@ def add_doc(docstring, *args, **kwargs):
             # In case the docstring is empty it's probably not what was wanted.
             raise ValueError('docstring must be a string or containing a '
                              'docstring that is not empty.')
-
+        obj.__doc__ = doc
         return obj
 
     return set_docstring
