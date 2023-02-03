@@ -1,3 +1,18 @@
+
+## v0.2.15 - Last Updated: Feb 3, 2023
+- Add additional utils
+  - `lazyops.utils.helpers.import_function`
+  - `lazyops.utils.helpers.create_timestamp`
+  - `lazyops.utils.helpers.create_unique_id`
+  - `lazyops.utils.helpers.create_secret`
+  - `lazyops.utils.helpers.fetch_property`
+
+- Add logger modification methods
+  - `lazyops.utils.logs.change_logger_level`
+  - `lazyops.utils.logs.add_api_log_filters`
+
+- Add `lazyops.libs.asyncz` module
+
 ## v0.2.7-8 - Last Updated: Jan 4, 2023
 - Add some validation checks to `lazyops.configs.base.DefaultSettings`
 

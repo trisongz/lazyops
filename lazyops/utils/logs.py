@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import typing
 import warnings
 import atexit as _atexit
 
@@ -176,6 +177,73 @@ class CustomizeLogger:
                    + extra + "<level>" + msg + "</level>\n"
 
 
+logger_level: str = os.getenv('LOGGER_LEVEL', 'INFO').upper()
+
 get_logger = CustomizeLogger.make_default_logger
-default_logger = CustomizeLogger.make_default_logger()
+default_logger = CustomizeLogger.make_default_logger(level = logger_level)
+
+
+def change_logger_level(
+    level: str = 'INFO',
+    verbose: bool = False,
+):
+    """
+    Change the logger level for a specific logger
+
+    args:
+        level: str = 'INFO'
+            The level to change the logger to
+        verbose: bool = False
+            Whether to print the change to the logger
+    """
+    global default_logger, logger_level
+    level = level.upper()
+    # Skip if the level is the same
+    if level == logger_level: return
+    if verbose: default_logger.info(f"Changing logger level from {logger_level} -> {level}")
+    logger_level = level
+    default_logger = get_logger(logger_level)
+
+
+def add_api_log_filters(
+    modules: typing.Optional[typing.Union[typing.List[str], str]] = ['gunicorn', 'uvicorn'],
+    routes: typing.Optional[typing.Union[typing.List[str], str]] = ['/healthz'],
+    status_codes: typing.Optional[typing.Union[typing.List[int], int]] = None,
+    verbose: bool = False,
+):  # sourcery skip: default-mutable-arg
+    """
+    Add filters to the logger to remove health checks and other unwanted logs
+
+    args:
+
+        modules: list of modules to filter [default: ['gunicorn', 'uvicorn']
+        routes: list of routes to filter [default: ['/healthz']]
+        status_codes: list of status codes to filter [default: None]
+        verbose: bool = False [default: False]
+    """
+
+    if not isinstance(modules, list): modules = [modules]
+    if routes and not isinstance(routes, list): routes = [routes]
+    if status_codes and not isinstance(status_codes, list): status_codes = [status_codes]
+
+    def filter_api_record(record: logging.LogRecord) -> bool:
+        """
+        Filter out health checks and other unwanted logs
+        """
+        if routes:
+            for route in routes:
+                if route in record.args: return False
+        if status_codes:
+            for sc in status_codes:
+                if sc in record.args: return False
+        return True
+    
+    for module in modules:
+        if module == 'gunicorn': module = 'gunicorn.glogging.Logger'
+        elif module == 'uvicorn': module = 'uvicorn.logging.Logger'
+        _apilogger = logging.getLogger(module)
+        if verbose: default_logger.info(f"Adding API filters to {module} for routes: {routes} and status_codes: {status_codes}")
+        _apilogger.addFilter(filter_api_record)
+
+
 

@@ -1,18 +1,23 @@
-import time 
+import time
+import uuid
 import typing
 import random
 import inspect
 import functools
+import datetime
 import itertools
 import asyncio
 import contextlib
-from typing import Dict, Callable, List, Any
+from typing import Dict, Callable, List, Any, TYPE_CHECKING
 from lazyops.utils.logs import default_logger
 
 from lazyops.utils.serialization import (
     object_serializer, object_deserializer,
     ObjectEncoder, ObjectDecoder,
 )
+
+if TYPE_CHECKING:
+    from lazyops.types import BaseModel
 
 
 def timer(t: typing.Optional[float] = None, msg: typing.Optional[str] = None, logger = default_logger):
@@ -123,4 +128,86 @@ def split_into_batches(items: List[Any], n: int):
     n = min(n, len(items))
     k, m = divmod(len(items), n)
     return (items[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n))
+
+
+
+def import_string(dotted_path: str) -> Any:
+    """
+    Taken from pydantic.utils.
+    """
+    from importlib import import_module
+
+    try:
+        module_path, class_name = dotted_path.strip(' ').rsplit('.', 1)
+    except ValueError as e:
+        raise ImportError(f'"{dotted_path}" doesn\'t look like a module path') from e
+
+    module = import_module(module_path)
+    try:
+        return getattr(module, class_name)
+    except AttributeError as e:
+        raise ImportError(f'Module "{module_path}" does not define a "{class_name}" attribute') from e
+
+
+def fetch_property(
+    obj: typing.Union[typing.Type['BaseModel'], Dict],
+    key: str,
+    default: typing.Optional[Any] = None
+):  
+    """
+    Fetches a property from a dict or object
+    """
+    return obj.get(key, default) if isinstance(obj, dict) else getattr(obj, key, default)
+
+
+def create_unique_id(
+    method: typing.Optional[str] = 'uuid4',
+    alph_only: typing.Optional[bool] = False,
+    length: typing.Optional[int] = None,
+):
+    """
+    Creates a unique id
+    args:
+        method: uuid4, uuid1, uuid5, timestamp, secret
+        alph_only: if True, returns a string of only alphabets
+        length: if specified, returns a string of the specified length
+    """
+    meth = getattr(uuid, method, None)
+    if not meth:  raise ValueError(f'Invalid UUID method: {method}')
+    val = str(meth())
+    if alph_only: val = ''.join([c for c in val if c.isalpha()])
+    if length:
+        while len(val) < length:
+            val += str(meth())
+            if alph_only: val = ''.join([c for c in val if c.isalpha()])
+            # remove trailing hyphen
+            if val.endswith('-'): val = val[:-1]
+        val = val[:length]
+    return val
+
+def create_timestamp(
+    tz: typing.Optional[datetime.tzinfo] = datetime.timezone.utc,
+    as_str: typing.Optional[bool] = False,
+):
+    """
+    Creates a timestamp
+    args:
+        tz: timezone
+        as_str: if True, returns a string
+    """
+    dt = datetime.datetime.now(tz =tz)
+    return dt.isoformat() if as_str else dt
+
+def create_secret(
+    nbytes: typing.Optional[int] = 16,    
+):
+    import secrets
+    return secrets.token_hex(nbytes)
+
+@functools.lru_cache()
+def import_function(func: typing.Union[str, Callable]) -> Callable:
+    """
+    Imports a function from a string
+    """
+    return func if callable(func) else import_string(func)
 
