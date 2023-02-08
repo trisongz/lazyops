@@ -75,6 +75,21 @@ def object_serializer(obj: typing.Any) -> typing.Any:
     
     if hasattr(obj, 'todict'):
         return obj.todict()
+    
+    if hasattr(obj, 'to_json'):
+        return obj.to_json()
+    
+    if hasattr(obj, 'tojson'):
+        return obj.tojson()
+    
+    if hasattr(obj, 'toJson'):
+        return obj.toJson()
+
+    if hasattr(obj, 'json'):
+        return obj.json()
+    
+    if hasattr(obj, 'encode'):
+        return obj.encode()
 
     if hasattr(obj, 'get_secret_value'):
         return obj.get_secret_value()
@@ -96,14 +111,17 @@ def object_serializer(obj: typing.Any) -> typing.Any:
     if isinstance(obj, uuid.UUID):
         return str(obj)
 
-
     if np is not None:
         if isinstance(obj, (np.int_, np.intc, np.intp, np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64)):
             return int(obj)
         
         if isinstance(obj, (np.float_, np.float16, np.float32, np.float64)):
             return float(obj)
-        
+
+    if isinstance(obj, object):
+        with contextlib.suppress(Exception):
+            return {k: object_serializer(v) for k, v in obj.__dict__.items()}
+
     else:
         # Try to convert to a primitive type
         with contextlib.suppress(Exception):

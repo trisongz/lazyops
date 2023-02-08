@@ -71,6 +71,10 @@ class Logger(_Logger):
             __message = str(message)
         self._log(level.upper(), None, False, self._options, __message.strip(), args, kwargs)
 
+    def dev(self, message: Any, *args, **kwargs):
+        r"""Log ``message.format(*args, **kwargs)`` with severity ``'DEV'``."""
+        self._log('DEV', None, False, self._options, message, args, kwargs)
+
 
 logger = Logger(
     core=_Core(),
@@ -96,6 +100,7 @@ class InterceptHandler(logging.Handler):
         40: 'ERROR',
         30: 'WARNING',
         20: 'INFO',
+        19: 'DEV',
         10: 'DEBUG',
         5: 'CRITICAL',
         4: 'ERROR',
@@ -184,7 +189,7 @@ default_logger = CustomizeLogger.make_default_logger(level = logger_level)
 
 
 def change_logger_level(
-    level: str = 'INFO',
+    level: Union[str, int] = 'INFO',
     verbose: bool = False,
 ):
     """
@@ -197,7 +202,8 @@ def change_logger_level(
             Whether to print the change to the logger
     """
     global default_logger, logger_level
-    level = level.upper()
+    if isinstance(level, str):
+        level = level.upper()
     # Skip if the level is the same
     if level == logger_level: return
     if verbose: default_logger.info(f"Changing logger level from {logger_level} -> {level}")
