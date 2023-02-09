@@ -4,6 +4,7 @@ import logging
 import typing
 import warnings
 import atexit as _atexit
+import functools
 
 from loguru import _defaults
 from loguru._logger import Core as _Core
@@ -137,6 +138,8 @@ class CustomizeLogger:
         if isinstance(level, str):
             level = level.upper()
         logger.remove()
+        logger.level(name='DEV', no=19)
+        logger.__class__.dev = functools.partialmethod(logger.__class__.log, 'DEV')
         logger.add(
             sys.stdout,
             enqueue=True,
@@ -148,7 +151,6 @@ class CustomizeLogger:
         logging.basicConfig(handlers=[InterceptHandler()], level=0)
         *options, extra = logger._options
         return Logger(logger._core, *options, {**extra})
-        # return logger
 
     @staticmethod
     def logger_formatter(record: dict) -> str:
