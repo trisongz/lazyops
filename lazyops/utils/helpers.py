@@ -211,3 +211,60 @@ def import_function(func: typing.Union[str, Callable]) -> Callable:
     """
     return func if callable(func) else import_string(func)
 
+def suppress(
+    *exceptions: typing.Optional[typing.Union[typing.Tuple[Exception], Exception]],
+):
+    """
+    Wrapper for suppressing exceptions
+    args:
+        exceptions: exceptions to suppress
+    """
+    if not exceptions: exceptions = (Exception,)
+    def wrapper(func):
+        if is_coro_func(func):
+            @functools.wraps(func)
+            async def wrapped_func(*args, **kwargs):
+                with contextlib.suppress(*exceptions):
+                    return await func(*args, **kwargs)
+            return wrapped_func
+        else:
+            @functools.wraps(func)
+            def wrapped_func(*args, **kwargs):
+                with contextlib.suppress(*exceptions):
+                    return func(*args, **kwargs)
+        return wrapped_func
+    return wrapper
+
+def timed_cache(
+    secs: typing.Optional[int] = 60 * 60, 
+    maxsize: int = 128
+):
+    """
+    Wrapper for creating a expiring cached function
+    args:
+        secs: number of seconds to cache the function
+        maxsize: maxsize of the cache
+    """
+    def wrapper_cache(func):
+        func = functools.lru_cache(maxsize=maxsize)(func)
+        func.lifetime = functools.timedelta(seconds=secs)
+        func.expiration = datetime.utcnow() + func.lifetime
+        
+        if is_coro_func(func):
+            @functools.wraps(func)
+            async def wrapped_func(*args, **kwargs):
+                if datetime.utcnow() >= func.expiration:
+                    func.cache_clear()
+                    func.expiration = datetime.utcnow() + func.lifetime
+                return await func(*args, **kwargs)
+            return wrapped_func
+        
+        else:
+            @functools.wraps(func)
+            def wrapped_func(*args, **kwargs):
+                if datetime.utcnow() >= func.expiration:
+                    func.cache_clear()
+                    func.expiration = datetime.utcnow() + func.lifetime
+                return func(*args, **kwargs)
+            return wrapped_func
+    return wrapper_cache
