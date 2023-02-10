@@ -245,26 +245,68 @@ def timed_cache(
         secs: number of seconds to cache the function
         maxsize: maxsize of the cache
     """
+    if secs is None: secs = 60
     def wrapper_cache(func):
         func = functools.lru_cache(maxsize=maxsize)(func)
-        func.lifetime = functools.timedelta(seconds=secs)
-        func.expiration = datetime.utcnow() + func.lifetime
+        func.lifetime = datetime.timedelta(seconds=secs)
+        func.expiration = create_timestamp() + func.lifetime
+
+        if is_coro_func(func):
+            @functools.wraps(func)
+            async def wrapped_func(*args, **kwargs):
+                if create_timestamp() >= func.expiration:
+                    func.cache_clear()
+                    func.expiration = create_timestamp() + func.lifetime
+                return await func(*args, **kwargs)
+
+            return wrapped_func
+
+        else:
+            @functools.wraps(func)
+            def wrapped_func(*args, **kwargs):
+                if create_timestamp() >= func.expiration:
+                    func.cache_clear()
+                    func.expiration = create_timestamp() + func.lifetime
+                return func(*args, **kwargs)
+            return wrapped_func
+
+    return wrapper_cache
+
+
+def lazy_function(
+    validator: Callable,
+    function: Callable,
+    *args,
+    **kwargs,
+):
+    """
+    Creates an empty function wrapper
+    args:
+        validator: function to validate the arguments
+        func: function to call
+        
+    """
+    def wrapper_func(func):
+        if not validator():
+            return func
         
         if is_coro_func(func):
             @functools.wraps(func)
             async def wrapped_func(*args, **kwargs):
-                if datetime.utcnow() >= func.expiration:
-                    func.cache_clear()
-                    func.expiration = datetime.utcnow() + func.lifetime
-                return await func(*args, **kwargs)
-            return wrapped_func
+                return await function(*args, **kwargs)
         
         else:
             @functools.wraps(func)
             def wrapped_func(*args, **kwargs):
-                if datetime.utcnow() >= func.expiration:
-                    func.cache_clear()
-                    func.expiration = datetime.utcnow() + func.lifetime
-                return func(*args, **kwargs)
-            return wrapped_func
-    return wrapper_cache
+                return function(*args, **kwargs)
+        return wrapped_func
+    return wrapper_func
+
+
+
+
+
+
+
+
+
