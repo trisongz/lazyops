@@ -268,7 +268,7 @@ def freeze_args_and_kwargs(*args, **kwargs):
 
 def timed_cache(
     secs: typing.Optional[int] = 60 * 60, 
-    maxsize: int = 128
+    maxsize: int = 1024
 ):
     """
     Wrapper for creating a expiring cached function
