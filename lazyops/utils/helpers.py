@@ -8,12 +8,15 @@ import datetime
 import itertools
 import asyncio
 import contextlib
+
+from frozendict import frozendict
 from typing import Dict, Callable, List, Any, TYPE_CHECKING
 from lazyops.utils.logs import default_logger
 
 from lazyops.utils.serialization import (
     object_serializer, object_deserializer,
     ObjectEncoder, ObjectDecoder,
+    Json,
 )
 
 if TYPE_CHECKING:
@@ -235,6 +238,34 @@ def suppress(
         return wrapped_func
     return wrapper
 
+"""
+Timed Caches
+"""
+
+def recursive_freeze(value):
+    if not isinstance(value, dict):
+        return value
+    for k,v in value.items():
+        value[k] = recursive_freeze(v)
+    return frozendict(value)
+
+# To unfreeze
+def recursive_unfreeze(value):
+    if isinstance(value, frozendict):
+        value = dict(value)
+        for k,v in value.items():
+            value[k] = recursive_unfreeze(v)
+    
+    return value
+
+def freeze_args_and_kwargs(*args, **kwargs):
+    args = tuple(
+        recursive_freeze(arg) if isinstance(arg, dict) else arg
+        for arg in args
+    )
+    kwargs = {k: recursive_freeze(v) if isinstance(v, dict) else v for k, v in kwargs.items()}
+    return args, kwargs
+
 def timed_cache(
     secs: typing.Optional[int] = 60 * 60, 
     maxsize: int = 128
@@ -250,23 +281,24 @@ def timed_cache(
         func = functools.lru_cache(maxsize=maxsize)(func)
         func.lifetime = datetime.timedelta(seconds=secs)
         func.expiration = create_timestamp() + func.lifetime
+        def _check_cache(func):
+            if create_timestamp() >= func.expiration:
+                func.cache_clear()
+                func.expiration = create_timestamp() + func.lifetime
 
         if is_coro_func(func):
             @functools.wraps(func)
             async def wrapped_func(*args, **kwargs):
-                if create_timestamp() >= func.expiration:
-                    func.cache_clear()
-                    func.expiration = create_timestamp() + func.lifetime
+                _check_cache(func)
+                args, kwargs = freeze_args_and_kwargs(*args, **kwargs)
                 return await func(*args, **kwargs)
-
             return wrapped_func
 
         else:
             @functools.wraps(func)
             def wrapped_func(*args, **kwargs):
-                if create_timestamp() >= func.expiration:
-                    func.cache_clear()
-                    func.expiration = create_timestamp() + func.lifetime
+                _check_cache(func)
+                args, kwargs = freeze_args_and_kwargs(*args, **kwargs)
                 return func(*args, **kwargs)
             return wrapped_func
 

@@ -14,6 +14,7 @@ version = root.joinpath(f'{pkg_name}/version.py').read_text().split('VERSION = '
 requirements = [
     'loguru',
     'pydantic',
+    'frozendict',
 ]
 
 if sys.version_info.minor < 8:
