@@ -193,10 +193,31 @@ class ObjectDecoder(json.JSONDecoder):
 class Json:
 
     @staticmethod
-    def dumps(obj: typing.Dict[typing.Any, typing.Any], *args, default: typing.Dict[typing.Any, typing.Any] = None, cls: typing.Type[json.JSONEncoder] = ObjectEncoder, **kwargs) -> str:
-        return json.dumps(obj, *args, default = default, cls = cls, **kwargs)
+    def dumps(
+        obj: typing.Dict[typing.Any, typing.Any], 
+        *args, 
+        default: typing.Dict[typing.Any, typing.Any] = None, 
+        cls: typing.Type[json.JSONEncoder] = ObjectEncoder,
+        _fallback_method: typing.Optional[typing.Callable] = None,
+        **kwargs
+    ) -> str:
+        try:
+            return json.dumps(obj, *args, default = default, cls = cls, **kwargs)
+        except Exception as e:
+            if _fallback_method is not None:
+                return _fallback_method(obj, *args, default = default, **kwargs)
+            raise e
 
     @staticmethod
-    def loads(data: typing.Union[str, bytes], *args, **kwargs) -> typing.Union[typing.Dict[typing.Any, typing.Any], typing.List[str]]:
-        return json.loads(data, *args, **kwargs)
-
+    def loads(
+        data: typing.Union[str, bytes], 
+        *args, 
+        _fallback_method: typing.Optional[typing.Callable] = None,
+        **kwargs
+    ) -> typing.Union[typing.Dict[typing.Any, typing.Any], typing.List[str]]:
+        try:
+            return json.loads(data, *args, **kwargs)
+        except json.JSONDecodeError as e:
+            if _fallback_method is not None:
+                return _fallback_method(data, *args, **kwargs)
+            raise e

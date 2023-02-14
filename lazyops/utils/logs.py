@@ -138,9 +138,11 @@ class CustomizeLogger:
         if isinstance(level, str):
             level = level.upper()
         logger.remove()
-        if not hasattr(logger.__class__, 'dev'):
+        # if not hasattr(logger.__class__, 'dev'):
+        try:
             logger.level(name='DEV', no=19)
             logger.__class__.dev = functools.partialmethod(logger.__class__.log, 'DEV')
+        except: pass
         logger.add(
             sys.stdout,
             enqueue=True,
