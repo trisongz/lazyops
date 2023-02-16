@@ -17,6 +17,17 @@ def to_snake_case(text: str):
         sub('([A-Z]+)', r' \1',
         text.replace('-', ' '))).split()).lower()
 
+
+def to_snake_case_key(text: str):
+    """
+    multi_master -> multi-master
+    """
+    return '-'.join(
+        sub('([A-Z][a-z]+)', r' \1',
+        sub('([A-Z]+)', r' \1',
+        text.replace('_', ' '))).split()).lower()
+        
+
 def to_snake_case_args(text: str):
     """
     multiMaster -> multi-master

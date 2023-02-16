@@ -151,9 +151,9 @@ class DefaultSettings(BaseSettings):
     @lazyproperty
     def in_container(self) -> bool:
         return any(
-            self.in_docker,
+            [self.in_docker,
             self.in_app,
-            self.gpg_key is not None,
+            self.gpg_key is not None,]
         )
 
     @lazyproperty
@@ -170,7 +170,7 @@ class DefaultSettings(BaseSettings):
     
     @lazyproperty
     def is_local(self) -> bool:
-        return not any(self.in_k8s, self.in_k8s, self.in_api, self.in_docker)
+        return not any([self.in_k8s, self.in_k8s, self.in_api, self.in_docker])
     
     @lazyproperty
     def is_remote(self) -> bool:
