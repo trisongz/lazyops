@@ -1,4 +1,11 @@
 
+## v0.2.24 - Last Updated: Feb 23, 2023
+- Resolve Async issues with `timed_cache` to resolve properly.
+  - added `async_lru` as a dependency
+
+
+
+
 ## v0.2.15 - Last Updated: Feb 3, 2023
 - Add additional utils
   - `lazyops.utils.helpers.import_function`

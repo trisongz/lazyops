@@ -139,10 +139,20 @@ class CustomizeLogger:
             level = level.upper()
         logger.remove()
         # if not hasattr(logger.__class__, 'dev'):
-        try:
-            logger.level(name='DEV', no=19)
-            logger.__class__.dev = functools.partialmethod(logger.__class__.log, 'DEV')
-        except: pass
+        # try:
+        #     dev_level = logger.level(name='DEV', no=19, color="<blue>", icon="@")
+        #     logger.__class__.dev = functools.partialmethod(logger.__class__.log, 'DEV')
+        #     logger.add(
+        #         sys.stdout,
+        #         enqueue=True,
+        #         backtrace=True,
+        #         colorize=True,
+        #         level=19,
+        #         format=cls.logger_formatter,
+        #     )
+        # except Exception as e:
+        #     print("Error adding DEV level to logger: ", e) 
+        #     # pass
         logger.add(
             sys.stdout,
             enqueue=True,

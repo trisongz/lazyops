@@ -8,6 +8,7 @@ import datetime
 import itertools
 import asyncio
 import contextlib
+import async_lru
 
 from frozendict import frozendict
 from typing import Dict, Callable, List, Any, TYPE_CHECKING
@@ -266,44 +267,58 @@ def freeze_args_and_kwargs(*args, **kwargs):
     kwargs = {k: recursive_freeze(v) if isinstance(v, dict) else v for k, v in kwargs.items()}
     return args, kwargs
 
+
 def timed_cache(
     secs: typing.Optional[int] = 60 * 60, 
-    maxsize: int = 1024
+    maxsize: int = 1024,
+    invalidate_cache_key: typing.Optional[str] = '_invalidate_cache',
 ):
     """
     Wrapper for creating a expiring cached function
     args:
         secs: number of seconds to cache the function
         maxsize: maxsize of the cache
+        invalidate_cache_key: key to invalidate the cache
     """
     if secs is None: secs = 60
     def wrapper_cache(func):
-        func = functools.lru_cache(maxsize=maxsize)(func)
-        func.lifetime = datetime.timedelta(seconds=secs)
-        func.expiration = create_timestamp() + func.lifetime
-        def _check_cache(func):
-            if create_timestamp() >= func.expiration:
-                func.cache_clear()
-                func.expiration = create_timestamp() + func.lifetime
-
         if is_coro_func(func):
+
+            @async_lru.alru_cache(maxsize = maxsize, ttl = secs)
+            async def _wrapped(*args, **kwargs):
+                return await func(*args, **kwargs)
+            
             @functools.wraps(func)
             async def wrapped_func(*args, **kwargs):
-                _check_cache(func)
+                _invalidate = kwargs.pop(invalidate_cache_key, None) if invalidate_cache_key else None
                 args, kwargs = freeze_args_and_kwargs(*args, **kwargs)
-                return await func(*args, **kwargs)
+                if _invalidate is True:
+                    _wrapped.cache_invalidate(*args, **kwargs)
+                # print(f'wrapped: {_wrapped.cache_info()}')
+                return await _wrapped(*args, **kwargs)
+            
             return wrapped_func
-
+        
         else:
+            func = functools.lru_cache(maxsize=maxsize)(func)
+            func.lifetime = datetime.timedelta(seconds=secs)
+            func.expiration = create_timestamp() + func.lifetime
+            def _check_cache(func, invalidate: typing.Optional[bool] = None):
+                if invalidate is True or create_timestamp() >= func.expiration:
+                    func.cache_clear()
+                    func.expiration = create_timestamp() + func.lifetime
+            
             @functools.wraps(func)
             def wrapped_func(*args, **kwargs):
-                _check_cache(func)
+                _check_cache(func, invalidate = kwargs.pop(invalidate_cache_key, None) if invalidate_cache_key else None)
                 args, kwargs = freeze_args_and_kwargs(*args, **kwargs)
                 return func(*args, **kwargs)
+            
             return wrapped_func
 
     return wrapper_cache
-
+        
+        
 
 def lazy_function(
     validator: Callable,

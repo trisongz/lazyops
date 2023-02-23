@@ -15,6 +15,7 @@ requirements = [
     'loguru',
     'pydantic',
     'frozendict',
+    'async_lru',
 ]
 
 if sys.version_info.minor < 8:
