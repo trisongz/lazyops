@@ -23,6 +23,7 @@ def resolve_psutil(
         resolve_missing('psutil', required = required)
         import psutil
         _psutil_available = True
+        globals()['psutil'] = psutil
 
 
 def require_psutil(

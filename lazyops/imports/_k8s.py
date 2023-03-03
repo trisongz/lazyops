@@ -115,6 +115,7 @@ def resolve_kopf(
         resolve_missing('kopf', required = required)
         import kopf
         _kopf_available = True
+        globals()['kopf'] = kopf
 
 def resolve_k8s(
     is_sync: bool = False,

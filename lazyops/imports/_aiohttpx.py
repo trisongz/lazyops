@@ -23,6 +23,7 @@ def resolve_aiohttpx(
         resolve_missing('aiohttpx', required = required)
         import aiohttpx
         _aiohttpx_available = True
+        globals()['aiohttpx'] = aiohttpx
 
 
 def require_aiohttpx(

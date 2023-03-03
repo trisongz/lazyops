@@ -132,6 +132,65 @@ class InterceptHandler(logging.Handler):
 
 class CustomizeLogger:
 
+    # @classmethod
+    # def make_default_logger(cls, level: Union[str, int] = "INFO"):
+    #     # todo adjust this later to use a ConfigModel
+    #     if isinstance(level, str):
+    #         level = level.upper()
+    #     logger.remove()
+    #     logging.basicConfig(handlers=[InterceptHandler()], level=0)
+
+    #     *options, extra = logger._options
+    #     new_logger = Logger(logger._core, *options, {**extra})
+    #     new_logger.configure(
+    #         handlers=[
+    #             {
+    #                 "sink": sys.stdout,
+    #                 "format": cls.logger_formatter,
+    #                 "enqueue": True,
+    #                 "backtrace": True,
+    #                 "colorize": True,
+    #                 "level": level,
+    #             },
+    #         ],
+    #         levels = [{
+    #             "name": "DEV",
+    #             "no": 19,
+    #             "color": "<blue>",
+    #             "icon": "@"
+    #         }]
+    #     )
+    #     return new_logger
+
+
+        # if not hasattr(logger.__class__, 'dev'):
+        # try:
+        #     dev_level = logger.level(name='DEV', no=19, color="<blue>", icon="@")
+        #     logger.__class__.dev = functools.partialmethod(logger.__class__.log, 'DEV')
+        #     logger.add(
+        #         sys.stdout,
+        #         enqueue=True,
+        #         backtrace=True,
+        #         colorize=True,
+        #         level=19,
+        #         format=cls.logger_formatter,
+        #     )
+        # except Exception as e:
+        #     pass
+        # #     print("Error adding DEV level to logger: ", e) 
+        # #     # pass
+        # logger.add(
+        #     sys.stdout,
+        #     enqueue=True,
+        #     backtrace=True,
+        #     colorize=True,
+        #     level=level,
+        #     format=cls.logger_formatter,
+        # )
+        # logging.basicConfig(handlers=[InterceptHandler()], level=0)
+        # *options, extra = logger._options
+        # return Logger(logger._core, *options, {**extra})
+
     @classmethod
     def make_default_logger(cls, level: Union[str, int] = "INFO"):
         # todo adjust this later to use a ConfigModel

@@ -43,6 +43,7 @@ def resolve_torch(
         resolve_missing_custom(pkg, required = required)
         import torch
         _torch_available = True
+        globals()['torch'] = torch
 
 
 def require_torch(

@@ -27,6 +27,7 @@ def resolve_transformers(
         resolve_missing(pkg, required = required)
         import transformers
         _transformers_available = True
+        globals()['transformers'] = transformers
 
 
 def require_transformers(

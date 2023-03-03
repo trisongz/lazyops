@@ -22,9 +22,10 @@ def resolve_fileio(
     """
     global fileio, _fileio_available
     if not _fileio_available:
-        resolve_missing('fileio', required = required)
+        resolve_missing('fileio', 'file-io', required = required)
         import fileio
         _fileio_available = True
+        globals()['fileio'] = fileio
 
 
 def require_fileio(

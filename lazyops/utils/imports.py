@@ -9,18 +9,24 @@ from lazyops.utils.helpers import is_coro_func
 
 def resolve_missing(
     modules: typing.Union[str, typing.List],
+    packages: typing.Union[str, typing.List] = None,
     required: bool = True,
 ):
     if not isinstance(modules, list):
         modules = [modules]
+    if packages is not None and not isinstance(packages, list):
+        packages = [packages]
+    elif packages is None:
+        packages = modules
     kind = 'required' if required else 'optionally required'
     logger.info(f"{', '.join(modules)} are {kind}. Installing...")
-    for module in modules:
-        LazyLib.import_lib(module)
+    for module, pkg in zip(modules, packages):
+        LazyLib.import_lib(module, pkg)
 
 
 def resolve_missing_custom(
     modules: typing.Union[str, typing.List],
+    packages: typing.Union[str, typing.List] = None,
     required: bool = True,
 ):
     """
@@ -29,14 +35,19 @@ def resolve_missing_custom(
     """
     if not isinstance(modules, list):
         modules = [modules]
+    if packages is not None and not isinstance(packages, list):
+        packages = [packages]
+    elif packages is None:
+        packages = modules
+    
     module_names = [module.split(' ', 1)[0] for module in modules]
     kind = 'required' if required else 'optionally required'
     logger.info(f"{', '.join(module_names)} are {kind}. Installing...")
-    for module in modules:
+    for module, pkg in zip(modules, packages):
         module_name = LazyLib.get_requirement(module, True)
         if LazyLib.is_available(module_name):
             continue
-        LazyLib.install_library(module)
+        LazyLib.install_library(pkg)
 
     
 def require_missing_wrapper(

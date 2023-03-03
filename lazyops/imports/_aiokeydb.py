@@ -26,6 +26,7 @@ def resolve_aiokeydb(
         resolve_missing(f'aiokeydb=={version}', required = required)
         import aiokeydb
         _aiokeydb_available = True
+        globals()['aiokeydb'] = aiokeydb
 
 
 def require_aiokeydb(
