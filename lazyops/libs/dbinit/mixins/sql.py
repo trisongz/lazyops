@@ -17,7 +17,8 @@ class SQLBase(ABC):
         with engine.connect() as conn:
             for statement in statements:
                 conn.execution_options(isolation_level="AUTOCOMMIT").execute(statement)
-                conn.commit()
+                if hasattr(conn, 'commit'):
+                    conn.commit()
 
     @staticmethod
     def _fetch_sql(engine: Engine, statement: TextClause) -> Sequence[Row[Any]]:
