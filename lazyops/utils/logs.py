@@ -9,7 +9,9 @@ import functools
 from loguru import _defaults
 from loguru._logger import Core as _Core
 from loguru._logger import Logger as _Logger
-from typing import Any, Union
+from pydantic import BaseSettings
+
+from typing import Type, Union, Optional, Any
 
 # Use this section to filter out warnings from other modules
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = os.getenv('TF_CPP_MIN_LOG_LEVEL', '3')
@@ -192,27 +194,42 @@ class CustomizeLogger:
         # return Logger(logger._core, *options, {**extra})
 
     @classmethod
-    def make_default_logger(cls, level: Union[str, int] = "INFO"):
+    def make_default_logger(
+        cls, 
+        level: Union[str, int] = "INFO",
+        settings: Optional[Type[BaseSettings]] = None,
+        **kwargs,
+    ):
         # todo adjust this later to use a ConfigModel
         if isinstance(level, str):
             level = level.upper()
         logger.remove()
-        # if not hasattr(logger.__class__, 'dev'):
-        try:
-            dev_level = logger.level(name='DEV', no=19, color="<blue>", icon="@")
-            logger.__class__.dev = functools.partialmethod(logger.__class__.log, 'DEV')
-            logger.add(
-                sys.stdout,
-                enqueue=True,
-                backtrace=True,
-                colorize=True,
-                level=19,
-                format=cls.logger_formatter,
-            )
-        except Exception as e:
-            pass
-        #     print("Error adding DEV level to logger: ", e) 
-        #     # pass
+        if settings:
+            try:
+                dev_level = logger.level(name='DEV', no=19, color="<blue>", icon="@")
+                logger.__class__.dev = functools.partialmethod(logger.__class__.log, 'DEV')
+
+                def _filter_dev(record: dict, **kwargs):
+
+                    for key in {'api_dev_mode', 'debug_enabled'}:
+                        if hasattr(settings, key):
+                            return getattr(settings, key, False) and record['level'].name == 'DEV'
+                    return False
+
+                logger.add(
+                    sys.stdout,
+                    enqueue = True,
+                    backtrace = True,
+                    colorize = True,
+                    level = 19,
+                    format = cls.logger_formatter,
+                    filter = _filter_dev,
+                )
+            except Exception as e:
+                pass
+            #    print("Error adding DEV level to logger: ", e) 
+            #     # pass
+
         logger.add(
             sys.stdout,
             enqueue=True,
@@ -271,6 +288,7 @@ default_logger = CustomizeLogger.make_default_logger(level = logger_level)
 def change_logger_level(
     level: Union[str, int] = 'INFO',
     verbose: bool = False,
+    **kwargs,
 ):
     """
     Change the logger level for a specific logger
@@ -288,7 +306,7 @@ def change_logger_level(
     if level == logger_level: return
     if verbose: default_logger.info(f"Changing logger level from {logger_level} -> {level}")
     logger_level = level
-    default_logger = get_logger(logger_level)
+    default_logger = get_logger(logger_level, **kwargs)
 
 
 def add_api_log_filters(
