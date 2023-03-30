@@ -32,6 +32,7 @@ STATUS_COLOR = {
     'shutdown': 'red',
     'sweep': 'yellow',
     'dequeue': 'light-blue',
+    'stats': 'light-blue',
 
 }
 FALLBACK_STATUS_COLOR = 'magenta'
@@ -39,6 +40,22 @@ FALLBACK_STATUS_COLOR = 'magenta'
 
 # Setup Default Logger
 class Logger(_Logger):
+
+    settings: Type[BaseSettings] = None
+
+    def _filter_dev(self, record: logging.LogRecord, **kwargs):
+        if not self.settings:
+            return True
+        if record.levelname == 'DEV':
+            for key in {'api_dev_mode', 'debug_enabled'}:
+                if (
+                    hasattr(self.settings, key)
+                    and getattr(self.settings, key) is False
+                ):
+                    return False
+        return True
+
+
 
     def display_crd(self, message: Any, *args, level: str = 'info', **kwargs):
         """
@@ -91,6 +108,7 @@ logger = Logger(
     patcher=None,
     extra={},
 )
+dev_level = logger.level(name='DEV', no=19, color="<blue>", icon="@")
 
 if _defaults.LOGURU_AUTOINIT and sys.stderr:
     logger.add(sys.stderr)
@@ -134,64 +152,6 @@ class InterceptHandler(logging.Handler):
 
 class CustomizeLogger:
 
-    # @classmethod
-    # def make_default_logger(cls, level: Union[str, int] = "INFO"):
-    #     # todo adjust this later to use a ConfigModel
-    #     if isinstance(level, str):
-    #         level = level.upper()
-    #     logger.remove()
-    #     logging.basicConfig(handlers=[InterceptHandler()], level=0)
-
-    #     *options, extra = logger._options
-    #     new_logger = Logger(logger._core, *options, {**extra})
-    #     new_logger.configure(
-    #         handlers=[
-    #             {
-    #                 "sink": sys.stdout,
-    #                 "format": cls.logger_formatter,
-    #                 "enqueue": True,
-    #                 "backtrace": True,
-    #                 "colorize": True,
-    #                 "level": level,
-    #             },
-    #         ],
-    #         levels = [{
-    #             "name": "DEV",
-    #             "no": 19,
-    #             "color": "<blue>",
-    #             "icon": "@"
-    #         }]
-    #     )
-    #     return new_logger
-
-
-        # if not hasattr(logger.__class__, 'dev'):
-        # try:
-        #     dev_level = logger.level(name='DEV', no=19, color="<blue>", icon="@")
-        #     logger.__class__.dev = functools.partialmethod(logger.__class__.log, 'DEV')
-        #     logger.add(
-        #         sys.stdout,
-        #         enqueue=True,
-        #         backtrace=True,
-        #         colorize=True,
-        #         level=19,
-        #         format=cls.logger_formatter,
-        #     )
-        # except Exception as e:
-        #     pass
-        # #     print("Error adding DEV level to logger: ", e) 
-        # #     # pass
-        # logger.add(
-        #     sys.stdout,
-        #     enqueue=True,
-        #     backtrace=True,
-        #     colorize=True,
-        #     level=level,
-        #     format=cls.logger_formatter,
-        # )
-        # logging.basicConfig(handlers=[InterceptHandler()], level=0)
-        # *options, extra = logger._options
-        # return Logger(logger._core, *options, {**extra})
 
     @classmethod
     def make_default_logger(
@@ -204,43 +164,49 @@ class CustomizeLogger:
         if isinstance(level, str):
             level = level.upper()
         logger.remove()
-        if settings:
-            try:
-                dev_level = logger.level(name='DEV', no=19, color="<blue>", icon="@")
-                logger.__class__.dev = functools.partialmethod(logger.__class__.log, 'DEV')
+        # if settings:
+        #     try:
+        #         dev_level = logger.level(name='DEV', no=19, color="<blue>", icon="@")
+        #         logger.__class__.dev = functools.partialmethod(logger.__class__.log, 'DEV')
 
-                def _filter_dev(record: dict, **kwargs):
+        #         def _filter_dev(record: dict, **kwargs):
 
-                    for key in {'api_dev_mode', 'debug_enabled'}:
-                        if hasattr(settings, key):
-                            return getattr(settings, key, False) and record['level'].name == 'DEV'
-                    return False
-
-                logger.add(
-                    sys.stdout,
-                    enqueue = True,
-                    backtrace = True,
-                    colorize = True,
-                    level = 19,
-                    format = cls.logger_formatter,
-                    filter = _filter_dev,
-                )
-            except Exception as e:
-                pass
-            #    print("Error adding DEV level to logger: ", e) 
-            #     # pass
-
+        #             for key in {'api_dev_mode', 'debug_enabled'}:
+        #                 if hasattr(settings, key):
+        #                     return getattr(settings, key, False) and record['level'].name == 'DEV'
+        #             return False
+                
+        #         logger._core.levels["DEV"] = 19
+        #         logger.add(
+        #             sys.stdout,
+        #             enqueue = True,
+        #             backtrace = True,
+        #             colorize = True,
+        #             level = 19,
+        #             format = cls.logger_formatter,
+        #             filter = _filter_dev,
+        #         )
+        #     except Exception as e:
+        #         pass
+        #     #    print("Error adding DEV level to logger: ", e) 
+        #     #     # pass
+        
         logger.add(
             sys.stdout,
-            enqueue=True,
-            backtrace=True,
-            colorize=True,
-            level=level,
-            format=cls.logger_formatter,
+            enqueue = True,
+            backtrace = True,
+            colorize = True,
+            level = level,
+            format = cls.logger_formatter,
+            filter = logger._filter_dev,
         )
         logging.basicConfig(handlers=[InterceptHandler()], level=0)
         *options, extra = logger._options
-        return Logger(logger._core, *options, {**extra})
+        new_logger = Logger(logger._core, *options, {**extra})
+        if settings: new_logger.settings = settings
+        # dev_level = new_logger.level(name='DEV', no=19, color="<blue>", icon="@")
+        return new_logger
+
 
     @staticmethod
     def logger_formatter(record: dict) -> str:
