@@ -9,6 +9,8 @@ import itertools
 import asyncio
 import contextlib
 import async_lru
+import signal
+
 
 from frozendict import frozendict
 from typing import Dict, Callable, List, Any, TYPE_CHECKING
@@ -111,16 +113,13 @@ def retryable(limit: int = 3, delay: int = 3):
 
 
 
-def get_batches_from_generator(iterable, n):
+def get_batches_from_generator(iterable: typing.Iterable, n: int) -> typing.Generator[typing.List, None, None]:
     """
     Batch elements of an iterable into fixed-length chunks or blocks.
     """
     it = iter(iterable)
-    x = tuple(itertools.islice(it, n))
-    while x:
+    while x := tuple(itertools.islice(it, n)):
         yield x
-        x = tuple(itertools.islice(it, n))
-
 
 def split_into_batches(items: List[Any], n: int):
     """
@@ -133,6 +132,32 @@ def split_into_batches(items: List[Any], n: int):
     k, m = divmod(len(items), n)
     return (items[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n))
 
+def split_into_batches_of_n(iterable: typing.Iterable, n: int) -> typing.Iterable[typing.List]:
+    """
+    Splits the items into fixed-length chunks or blocks.
+
+    >>> list(split_into_batches_of_n(range(11), 3))
+    [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10]]
+    """
+    return list(get_batches_from_generator(iterable, n))
+
+
+def split_into_n_batches(iterable: typing.Iterable, size: int) -> typing.Iterable[typing.List]:
+    """
+    Splits the items into n amount of equal items
+
+    >>> list(split_into_batches_of_size(range(11), 3))
+    [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10]]
+    """
+    return split_into_batches(iterable, size)
+
+def build_batches(iterable: typing.Iterable, size: int, fixed_batch_size: bool = True) -> typing.Iterable[typing.List]:
+    """
+    Builds batches of a given size from an iterable.
+    """
+    if fixed_batch_size:
+        return split_into_batches_of_n(iterable, size)
+    return split_into_n_batches(iterable, size)
 
 
 def import_string(dotted_path: str) -> Any:
@@ -350,6 +375,37 @@ def lazy_function(
     return wrapper_func
 
 
+def fail_after(delay: float):
+    """
+    Creates a timeout for a function
+    """
+
+    def wrapper(func):
+        @functools.wraps(func)
+        def time_limited(*args, **kwargs):
+            # Register an handler for the timeout
+            def handler(signum, frame):
+                raise TimeoutError(f"Timeout for function '{func.__name__}'")
+
+            # Register the signal function handler
+            signal.signal(signal.SIGALRM, handler)
+
+            # Define a timeout for your function
+            signal.alarm(delay)
+
+            result = None
+            try:
+                result = func(*args, **kwargs)
+            except Exception as exc:
+                raise exc
+            finally:
+                # disable the signal alarm
+                signal.alarm(0)
+
+            return result
+
+        return time_limited
+    return wrapper
 
 
 
