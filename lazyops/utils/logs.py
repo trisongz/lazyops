@@ -95,19 +95,35 @@ class Logger(_Logger):
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'DEV'``."""
         self._log('DEV', None, False, self._options, message, args, kwargs)
 
+# < 0.7.0
+try:
+    logger = Logger(
+        core=_Core(),
+        exception=None,
+        depth=0,
+        record=False,
+        lazy=False,
+        colors=False,
+        raw=False,
+        capture=True,
+        patcher=None,
+        extra={},
+    )
+# >= 0.7.0
+except Exception as e:
+    logger = Logger(
+        core=_Core(),
+        exception=None,
+        depth=0,
+        record=False,
+        lazy=False,
+        colors=False,
+        raw=False,
+        capture=True,
+        patchers=None,
+        extra={},
+    )
 
-logger = Logger(
-    core=_Core(),
-    exception=None,
-    depth=0,
-    record=False,
-    lazy=False,
-    colors=False,
-    raw=False,
-    capture=True,
-    patchers=None,
-    extra={},
-)
 dev_level = logger.level(name='DEV', no=19, color="<blue>", icon="@")
 
 if _defaults.LOGURU_AUTOINIT and sys.stderr:
