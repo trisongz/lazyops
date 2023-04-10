@@ -105,7 +105,7 @@ logger = Logger(
     colors=False,
     raw=False,
     capture=True,
-    patcher=None,
+    patchers=None,
     extra={},
 )
 dev_level = logger.level(name='DEV', no=19, color="<blue>", icon="@")
