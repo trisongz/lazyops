@@ -120,7 +120,7 @@ except Exception as e:
         colors=False,
         raw=False,
         capture=True,
-        patchers=None,
+        patchers=[],
         extra={},
     )
 
