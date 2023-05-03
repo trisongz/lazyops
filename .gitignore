@@ -14,3 +14,13 @@ build.sh
 tests/private_*
 !tests/
 !lazyops/types/asyncprop/cached.py
+lazyops/types/asyncprop/proxy.py
+lazyops/types/asyncprop/loader.py
+lazyops/types/asyncprop/cached.py
+lazyops/types/asyncprop/base.py
+lazyops/types/asyncprop/__init__.py
+lazyops/libs/stream_unzip/README.md
+lazyops/libs/stream_unzip/lib.py
+lazyops/libs/stream_unzip/inflate.py
+lazyops/libs/stream_unzip/exceptions.py
+lazyops/libs/stream_unzip/constants.py

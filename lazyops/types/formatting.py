@@ -2,7 +2,10 @@ import typing
 from re import sub
 
 def to_camel_case(text: str):
-    """Convert a snake str to camel case."""
+    """
+    Convert a snake str to camel case.
+    multi_master -> multiMaster
+    """
     components = text.split("_")
     # We capitalize the first letter of each component except the first one
     # with the 'title' method and join them together.

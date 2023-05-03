@@ -2,7 +2,9 @@ import os
 import sys
 import logging
 import typing
+import traceback
 import warnings
+import pprint
 import atexit as _atexit
 import functools
 
@@ -11,7 +13,7 @@ from loguru._logger import Core as _Core
 from loguru._logger import Logger as _Logger
 from pydantic import BaseSettings
 
-from typing import Type, Union, Optional, Any
+from typing import Type, Union, Optional, Any, List
 
 # Use this section to filter out warnings from other modules
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = os.getenv('TF_CPP_MIN_LOG_LEVEL', '3')
@@ -33,6 +35,7 @@ STATUS_COLOR = {
     'sweep': 'yellow',
     'dequeue': 'light-blue',
     'stats': 'light-blue',
+    'reset': '\x1b[0m'
 
 }
 FALLBACK_STATUS_COLOR = 'magenta'
@@ -55,6 +58,8 @@ class Logger(_Logger):
                     return False
         return True
 
+    def get_log_mode(self, level: str = "info"):
+        return self.dev if level.upper() in {'DEV'} else getattr(self, level.lower())
 
 
     def display_crd(self, message: Any, *args, level: str = 'info', **kwargs):
@@ -79,7 +84,8 @@ class Logger(_Logger):
             __message = "".join(f'- <light-blue>{key}</>: {value}\n' for key, value in message.items())
         else:
             __message = str(message)
-        self._log(level.upper(), None, False, self._options, __message.strip(), args, kwargs)
+        _log = self.get_log_mode(level)
+        _log(__message.strip(), *args, **kwargs)
 
     def __call__(self, message: Any, *args, level: str = 'info', **kwargs):
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'INFO'``."""
@@ -89,11 +95,115 @@ class Logger(_Logger):
             __message = "".join(f'- {key}: {value}\n' for key, value in message.items())
         else:
             __message = str(message)
-        self._log(level.upper(), None, False, self._options, __message.strip(), args, kwargs)
+        _log = self.get_log_mode(level)
+        _log(__message.strip(), *args, **kwargs)
 
     def dev(self, message: Any, *args, **kwargs):
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'DEV'``."""
         self._log('DEV', None, False, self._options, message, args, kwargs)
+
+    def trace(self, msg: Union[str, Any], level: str = "ERROR", error: Optional[Type[Exception]] = None) -> None:
+        """
+        This method logs the traceback of an exception.
+
+        :param error: The exception to log.
+        """
+        _msg = msg if isinstance(msg, str) else pprint.pformat(msg)
+        _msg += f": {traceback.format_exc()}"
+        if error: _msg += f" - {error}"
+        _log = self.get_log_mode(level)
+        _log(_msg)
+
+    def render(
+        self,
+        objs: Union[Any, List[Any]],
+        level: str = 'INFO',
+        **kwargs,
+    ) -> None:
+        """
+        Tries to render an object with pformat
+        """
+        if not isinstance(objs, list):
+            objs = [objs]
+        _log = self.get_log_mode(level)
+        for obj in objs:
+            try:
+                _log('\n' + pprint.pformat(obj, **kwargs))
+            except Exception as e:
+                _log('\n' + obj)
+
+    def render_yaml(
+        self,
+        objs: Union[Any, List[Any]],
+        level: str = 'INFO',
+        **kwargs,
+    ) -> None:
+        """
+        Tries to render a yaml object.
+        """
+        _log = self.get_log_mode(level)
+        try:
+            from fileio.io import Yaml
+            _log('\n' + Yaml.dumps(objs, **kwargs))
+        
+        except Exception as e:
+            import yaml
+            _log('\n' + yaml.dump(objs, **kwargs))
+
+        
+    """
+    Utilties
+    """
+    def mute_logger(self, modules: Optional[Union[str, List[str]]], level: str = 'WARNING'):
+        """
+        Helper to mute a logger from another module.
+        """
+        if not isinstance(modules, list):
+            modules = [modules]
+        for module in modules:
+            logging.getLogger(module).setLevel(logging.getLevelName(level))
+
+    def mute_warning(self, action: str = 'ignore', category: Type[Warning] = Warning, module: str = None, **kwargs):
+        """
+        Helper to mute a warning from another module.
+        """
+        if module:
+            warnings.filterwarnings(action, category=category, module=module, **kwargs)
+        else:
+            warnings.filterwarnings(action, category=category, **kwargs)
+    
+    def add_healthz_filter(
+        self,
+        loggers: Optional[Union[str, List[str]]] = None,
+        paths: Optional[Union[str, List[str]]] = None,
+    ):
+        """
+        Adds a filter to the logger to filter out healthz requests.
+
+        Parameters
+        ----------
+        loggers : Optional[Union[str, List[str]]]
+            The loggers to add the filter to.
+            defaults to ['gunicorn.glogging.Logger', 'uvicorn.access']
+        paths : Optional[Union[str, List[str]]]
+            The paths to filter out.
+            defaults to ['/healthz', '/health']
+        """
+        if not loggers: loggers = ['gunicorn.glogging.Logger', 'uvicorn.access']
+        if not paths: paths = ['/healthz', '/health']
+        if not isinstance(loggers, list): loggers = [loggers]
+        if not isinstance(paths, list): paths = [paths]
+
+        def _healthz_filter(record: logging.LogRecord) -> bool:
+            if record.args.get('path'):
+                return record.args['path'] not in paths
+            return all(path not in record.args for path in paths)
+
+        for logger in loggers:
+            logging.getLogger(logger).addFilter(_healthz_filter)
+
+
+
 
 # < 0.7.0
 try:
@@ -258,10 +368,14 @@ class CustomizeLogger:
                        + extra + "<level>{message}</level>\n"
         msg = str(record['message'])[:100].replace('{', '(').replace('}', ')')
         return "<level>{level: <8}</> <green>{time:YYYY-MM-DD HH:mm:ss.SSS}</>: "\
-                   + extra + "<level>" + msg + "</level>\n"
+                   + extra + "<level>" + msg + f"</level>{STATUS_COLOR['reset']}\n"
 
 
-logger_level: str = os.getenv('LOGGER_LEVEL', 'INFO').upper()
+if os.getenv('DEBUG_ENABLED') == 'True':
+    logger_level = 'DEV'
+else:
+    logger_level: str = os.getenv('LOGGER_LEVEL', 'INFO').upper()
+
 
 get_logger = CustomizeLogger.make_default_logger
 default_logger = CustomizeLogger.make_default_logger(level = logger_level)

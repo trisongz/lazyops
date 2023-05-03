@@ -6,7 +6,7 @@ from pydantic import Field, validator
 from pydantic.networks import AnyUrl
 from pydantic import BaseModel as _BaseModel
 from pydantic import BaseSettings as _BaseSettings
-from lazyops.types.formatting import to_snake_case, to_graphql_format
+from lazyops.types.formatting import to_camel_case, to_snake_case, to_graphql_format
 from lazyops.types.classprops import classproperty, lazyproperty
 from lazyops.utils.serialization import Json
 
@@ -125,6 +125,11 @@ class Schema(BaseModel):
         extra = 'allow'
         arbitrary_types_allowed = True
         json_dumps = Json.dumps
+        # alias_generator = to_camel_case
+
+    @lazyproperty
+    def schema_fields(self) -> List[str]:
+        return [field.name for field in self.__fields__.values()]
 
     def get(self, name, default: Any = None):
         return getattr(self, name, default)
