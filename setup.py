@@ -21,7 +21,14 @@ requirements = [
 if sys.version_info.minor < 8:
     requirements.append('typing_extensions')
 
-extras = {}
+extras = {
+    'kops': [
+        'kubernetes',
+        'kubernetes_asyncio',
+        'kopf',
+        'aiocache',
+    ]
+}
 args = {
     'packages': find_packages(include = [f'{pkg_name}', f'{pkg_name}.*',]),
     'install_requires': requirements,

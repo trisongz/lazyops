@@ -59,7 +59,7 @@ except ImportError:
     _kopf_available = False
 
 
-from gexai.libs.imports.base import resolve_missing, require_missing_wrapper
+from lazyops.utils.imports import resolve_missing, require_missing_wrapper
 
 def resolve_sync_k8s(
     required: bool = True,
