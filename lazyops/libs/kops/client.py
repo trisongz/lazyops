@@ -43,7 +43,7 @@ class KOpsContext:
         if self.ainitialized: return
         if self.settings.in_k8s:
             logger.info('Loading in-cluster config')
-            await AsyncConfig.load_incluster_config()
+            AsyncConfig.load_incluster_config()
         else:
             config = self.settings.get_kconfig_path(self.ctx or self.name)
             if config: config = config.as_posix()
