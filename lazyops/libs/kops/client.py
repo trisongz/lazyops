@@ -826,13 +826,15 @@ class KOpsClientMeta(type):
 
         
         @kopf.on.startup()
-        async def configure(settings: kopf.OperatorSettings, logger: logging.Logger = _logger, **kwargs):
+        async def configure(settings: kopf.OperatorSettings, logger: logging.Logger, **kwargs):
             if _settings is not None:
                 settings = _settings
+            logger = _logger
             if enable_event_logging is False:
                 settings.posting.enabled = enable_event_logging
                 logger.info(f'Kopf Events Enabled: {enable_event_logging}')
-            elif enable_event_logging is True:
+            if event_logging_level is not None:
+                # elif enable_event_logging is True:
                 settings.posting.level = logging.getLevelName(event_logging_level.upper())
                 logger.info(f'Kopf Events Logging Level: {event_logging_level}')
 
