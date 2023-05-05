@@ -805,16 +805,27 @@ class KOpsClientMeta(type):
             else cls.settings.kopf_event_logging_level
         finalizer = finalizer if finalizer is not None \
             else cls.settings.kops_finalizer
+        
+        if finalizer != cls.settings.kops_finalizer:
+            cls.settings.kops_finalizer = finalizer
+        
         storage_prefix = storage_prefix if storage_prefix is not None \
             else cls.settings.kops_prefix
         persistent_key = persistent_key if persistent_key is not None \
             else cls.settings.kops_persistent_key
+        
+        if persistent_key != cls.settings.kops_persistent_key:
+            cls.settings.kops_persistent_key = persistent_key
+        
         error_delays = error_delays if error_delays is not None \
             else [10, 20, 30]
         kopf_name = kopf_name if kopf_name is not None \
             else cls.settings.kopf_name
         app_name = app_name if app_name is not None \
             else cls.settings.app_name
+        
+        _logger = _logger if _logger is not None \
+            else logger
         
         if startup_functions is not None:
             for func in startup_functions:
@@ -825,19 +836,20 @@ class KOpsClientMeta(type):
                 cls.add_function(func, EventType.shutdown)
 
         
+        # @kopf.on.startup()
+        # async def configure(settings: kopf.OperatorSettings, logger: logging.Logger, **kwargs):
+        
         @kopf.on.startup()
-        async def configure(settings: kopf.OperatorSettings, logger: logging.Logger, **kwargs):
+        async def configure(settings: kopf.OperatorSettings, **kwargs):
             if _settings is not None:
                 settings = _settings
-            if _logger is not None:
-                logger = _logger
             if enable_event_logging is False:
                 settings.posting.enabled = enable_event_logging
-                logger.info(f'Kopf Events Enabled: {enable_event_logging}')
+                _logger.info(f'Kopf Events Enabled: {enable_event_logging}')
             if event_logging_level is not None:
                 # elif enable_event_logging is True:
                 settings.posting.level = logging.getLevelName(event_logging_level.upper())
-                logger.info(f'Kopf Events Logging Level: {event_logging_level}')
+                _logger.info(f'Kopf Events Logging Level: {event_logging_level}')
 
             settings.persistence.finalizer = finalizer
             settings.persistence.progress_storage = kopf.SmartProgressStorage(prefix = storage_prefix)
@@ -863,12 +875,12 @@ class KOpsClientMeta(type):
             # )
             # settings.batching.error_delays = [10, 20, 30]
 
-            logger.info(f'Starting Kopf: {kopf_name} {app_name} @ {cls.settings.build_id}')
+            _logger.info(f'Starting Kopf: {kopf_name} {app_name} @ {cls.settings.build_id}')
             await cls.aset_k8_config()
             if cls._startup_functions:
-                logger.info('Running Startup Functions')
+                _logger.info('Running Startup Functions')
                 await cls.run_startup_functions()
-            logger.info('Completed Kopf Startup')
+            _logger.info('Completed Kopf Startup')
 
         @kopf.on.login()
         async def login_fn(**kwargs):

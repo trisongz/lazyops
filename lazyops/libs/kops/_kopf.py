@@ -11,6 +11,7 @@ from kopf._cogs.helpers import typedefs
 from kopf._cogs.structs import bodies, references
 import kopf._cogs.clients.events
 from typing import Dict, Any, TYPE_CHECKING
+from lazyops.utils.logs import logger as _logger
 
 if TYPE_CHECKING:
     from lazyops.libs.kops.config import KOpsSettings
@@ -40,14 +41,14 @@ def _get_config():
 
 
 async def post_event(
-        *,
-        ref: bodies.ObjectReference,
-        type: str,
-        reason: str,
-        message: str = '',
-        resource: references.Resource,
-        settings: configuration.OperatorSettings,
-        logger: typedefs.Logger,
+    *,
+    ref: bodies.ObjectReference,
+    type: str,
+    reason: str,
+    message: str = '',
+    resource: references.Resource,
+    settings: configuration.OperatorSettings,
+    logger: typedefs.Logger,
 ) -> None:
     """
     Issue an event for the object.
