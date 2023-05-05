@@ -779,12 +779,94 @@ class KOpsClientMeta(type):
     # Register Startup Functions
     def configure_kopf(
         cls, 
-        _logger: logging.Logger = logger, 
+        _logger: logging.Logger = logger,
+        _settings: Optional[kopf.OperatorSettings] = None,
+        enable_event_logging: Optional[bool] = None,
+        event_logging_level: Optional[str] = None,
+        finalizer: Optional[str] = None,
+        storage_prefix: Optional[str] = None,
+        persistent_key: Optional[str] = None,
+        error_delays: Optional[List[int]] = None,
+        startup_functions: Optional[List[Callable]] = None,
+        shutdown_functions: Optional[List[Callable]] = None,
+        kopf_name: Optional[str] = None,
+        app_name: Optional[str] = None,
+
         **kwargs
     ):
         """
         Registers the startup function for configuring kopf.
+
+        Parameters
         """ 
+        enable_event_logging = enable_event_logging if enable_event_logging is not None \
+            else cls.settings.kopf_enable_event_logging
+        event_logging_level = event_logging_level if event_logging_level is not None \
+            else cls.settings.kopf_event_logging_level
+        finalizer = finalizer if finalizer is not None \
+            else cls.settings.kops_finalizer
+        storage_prefix = storage_prefix if storage_prefix is not None \
+            else cls.settings.kops_prefix
+        persistent_key = persistent_key if persistent_key is not None \
+            else cls.settings.kops_persistent_key
+        error_delays = error_delays if error_delays is not None \
+            else [10, 20, 30]
+        kopf_name = kopf_name if kopf_name is not None \
+            else cls.settings.kopf_name
+        app_name = app_name if app_name is not None \
+            else cls.settings.app_name
+        
+        if startup_functions is not None:
+            for func in startup_functions:
+                cls.add_function(func, EventType.startup)
+        
+        if shutdown_functions is not None:
+            for func in shutdown_functions:
+                cls.add_function(func, EventType.shutdown)
+
+        
+        @kopf.on.startup()
+        async def configure(settings: kopf.OperatorSettings, logger: logging.Logger = _logger, **kwargs):
+            if _settings is not None:
+                settings = _settings
+            if enable_event_logging is False:
+                settings.posting.enabled = enable_event_logging
+                logger.info(f'Kopf Events Enabled: {enable_event_logging}')
+            elif enable_event_logging is True:
+                settings.posting.level = logging.getLevelName(event_logging_level.upper())
+                logger.info(f'Kopf Events Logging Level: {event_logging_level}')
+
+            settings.persistence.finalizer = finalizer
+            settings.persistence.progress_storage = kopf.SmartProgressStorage(prefix = storage_prefix)
+            settings.persistence.diffbase_storage = kopf.AnnotationsDiffBaseStorage(
+                prefix = storage_prefix,
+                key = persistent_key,
+            )
+            settings.batching.error_delays = error_delays
+
+            
+            # if cls.settings.kopf_enable_event_logging is False:
+            #     settings.posting.enabled = cls.settings.kopf_enable_event_logging
+            #     logger.info(f'Kopf Events Enabled: {cls.settings.kopf_enable_event_logging}')
+            # elif cls.settings.kopf_enable_event_logging is True:
+            #     settings.posting.level = logging.getLevelName(cls.settings.kopf_event_logging_level.upper())
+            #     logger.info(f'Kopf Events Logging Level: {cls.settings.kopf_enable_event_logging}')
+
+            # settings.persistence.finalizer = cls.settings.kops_finalizer
+            # settings.persistence.progress_storage = kopf.SmartProgressStorage(prefix = cls.settings.kops_prefix)
+            # settings.persistence.diffbase_storage = kopf.AnnotationsDiffBaseStorage(
+            #     prefix = cls.settings.kops_prefix,
+            #     key = cls.settings.kops_persistent_key,
+            # )
+            # settings.batching.error_delays = [10, 20, 30]
+
+            logger.info(f'Starting Kopf: {kopf_name} {app_name} @ {cls.settings.build_id}')
+            await cls.aset_k8_config()
+            if cls._startup_functions:
+                logger.info('Running Startup Functions')
+                await cls.run_startup_functions()
+            logger.info('Completed Kopf Startup')
+
         @kopf.on.login()
         async def login_fn(**kwargs):
             return (
@@ -794,30 +876,6 @@ class KOpsClientMeta(type):
                 else kopf.login_via_client(**kwargs)
             )
         
-        @kopf.on.startup()
-        async def configure(settings: kopf.OperatorSettings, logger: logging.Logger = _logger, **kwargs):
-            if cls.settings.kopf_enable_event_logging is False:
-                settings.posting.enabled = cls.settings.kopf_enable_event_logging
-                logger.info(f'Kopf Events Enabled: {cls.settings.kopf_enable_event_logging}')
-            elif cls.settings.kopf_enable_event_logging is True:
-                settings.posting.level = logging.getLevelName(cls.settings.kopf_event_logging_level.upper())
-                logger.info(f'Kopf Events Logging Level: {cls.settings.kopf_enable_event_logging}')
-
-            settings.persistence.finalizer = cls.settings.kops_finalizer
-            settings.persistence.progress_storage = kopf.SmartProgressStorage(prefix = cls.settings.kops_prefix)
-            settings.persistence.diffbase_storage = kopf.AnnotationsDiffBaseStorage(
-                prefix = cls.settings.kops_prefix,
-                key = cls.settings.kops_persistent_key,
-            )
-            settings.batching.error_delays = [10, 20, 30]
-
-            logger.info(f'Starting Kopf: {cls.settings.kopf_name} {cls.settings.app_name} @ {cls.settings.build_id}')
-            await cls.aset_k8_config()
-            if cls._startup_functions:
-                logger.info('Running Startup Functions')
-                await cls.run_startup_functions()
-            logger.info('Completed Kopf Startup')
-
 
 class BaseKOpsClient(metaclass = KOpsClientMeta):
     """
