@@ -60,6 +60,22 @@ class Logger(_Logger):
 
     def get_log_mode(self, level: str = "info"):
         return self.dev if level.upper() in {'DEV'} else getattr(self, level.lower())
+    
+    def opt(
+        self,
+        *,
+        exception=None,
+        record=False,
+        lazy=False,
+        colors=False,
+        raw=False,
+        capture=True,
+        depth=0,
+        ansi=False
+    ):
+        if ansi: colors = True
+        args = self._options[-2:]
+        return Logger(self._core, exception, depth, record, lazy, colors, raw, capture, *args)
 
 
     def display_crd(self, message: Any, *args, level: str = 'info', **kwargs):
