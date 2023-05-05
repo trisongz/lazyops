@@ -785,6 +785,15 @@ class KOpsClientMeta(type):
         """
         Registers the startup function for configuring kopf.
         """ 
+        @kopf.on.login()
+        async def login_fn(**kwargs):
+            return (
+                kopf.login_with_service_account(**kwargs)
+                or kopf.login_with_kubeconfig(**kwargs)
+                if cls.settings.in_k8s
+                else kopf.login_via_client(**kwargs)
+            )
+        
         @kopf.on.startup()
         async def configure(settings: kopf.OperatorSettings, logger: logging.Logger = _logger, **kwargs):
             if cls.settings.kopf_enable_event_logging is False:
@@ -809,14 +818,6 @@ class KOpsClientMeta(type):
                 await cls.run_startup_functions()
             logger.info('Completed Kopf Startup')
 
-        @kopf.on.login()
-        async def login_fn(**kwargs):
-            return (
-                kopf.login_with_service_account(**kwargs)
-                or kopf.login_with_kubeconfig(**kwargs)
-                if cls.settings.in_k8s
-                else kopf.login_via_client(**kwargs)
-            )
 
 class BaseKOpsClient(metaclass = KOpsClientMeta):
     """
