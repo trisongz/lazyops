@@ -127,9 +127,9 @@ class Schema(BaseModel):
         json_dumps = Json.dumps
         # alias_generator = to_camel_case
 
-    @lazyproperty
-    def schema_fields(self) -> List[str]:
-        return [field.name for field in self.__fields__.values()]
+    # @lazyproperty
+    # def schema_fields(self) -> List[str]:
+    #     return [field.name for field in self.__fields__.values()]
 
     def get(self, name, default: Any = None):
         return getattr(self, name, default)
