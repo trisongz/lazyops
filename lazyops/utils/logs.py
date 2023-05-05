@@ -75,7 +75,7 @@ class Logger(_Logger):
     ):
         if ansi: colors = True
         args = self._options[-2:]
-        return Logger(self._core, exception, depth, record, lazy, colors, raw, capture, *args)
+        return type(self)(self._core, exception, depth, record, lazy, colors, raw, capture, *args)
 
 
     def display_crd(self, message: Any, *args, level: str = 'info', **kwargs):
@@ -229,7 +229,7 @@ try:
         depth=0,
         record=False,
         lazy=False,
-        colors=False,
+        colors=True,
         raw=False,
         capture=True,
         patcher=None,

@@ -11,7 +11,7 @@ from kopf._cogs.helpers import typedefs
 from kopf._cogs.structs import bodies, references
 import kopf._cogs.clients.events
 from typing import Dict, Any, TYPE_CHECKING
-from lazyops.utils.logs import logger as _logger
+from lazyops.utils.logs import default_logger as _logger
 
 if TYPE_CHECKING:
     from lazyops.libs.kops.config import KOpsSettings
