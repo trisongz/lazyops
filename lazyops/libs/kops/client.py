@@ -779,7 +779,7 @@ class KOpsClientMeta(type):
     # Register Startup Functions
     def configure_kopf(
         cls, 
-        _logger: logging.Logger = logger,
+        _logger: logging.Logger = None,
         _settings: Optional[kopf.OperatorSettings] = None,
         enable_event_logging: Optional[bool] = None,
         event_logging_level: Optional[str] = None,
@@ -829,7 +829,8 @@ class KOpsClientMeta(type):
         async def configure(settings: kopf.OperatorSettings, logger: logging.Logger, **kwargs):
             if _settings is not None:
                 settings = _settings
-            logger = _logger
+            if _logger is not None:
+                logger = _logger
             if enable_event_logging is False:
                 settings.posting.enabled = enable_event_logging
                 logger.info(f'Kopf Events Enabled: {enable_event_logging}')
