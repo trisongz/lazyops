@@ -79,6 +79,19 @@ class KOpsContext:
         """
         return AsyncClient.ApiClient(pool_threads=4)
     
+    @lazyproperty
+    def wsclient(self) -> 'SyncStream.WSClient':
+        """
+        Primary Websocket Client
+        """
+        return SyncStream.WSClient(pool_threads=4)
+    
+    @lazyproperty
+    def awsclient(self) -> 'AsyncStream.WsApiClient':
+        """
+        Primary Async Websocket Client
+        """
+        return AsyncStream.WsApiClient(pool_threads=4)
     
     @lazyproperty
     def core_v1(self) -> 'SyncClient.CoreV1Api':
@@ -92,6 +105,21 @@ class KOpsContext:
         - Nodes
         """
         return SyncClient.CoreV1Api(self.client)
+    
+    @lazyproperty
+    def core_v1_ws(self) -> 'SyncClient.CoreV1Api':
+        """
+        Websocket Client
+
+        - StatefulSets
+        - Deployments
+        - DaemonSets
+        - ReplicaSets
+        - Secrets
+        - Pods
+        - Nodes
+        """
+        return SyncClient.CoreV1Api(self.wsclient)
     
 
     @lazyproperty
@@ -120,7 +148,6 @@ class KOpsContext:
     @lazyproperty
     def customobjs(self) -> 'SyncClient.CustomObjectsApi':
         return SyncClient.CustomObjectsApi(self.client)
-    
 
     """
     Async Properties
@@ -138,6 +165,22 @@ class KOpsContext:
         - Nodes
         """
         return AsyncClient.CoreV1Api(self.aclient)
+    
+
+    @lazyproperty
+    def acore_v1_ws(self) -> 'AsyncClient.CoreV1Api':
+        """
+        Websocket Client
+
+        - StatefulSets
+        - Deployments
+        - DaemonSets
+        - ReplicaSets
+        - Secrets
+        - Pods
+        - Nodes
+        """
+        return AsyncClient.CoreV1Api(self.awsclient)
     
 
     @lazyproperty
@@ -458,7 +501,21 @@ class KOpsClientMeta(type):
         """
         return cls.session.aclient
     
-
+    @property
+    def wsclient(cls) -> 'SyncStream.WSClient':
+        """
+        Returns the websocket kubernetes client.
+        """
+        return cls.session.wsclient
+    
+    @property
+    def awsclient(cls) -> 'AsyncStream.WsApiClient':
+        """
+        Returns the async websocket kubernetes client.
+        """
+        return cls.session.awsclient
+    
+    
     @property
     def apps_v1(cls) -> 'SyncClient.AppsV1Api':
         """
@@ -472,6 +529,20 @@ class KOpsClientMeta(type):
         Returns the core_v1 api.
         """
         return cls.session.core_v1
+    
+    @property
+    def core_v1_ws(cls) -> 'SyncClient.CoreV1Api':
+        """
+        Websocket Client:
+        - StatefulSets
+        - Deployments
+        - DaemonSets
+        - ReplicaSets
+        - Secrets
+        - Pods
+        - Nodes
+        """
+        return cls.session.core_v1_ws
     
     @property
     def crds(cls) -> 'SyncClient.CustomObjectsApi':
@@ -502,6 +573,20 @@ class KOpsClientMeta(type):
         - Nodes
         """
         return cls.session.acore_v1
+    
+    @property
+    def acore_v1_ws(cls) -> 'AsyncClient.CoreV1Api':
+        """
+        Websocket Client:
+        - StatefulSets
+        - Deployments
+        - DaemonSets
+        - ReplicaSets
+        - Secrets
+        - Pods
+        - Nodes
+        """
+        return cls.session.acore_v1_ws
     
 
     @property
@@ -1003,6 +1088,88 @@ async def aget_claimnames_from_pods_on_node(name: str, host_ip: Optional[str] = 
     return claim_names
 
 
+def run_pod_command(
+    name: str, 
+    namespace: str,
+    command: Union[str, List[str]],
+    container: Optional[str] = None,
+    stderr: Optional[bool] = True,
+    stdin: Optional[bool] = True,
+    stdout: Optional[bool] = True,
+    tty: Optional[bool] = False,
+    ignore_error: bool = True, 
+    **kwargs
+) -> str:
+    """
+    Runs a command in the pod and returns the command
+    name = 'name_example' # str | name of the PodExecOptions
+    namespace = 'namespace_example' # str | object name and auth scope, such as for teams and projects
+    command = 'command_example' # str | Command is the remote command to execute. argv array. Not executed within a shell. (optional)
+    container = 'container_example' # str | Container in which to execute the command. Defaults to only container if there is only one container in the pod. (optional)
+    stderr = True # bool | Redirect the standard error stream of the pod for this call. (optional)
+    stdin = True # bool | Redirect the standard input stream of the pod for this call. Defaults to false. (optional)
+    stdout = True # bool | Redirect the standard output stream of the pod for this call. (optional)
+    tty = True # bool | TTY if true indicates that a tty will be allocated for the exec call. Defaults to false. (optional)
+
+    """
+    try:
+
+        return BaseKOpsClient.core_v1_ws.connect_post_namespaced_pod_exec(
+            name = name, 
+            namespace = namespace, 
+            command = command,
+            container = container,
+            stderr = stderr,
+            stdin = stdin,
+            stdout = stdout,
+            tty = tty
+        )
+    except Exception as e:
+        if not ignore_error:
+            logger.warning(f'[{namespace}/{name}] Exec Status Failed: {e}')
+        return None
+
+async def arun_pod_command(
+    name: str, 
+    namespace: str,
+    command: Union[str, List[str]],
+    container: Optional[str] = None,
+    stderr: Optional[bool] = True,
+    stdin: Optional[bool] = True,
+    stdout: Optional[bool] = True,
+    tty: Optional[bool] = False,
+    ignore_error: bool = True, 
+    **kwargs
+) -> str:
+    """
+    Runs a command in the pod and returns the command
+    name = 'name_example' # str | name of the PodExecOptions
+    namespace = 'namespace_example' # str | object name and auth scope, such as for teams and projects
+    command = 'command_example' # str | Command is the remote command to execute. argv array. Not executed within a shell. (optional)
+    container = 'container_example' # str | Container in which to execute the command. Defaults to only container if there is only one container in the pod. (optional)
+    stderr = True # bool | Redirect the standard error stream of the pod for this call. (optional)
+    stdin = True # bool | Redirect the standard input stream of the pod for this call. Defaults to false. (optional)
+    stdout = True # bool | Redirect the standard output stream of the pod for this call. (optional)
+    tty = True # bool | TTY if true indicates that a tty will be allocated for the exec call. Defaults to false. (optional)
+
+    """
+    try:
+
+        return await BaseKOpsClient.acore_v1_ws.connect_post_namespaced_pod_exec(
+            name = name, 
+            namespace = namespace, 
+            command = command,
+            container = container,
+            stderr = stderr,
+            stdin = stdin,
+            stdout = stdout,
+            tty = tty
+        )
+    except Exception as e:
+        if not ignore_error:
+            logger.warning(f'[{namespace}/{name}] Exec Status Failed: {e}')
+        return None
+
 """
 PVCs
 """
@@ -1113,4 +1280,56 @@ class KOpsClient(BaseKOpsClient):
     async def aget_pods(cls, namespace: Optional[str] = None, **kwargs) -> List[at.V1Pod]:
         return await aget_pods(namespace = namespace, **kwargs)
     
+    @classmethod
+    def run_command(
+        cls,
+        name: str, 
+        namespace: str,
+        command: Union[str, List[str]],
+        container: Optional[str] = None,
+        stderr: Optional[bool] = True,
+        stdin: Optional[bool] = True,
+        stdout: Optional[bool] = True,
+        tty: Optional[bool] = False,
+        ignore_error: bool = True, 
+        **kwargs
+    ) -> str:
+        return run_pod_command(
+            name = name, 
+            namespace = namespace,
+            command = command,
+            container = container,
+            stderr = stderr,
+            stdin = stdin,
+            stdout = stdout,
+            tty = tty,
+            ignore_error = ignore_error, 
+            **kwargs
+        )
     
+    @classmethod
+    async def arun_command(
+        cls,
+        name: str, 
+        namespace: str,
+        command: Union[str, List[str]],
+        container: Optional[str] = None,
+        stderr: Optional[bool] = True,
+        stdin: Optional[bool] = True,
+        stdout: Optional[bool] = True,
+        tty: Optional[bool] = False,
+        ignore_error: bool = True, 
+        **kwargs
+    ) -> str:
+        return await arun_pod_command(
+            name = name, 
+            namespace = namespace,
+            command = command,
+            container = container,
+            stderr = stderr,
+            stdin = stdin,
+            stdout = stdout,
+            tty = tty,
+            ignore_error = ignore_error, 
+            **kwargs
+        )
