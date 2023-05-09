@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import contextlib
 from enum import Enum
 from lazyops.libs.kops.base import *
 from lazyops.libs.kops.config import KOpsSettings
@@ -11,10 +12,19 @@ from lazyops.types import lazyproperty
 from lazyops.utils import logger
 
 
-from typing import List, Dict, Union, Any, Optional, Callable
+from typing import List, Dict, Union, Any, Optional, Callable, TYPE_CHECKING
 
 import lazyops.libs.kops.types as t
 import lazyops.libs.kops.atypes as at
+
+if TYPE_CHECKING:
+    with contextlib.suppress(ImportError):
+        import requests
+        import aiohttpx
+
+
+
+    
 
 
 
@@ -91,7 +101,7 @@ class KOpsContext:
         """
         Primary Async Websocket Client
         """
-        return AsyncStream.WsApiClient(pool_threads=4)
+        return AsyncStream.WsApiClient()
     
     @lazyproperty
     def core_v1(self) -> 'SyncClient.CoreV1Api':
@@ -330,6 +340,62 @@ class KOpsContext:
     @lazyproperty
     def apersistent_volume_claims(self) -> 'AsyncClient.CoreV1Api':
         return self.acore_v1
+    
+    @property
+    def auth_headers(self) -> Dict[str, str]:
+        if not self.initialized and not self.ainitialized: return None
+        auth = self.aclient.configuration.auth_settings() if self.ainitialized \
+            else self.client.configuration.auth_settings()
+        return {auth['BearerToken']['key']: auth['BearerToken']['value']}
+
+    @property
+    def request_headers(self) -> Dict[str, str]:
+        if not self.initialized and not self.ainitialized: return None
+        headers = self.aclient.default_headers if self.ainitialized \
+            else self.client.default_headers
+        # logger.info(f"Request Headers: {headers}")
+        return {
+            'Accept': 'application/json;as=Table;v=v1;g=meta.k8s.io,application/json;as=Table;v=v1beta1;g=meta.k8s.io,application/json',
+            'Connection': 'keep-alive',
+            # 'Keep-alive': 'max=10, timeout=1200',
+            **self.auth_headers,
+            **headers
+        }
+    
+    @property
+    def cluster_url(self) -> str:
+        if self.initialized or self.ainitialized:
+            return self.aclient.configuration.host if self.ainitialized \
+                    else self.client.configuration.host
+        else: return None
+
+    @property
+    def ssl_ca_cert(self) -> str:
+        if self.initialized or self.ainitialized:
+            return self.aclient.configuration.ssl_ca_cert if self.ainitialized \
+                    else self.client.configuration.ssl_ca_cert
+        else: return None
+
+    @lazyproperty
+    def http_client(self) -> Union['aiohttpx.Client', 'requests.Session']:
+        """
+        Returns the http client
+        """
+        with contextlib.suppress(ImportError):
+            import aiohttpx
+            return aiohttpx.Client(
+                base_url = self.cluster_url,
+                headers = self.request_headers, 
+                verify = self.ssl_ca_cert,
+            )
+        with contextlib.suppress(ImportError):
+            import requests
+            sess = requests.Session()
+            sess.headers.update(self.request_headers)
+            sess.verify = self.ssl_ca_cert
+            return sess
+        raise ImportError('No http client found. Please install aiohttpx or requests')
+
 
     @staticmethod
     def to_singular(resource: str) -> str:
@@ -501,6 +567,45 @@ class KOpsClientMeta(type):
         """
         return cls.session.aclient
     
+    """
+    HTTP Client Properties
+    """
+
+    @property
+    def auth_headers(cls) -> Dict[str, str]:
+        """
+        Returns the authentication headers.
+        """
+        return cls.session.auth_headers
+    
+    @property
+    def request_headers(cls) -> Dict[str, str]:
+        """
+        Returns the request headers.
+        """
+        return cls.session.request_headers
+    
+    @property
+    def cluster_url(cls) -> str:
+        """
+        Returns the cluster url.
+        """
+        return cls.session.cluster_url
+    
+    @property
+    def ssl_ca_cert(cls) -> str:
+        """
+        Returns the ssl ca cert.
+        """
+        return cls.session.ssl_ca_cert
+    
+    @property
+    def http_client(cls) -> Union['aiohttpx.Client', 'requests.Session']:
+        """
+        Returns the http client.
+        """
+        return cls.session.http_client
+
     @property
     def wsclient(cls) -> 'SyncStream.WSClient':
         """
@@ -1112,8 +1217,9 @@ def run_pod_command(
     tty = True # bool | TTY if true indicates that a tty will be allocated for the exec call. Defaults to false. (optional)
 
     """
+    if isinstance(command, str):
+        command = command.split(' ')
     try:
-
         return BaseKOpsClient.core_v1_ws.connect_post_namespaced_pod_exec(
             name = name, 
             namespace = namespace, 
@@ -1153,8 +1259,10 @@ async def arun_pod_command(
     tty = True # bool | TTY if true indicates that a tty will be allocated for the exec call. Defaults to false. (optional)
 
     """
+    if isinstance(command, str):
+        command = command.split(' ')
+    
     try:
-
         return await BaseKOpsClient.acore_v1_ws.connect_post_namespaced_pod_exec(
             name = name, 
             namespace = namespace, 
