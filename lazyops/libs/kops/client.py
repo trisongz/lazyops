@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 import asyncio
 import logging
 import contextlib
@@ -21,11 +22,6 @@ if TYPE_CHECKING:
     with contextlib.suppress(ImportError):
         import requests
         import aiohttpx
-
-
-
-    
-
 
 
 class EventType(str, Enum):
@@ -981,7 +977,7 @@ class KOpsClientMeta(type):
         shutdown_functions: Optional[List[Callable]] = None,
         kopf_name: Optional[str] = None,
         app_name: Optional[str] = None,
-
+        multi_pods: Optional[bool] = True,
         **kwargs
     ):
         """
@@ -1048,8 +1044,12 @@ class KOpsClientMeta(type):
                 key = persistent_key,
             )
             settings.batching.error_delays = error_delays
+            if multi_pods:
+                settings.peering.priority = random.randint(0, 32767)
+                settings.peering.stealth = True
+                if kwargs.get('peering_name'):
+                    settings.peering.name = kwargs.get('peering_name')
 
-            
             # if cls.settings.kopf_enable_event_logging is False:
             #     settings.posting.enabled = cls.settings.kopf_enable_event_logging
             #     logger.info(f'Kopf Events Enabled: {cls.settings.kopf_enable_event_logging}')
