@@ -58,6 +58,13 @@ except ImportError:
     kopf = object
     _kopf_available = False
 
+try:
+    import aiocache
+    _aiocache_available = True
+
+except ImportError:
+    aiocache = object
+    _aiocache_available = False
 
 from lazyops.utils.imports import resolve_missing, require_missing_wrapper
 
@@ -90,6 +97,7 @@ def resolve_async_k8s(
     """
     global _async_k8_available
     global AsyncClient, AsyncConfig, AsyncStream, AsyncWatch, AsyncUtils, AsyncType, AsyncWSClient
+    
     if not _async_k8_available:
         resolve_missing('kubernetes_asyncio', required = required)
         import kubernetes_asyncio.client as AsyncClient
@@ -99,8 +107,22 @@ def resolve_async_k8s(
         import kubernetes_asyncio.utils as AsyncUtils
         import kubernetes_asyncio.client.models as AsyncType
         AsyncWSClient = AsyncStream.WsApiClient
-
         _async_k8_available = True
+
+def resolve_aiocache(
+    required: bool = True,
+):
+    """
+    Ensures that `aiocache` is availableable
+    """
+    global _aiocache_available
+    global aiocache
+
+    if not _aiocache_available:
+        resolve_missing('aiocache', required = required)
+        import aiocache
+        _aiocache_available = True
+        globals()['aiocache'] = aiocache
 
 def resolve_kopf(
     required: bool = True,
@@ -130,6 +152,7 @@ def resolve_k8s(
         resolve_kopf(required = required)
     if is_async:
         resolve_async_k8s(required = required)
+        resolve_aiocache(required = required)
     if is_sync or not is_async:
         resolve_sync_k8s(required = required)
 

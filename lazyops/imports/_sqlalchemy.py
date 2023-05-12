@@ -12,6 +12,20 @@ except ImportError:
     sqlalchemy = object
     _sqlalchemy_available = False
 
+try:
+    import asyncpg
+    _asyncpg_available = True
+except ImportError:
+    asyncpg = object
+    _asyncpg_available = False
+
+try:
+    import psycopg2
+    _psycopg2_available = True
+except ImportError:
+    psycopg2 = object
+    _psycopg2_available = False
+
 def resolve_sqlalchemy(
     required: bool = False,
 ):
@@ -25,6 +39,32 @@ def resolve_sqlalchemy(
         _sqlalchemy_available = True
         globals()['sqlalchemy'] = sqlalchemy
 
+def resolve_asyncpg(
+    required: bool = False,
+):
+    """
+    Ensures that `asyncpg` is available
+    """
+    global asyncpg, _asyncpg_available
+    if not _asyncpg_available:
+        resolve_missing('asyncpg', required = required)
+        import asyncpg
+        _asyncpg_available = True
+        globals()['asyncpg'] = asyncpg
+
+def resolve_psycopg2(
+    required: bool = False,
+):
+    """
+    Ensures that `psycopg2` is available
+    """
+    global psycopg2, _psycopg2_available
+    if not _psycopg2_available:
+        resolve_missing('psycopg2', 'psycogpg2-binary', required = required)
+        import psycopg2
+        _psycopg2_available = True
+        globals()['psycopg2'] = psycopg2
+
 
 def require_sqlalchemy(
     required: bool = False,
@@ -37,5 +77,41 @@ def require_sqlalchemy(
             resolver = resolve_sqlalchemy, 
             func = func, 
             required = required
+        )
+    return decorator
+
+def resolve_sql(
+    required: bool = True,
+    require_sqlalchemy: bool = True,
+    require_psycopg2: bool = False,
+    require_asyncpg: bool = False,
+):
+    """
+    Ensures that `sqlalchemy` is available
+    """
+    if require_sqlalchemy:
+        resolve_sqlalchemy(required = required)
+    if require_psycopg2:
+        resolve_psycopg2(required = required)
+    if require_asyncpg:
+        resolve_asyncpg(required = required)
+
+def require_sql(
+    required: bool = True,
+    require_sqlalchemy: bool = True,
+    require_psycopg2: bool = False,
+    require_asyncpg: bool = False,
+):
+    """
+    Wrapper for `resolve_sqlalchemy` that can be used as a decorator
+    """
+    def decorator(func):
+        return require_missing_wrapper(
+            resolver = resolve_sql, 
+            func = func, 
+            required = required,
+            require_sqlalchemy = require_sqlalchemy,
+            require_psycopg2 = require_psycopg2,
+            require_asyncpg = require_asyncpg,
         )
     return decorator
