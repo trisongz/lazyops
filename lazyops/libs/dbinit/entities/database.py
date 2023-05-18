@@ -151,3 +151,6 @@ class Database(ClusterEntity, Grantable):
             # then create a new engine
             self._db_engine = create_engine(f"postgresql+psycopg://{user}:{pw}@{host}:{port}/{self.name}")
         return self._db_engine
+
+    def __repr__(self):
+        return f"<Database (name={self.name}, owner={self.owner})>"

@@ -178,3 +178,6 @@ class Role(ClusterEntity):
                 )
             for target, privileges in self.grants.items():
                 target._safe_revoke(grantee=self, privileges=privileges)
+
+    def __repr__(self):
+        return f"<Role (name={self.name}, superuser={self.superuser}, createdb={self.createdb}, createrole={self.createrole}, inherit={self.inherit}, login={self.login}, replication={self.replication}, bypassrls={self.bypassrls}, connection_limit={self.connection_limit}, password={'*****' if self.password else None}, encrypted={self.encrypted}, valid_until={self.valid_until}, in_role={self.in_role}, role={self.role}, admin={self.admin}, grants={self.grants})>"

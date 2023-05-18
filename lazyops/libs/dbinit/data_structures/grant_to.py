@@ -18,3 +18,6 @@ class GrantTo:
 
     privileges: Sequence[Privilege]
     to: Sequence[Role]
+
+    def __repr__(self) -> str:
+        return f"<GrantTo (privileges={self.privileges}, to={self.to})>"

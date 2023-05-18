@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngin
 from lazyops.utils.logs import logger
 from lazyops.utils import Json
 from lazyops.types import BaseModel, lazyproperty, BaseSettings, Field
-from typing import Any, Generator, AsyncGenerator, Optional, Union, Type, Dict, cast
+from typing import Any, Generator, AsyncGenerator, Optional, Union, Type, Dict, cast, TYPE_CHECKING, List, Tuple, TypeVar, Callable
 from pydantic.networks import PostgresDsn
 from lazyops.libs.psqldb.retry import reconnecting_engine
 
@@ -27,6 +27,8 @@ EngineT = Union[Engine, AsyncEngine]
 SessionT = Union[Session, AsyncSession]
 SettingsT = Type[BaseSettings]
 
+
+
 class Dummy(BaseModel):
     dsn: PostgresDsn
 
@@ -34,8 +36,10 @@ def uri_builder(uri: Union[str, PostgresDsn], scheme: Optional[str] = None) -> P
     """
     Helper to construct a PostgresDsn from a string
     """
+    # print(uri)
     if isinstance(uri, str):
-        if scheme and not uri.startswith(scheme):
+        # if scheme and not uri.startswith(scheme):
+        if scheme and '://' not in uri:
             uri = f'{scheme}://{uri}'
         x = Dummy(dsn=uri)
         uri = x.dsn
@@ -60,6 +64,7 @@ def get_nested_arg(
 
 
 
+
 class Context(BaseModel):
     uri: PostgresDsn
 
@@ -72,6 +77,12 @@ class Context(BaseModel):
     sess: Optional[SessionT] = None
     sess_ro: Optional[SessionT] = None
 
+    asess: Optional[SessionT] = None
+    asess_ro: Optional[SessionT] = None
+
+    aeng: Optional[EngineT] = None
+    aeng_ro: Optional[EngineT] = None
+
     settings: Optional[SettingsT] = None
     config: Optional[Dict[str, Any]] = Field(default = {})
 
@@ -82,7 +93,8 @@ class Context(BaseModel):
         """
         if self.settings:
             return getattr(self.settings, 'debug_enabled', False)
-        return cast(bool, os.getenv('DEBUG_ENABLED', 'false'))
+        return os.getenv('DEBUG_ENABLED', 'false') in ['true', 'True', '1']
+        # return cast(bool, os.getenv('DEBUG_ENABLED', 'false'))
     
     @property
     def is_verbose(self) -> bool:
@@ -93,7 +105,8 @@ class Context(BaseModel):
             if hasattr(self.settings, 'logging'):
                 return getattr(self.settings.logging, 'db_verbose', False)
             return getattr(self.settings, 'db_verbose', False)
-        return cast(bool, os.getenv('DB_VERBOSE', 'false'))
+        return os.getenv('DB_VERBOSE', 'false') in ['true', 'True', '1']
+        # return cast(bool, os.getenv('DB_VERBOSE', 'false'))
     
     @property
     def retries(self) -> int:
@@ -102,7 +115,7 @@ class Context(BaseModel):
         """
         if self.settings:
             return getattr(self.settings, 'postgres_retry_limit', 5)
-        return cast(int, os.getenv('DB_RETRIES', '5'))
+        return int(os.getenv('DB_RETRIES', '5'))
     
     @property
     def retry_interval(self) -> float:
@@ -111,7 +124,8 @@ class Context(BaseModel):
         """
         if self.settings:
             return getattr(self.settings, 'postgres_retry_interval', 5.0)
-        return cast(float, os.getenv('DB_RETRY_INTERVAL', '5.0'))
+        return float(os.getenv('DB_RETRY_INTERVAL', '5.0'))
+        # return cast(float, os.getenv('DB_RETRY_INTERVAL', '5.0'))
 
     @lazyproperty
     def has_pooler(self) -> bool:
@@ -153,7 +167,10 @@ class Context(BaseModel):
         Resets the connections
         """
         self.eng = None
+        self.eng_ro = None
+
         self.aeng = None
+        self.aeng_ro = None
         
         self.sess = None
         self.sess_ro = None
@@ -432,6 +449,12 @@ class PostgresDBMeta(type):
     @property
     def settings(cls) -> SettingsT:
         return cls._settings
+    
+    def set_settings(cls, settings: SettingsT):
+        """
+        Sets the settings
+        """
+        cls._settings = settings
 
     @property
     def uri(cls) -> Union[str, PostgresDsn]:
@@ -442,8 +465,43 @@ class PostgresDBMeta(type):
             if cls.settings and hasattr(cls.settings, 'pg_uri'):
                 cls._uri = cls.settings.pg_uri
             else:
-                cls._uri = uri_builder(os.getenv('POSTGRES_URI', 'postgres@localhost:5432'), scheme=cls.scheme)
+                cls._uri = uri_builder(os.getenv('POSTGRES_URI', 'postgres@127.0.0.1:5432/postgres'), scheme=cls.scheme)
         return cls._uri
+    
+    @property
+    def pg_admin_user(cls) -> str:
+        """
+        Returns the admin user
+        """
+        if admin_user := cls.config.get(
+            'pg_admin_user', os.getenv('POSTGRES_USER'),
+        ):
+            return admin_user
+        return cls.uri.user
+    
+    @property
+    def pg_admin_password(cls) -> str:
+        """
+        Returns the admin password
+        """
+        if admin_password := cls.config.get(
+            'pg_admin_password', os.getenv('POSTGRES_PASSWORD'),
+        ):
+            return admin_password
+        return cls.uri.password
+    
+    @property
+    def admin_uri(cls) -> PostgresDsn:
+        """
+        Returns the admin uri
+        """
+        uri = f'{cls.uri.host}:{cls.uri.port}/postgres'
+        auth = f'{cls.pg_admin_user}'
+        if cls.pg_admin_password:
+            auth += f':{cls.pg_admin_password}'
+        uri = f'{auth}@{uri}'
+        return uri_builder(uri, scheme = cls.scheme)
+
     
     @property
     def config(cls) -> Dict[str, Any]:
@@ -464,10 +522,10 @@ class PostgresDBMeta(type):
         if not cls._ctx:
             cls._ctx = Context.from_uri(
                 cls.uri, 
-                settings=cls.settings, 
-                config=cls.config, 
-                scheme=cls.scheme, 
-                async_scheme=cls.async_scheme
+                settings = cls.settings, 
+                config = cls.config, 
+                scheme = cls.scheme, 
+                async_scheme = cls.async_scheme
             )
         return cls._ctx
 
@@ -499,33 +557,33 @@ class PostgresDBMeta(type):
         """
         return cls.ctx.async_engine_ro
     
-    @property
-    def session(cls) -> Session:
-        """
-        Returns the read-write session
-        """
-        return cls.ctx.session
+    # @property
+    # def session(cls) -> Session:
+    #     """
+    #     Returns the read-write session
+    #     """
+    #     return cls.ctx.session
     
-    @property
-    def session_ro(cls) -> Optional[Session]:
-        """
-        Returns the read-only session
-        """
-        return cls.ctx.session_ro
+    # @property
+    # def session_ro(cls) -> Optional[Session]:
+    #     """
+    #     Returns the read-only session
+    #     """
+    #     return cls.ctx.session_ro
     
-    @property
-    def async_session(cls) -> AsyncSession:
-        """
-        Returns the read-write async session
-        """
-        return cls.ctx.async_session
+    # @property
+    # def async_session(cls) -> AsyncSession:
+    #     """
+    #     Returns the read-write async session
+    #     """
+    #     return cls.ctx.async_session
     
-    @property
-    def async_session_ro(cls) -> Optional[AsyncSession]:
-        """
-        Returns the read-only async session
-        """
-        return cls.ctx.async_session_ro
+    # @property
+    # def async_session_ro(cls) -> Optional[AsyncSession]:
+    #     """
+    #     Returns the read-only async session
+    #     """
+    #     return cls.ctx.async_session_ro
     
     def get_sess(cls, ro: Optional[bool] = False, future: bool = True, **kwargs) -> Session:
         """
@@ -541,14 +599,14 @@ class PostgresDBMeta(type):
     
 
     @contextlib.contextmanager
-    def get_session(cls, ro: Optional[bool] = False, future: bool = True, **kwargs) -> Generator[Session, None, None]:
+    def session(cls, ro: Optional[bool] = False, future: bool = True, **kwargs) -> Generator[Session, None, None]:
         """
         Context manager for database session
         """
         yield from cls.ctx.get_session(ro=ro, future=future, **kwargs)
     
     @contextlib.asynccontextmanager
-    async def get_async_session(
+    async def async_session(
         cls, 
         ro: Optional[bool] = False, 
         retries: Optional[int] = None,
@@ -587,11 +645,116 @@ class PostgresDBMeta(type):
         return await cls.ctx.async_drop_all(base=base)
     
 
+if TYPE_CHECKING:
+    from lazyops.libs.dbinit import Privilege
+
     
 class PostgresDB(metaclass=PostgresDBMeta):
     """
     Postgres database
     """
-    pass
+    
+    @classmethod
+    def prepare_db(
+        cls, 
+
+        role_user: Optional[str] = None,
+        role_password: Optional[str] = None,
+        role_createdb: Optional[bool] = True,
+        role_createrole: Optional[bool] = True,
+        role_replication: Optional[bool] = True,
+        role_bypassrls: Optional[bool] = True,
+        role_login: Optional[bool] = None,
+        role_options: Optional[Dict[str, Any]] = None,
+        role_superuser: Optional[bool] = True,
+
+
+        db_name: Optional[str] = None,
+        db_owner: Optional[str] = None,
+        db_grants: Optional[List[Tuple[str, Optional['Privilege']]]] = None,
+        db_options: Optional[Dict[str, Any]] = None,
+
+        db_admin_uri: Optional[Union[str, PostgresDsn]] = None,
+
+        statements: Optional[List[str]] = None,
+        grant_public_schema: Optional[bool] = True,
+        verbose: Optional[bool] = True,
+        **kwargs,
+
+    ):  # sourcery skip: low-code-quality
+        """
+        Runs initialization for the DB
+        """
+        from lazyops.libs.dbinit import (
+            Controller,
+            GrantTo,
+            Privilege,
+            Database,
+            Role,
+        )
+
+        pg_user = role_user or cls.ctx.uri.user
+        pg_pass = role_password or cls.ctx.uri.password
+        if role_login is None: role_login = bool(pg_pass)
+        if not role_options: role_options = {}
+        if not db_options: db_options = {}
+
+        if pg_user == "postgres":
+            role = Role(name = pg_user)
+        else:
+            role = Role(
+                name = pg_user,
+                createdb = role_createdb,
+                createrole = role_createrole,
+                replication = role_replication,
+                bypassrls = role_bypassrls,
+                login = role_login,
+                password = pg_pass,
+                superuser = role_superuser,
+                **role_options
+            )
+        if verbose:
+            logger.info(f"Creating Role {pg_user}: {role}")
+        pg_db = db_name or cls.ctx.uri.path[1:]
+        db_owner = role if db_owner is None else Role(name = db_owner)
+        if not db_grants: 
+            db_grants = [
+                GrantTo(
+                    privileges = [Privilege.ALL_PRIVILEGES], to = [role]
+                )
+            ]
+
+        db = Database(
+            name = pg_db,
+            owner = db_owner,
+            grants = db_grants,
+            **db_options
+        )
+        if verbose: logger.info(f"Creating Database {pg_db}: {db}")
+        db_admin_uri = db_admin_uri or cls.admin_uri
+        Controller.run_all(engine = create_engine(url = db_admin_uri))
+
+        engine = create_engine(url = cls.ctx.uri)
+        if statements:
+            for statement in statements:
+                if verbose: logger.info(f"Executing statement: {statement}")
+                engine.execute(statement = statement)
+        
+        if grant_public_schema:
+            schema_statements = [
+                f"GRANT ALL PRIVILEGES ON SCHEMA public TO {pg_user}",
+                f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO {pg_user}",
+                f"GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO {pg_user}",
+                f"GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO {pg_user}",
+            ]
+            if statements: schema_statements = [statement for statement in schema_statements if statement not in statements]
+            for statement in schema_statements:
+                if verbose: logger.info(f"Executing statement: {statement}")
+                engine.execute(statement = statement)
+
+        if verbose: logger.info("Completed DB initialization")
+
+
+
     
     
