@@ -211,7 +211,8 @@ class Logger(_Logger):
         if not isinstance(paths, list): paths = [paths]
 
         def _healthz_filter(record: logging.LogRecord) -> bool:
-            if record.args.get('path'):
+            if 'path' in record.args:
+                # if record.args.get('path'):
                 return record.args['path'] not in paths
             return all(path not in record.args for path in paths)
 

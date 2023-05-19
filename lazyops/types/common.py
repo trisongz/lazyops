@@ -56,3 +56,13 @@ class aobject(object):
 
     async def __init__(self, *args, **kwargs):
         pass
+
+# borrowed from 
+# https://github.com/pydantic/pydantic/issues/1439
+def construct_union(modules: List):  
+    # modules is a list of class constructors and has to be accessible in the current global scope
+    eval_string = ', '.join([f'{i.__module__}.{i.__name__}' for i in modules])
+    return eval(f'Union[{eval_string}]')
+
+# def construct_union(modules: List):
+#     return Union[tuple(modules)]
