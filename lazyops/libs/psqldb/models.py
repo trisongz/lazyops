@@ -1,3 +1,4 @@
+
 from sqlalchemy import func
 from sqlalchemy import delete as sqlalchemy_delete
 from sqlalchemy import update as sqlalchemy_update
@@ -7,10 +8,12 @@ from sqlalchemy.sql.expression import Select
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload, joinedload, immediateload
 from typing import Any, Generator, AsyncGenerator, Optional, Union, Type, Dict, cast, TYPE_CHECKING, List, Tuple, TypeVar, Callable
+
 from lazyops.utils.logs import logger
 from lazyops.types import lazyproperty
 from lazyops.libs.psqldb.base import Base, PostgresDB, AsyncSession, Session
 from lazyops.libs.psqldb.utils import SQLJson, get_pydantic_model, object_serializer
+from fastapi.exceptions import HTTPException
 from pydantic import BaseModel
 
 ModelType = TypeVar("ModelType", bound = Base)
@@ -39,7 +42,7 @@ class ORMType(object):
         """
         Build a filter query
         """
-        query = query or select(cls)
+        query = query if query is not None else select(cls)
         return query.where(*[getattr(cls, key) == value for key, value in kwargs.items()])
 
     def _filter_update_data(self, **kwargs) -> Optional[Dict[str, Any]]:
@@ -55,6 +58,14 @@ class ORMType(object):
             data[field] = value
         return data or None
 
+    @classmethod
+    def _handle_exception(cls, msg: Optional[str] = None, e: Optional[Exception] = None):
+        """
+        Handle exception
+        """
+        msg = msg or f"{cls.__class__.__name__} not found"
+        logger.trace(msg, error = e)
+        raise HTTPException(status_code = 404, detail = msg)
     
 
     @classmethod
@@ -147,6 +158,7 @@ class ORMType(object):
         load_attrs: Optional[List[str]] = None,
         load_attr_method: Optional[Union[str, Callable]] = None,
         readonly : Optional[bool] = False,
+        raise_exceptions: Optional[bool] = True,
         **kwargs,
     ) -> 'ORMType':
         """
@@ -161,6 +173,8 @@ class ORMType(object):
                     query = query.options(load_attr_method(getattr(cls, attr)))
             results = db_sess.execute(query)
             (result,) = results.one()
+            if not result and raise_exceptions:
+                cls._handle_exception()
             return result
 
     @classmethod
@@ -171,6 +185,7 @@ class ORMType(object):
         load_attrs: Optional[List[str]] = None,
         load_attr_method: Optional[Union[str, Callable]] = None,
         readonly : Optional[bool] = False,
+        raise_exceptions: Optional[bool] = True,
         **kwargs,
     ) -> Type['ORMType']:
         """
@@ -185,6 +200,8 @@ class ORMType(object):
                     query = query.options(load_attr_method(getattr(cls, attr)))
             results = await db_sess.execute(query)
             (result,) = results.one()
+            if not result and raise_exceptions:
+                cls._handle_exception()
             return result
 
     @classmethod
@@ -239,11 +256,15 @@ class ORMType(object):
             db_sess.commit()
     
     @classmethod
-    async def async_delete(cls, id: Any):
+    async def async_delete(cls, **kwargs) -> ModelType:
+        """
+        Delete a record
+        """
+        obj = await cls.aget(**kwargs, raise_exceptions = True)
         async with PostgresDB.async_session() as db_sess:
-            query = sqlalchemy_delete(cls).where(cls.id == id)
-            await db_sess.execute(query)
+            db_sess.delete(obj)
             await db_sess.commit()
+        return obj
     
     @classmethod
     def delete_all(cls):
@@ -265,7 +286,9 @@ class ORMType(object):
         Return True if a record exists
         """
         async with PostgresDB.async_session(ro=True) as db_sess:
-            query = cls._filter(sqlalchemy_exists(cls), **kwargs)
+            query = cls._filter(sqlalchemy_exists(), **kwargs).select()
+            # result = await db_sess.execute(query)
+            # return bool(result.scalar())
             return bool(await db_sess.scalar(query))
 
 
