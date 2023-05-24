@@ -25,7 +25,7 @@ Base = declarative_base()
 
 EngineT = Union[Engine, AsyncEngine]
 SessionT = Union[Session, AsyncSession]
-SettingsT = Type[BaseSettings]
+SettingsT = Union[Type[BaseSettings], Any]
 
 
 
@@ -624,24 +624,28 @@ class PostgresDBMeta(type):
         """
         Creates all tables
         """
+        base = base or Base
         return cls.ctx.create_all(base=base)
     
     def drop_all(cls, base: Optional[Any] = None):
         """
         Drops all tables
         """
+        base = base or Base
         return cls.ctx.drop_all(base=base)
     
     async def async_create_all(cls, base: Optional[Any] = None):
         """
         Creates all tables
         """
+        base = base or Base
         return await cls.ctx.async_create_all(base=base)
     
     async def async_drop_all(cls, base: Optional[Any] = None):
         """
         Drops all tables
         """
+        base = base or Base
         return await cls.ctx.async_drop_all(base=base)
     
 

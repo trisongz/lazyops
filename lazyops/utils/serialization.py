@@ -5,6 +5,7 @@ import codecs
 import datetime
 import contextlib
 import dataclasses
+from enum import Enum
 
 try:
     import numpy as np
@@ -110,6 +111,9 @@ def object_serializer(obj: typing.Any) -> typing.Any:
     # Convert UUIDs
     if isinstance(obj, uuid.UUID):
         return str(obj)
+    
+    if isinstance(obj, Enum): #  hasattr(obj, 'value'):
+        return obj.value
 
     if np is not None:
         if isinstance(obj, (np.int_, np.intc, np.intp, np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64)):
@@ -121,13 +125,17 @@ def object_serializer(obj: typing.Any) -> typing.Any:
     if isinstance(obj, object):
         with contextlib.suppress(Exception):
             return {k: object_serializer(v) for k, v in obj.__dict__.items()}
-
-    else:
-        # Try to convert to a primitive type
-        with contextlib.suppress(Exception):
-            return int(obj)
-        with contextlib.suppress(Exception):
-            return float(obj)
+    
+    
+    # Try to convert to a primitive type
+    with contextlib.suppress(Exception):
+        return int(obj)
+    
+    with contextlib.suppress(Exception):
+        return float(obj)
+    
+    with contextlib.suppress(Exception):
+        return str(obj)
 
 
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
