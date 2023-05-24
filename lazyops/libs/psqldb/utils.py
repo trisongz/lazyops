@@ -57,7 +57,7 @@ class BasePydanticConfig:
         Enum: lambda v: v.value,
     }
     json_loads = Json.loads
-    json_dumps = Json.loads
+    json_dumps = Json.dumps
 
 
 def get_pydantic_model(obj: object) -> Type[BaseModel]:
