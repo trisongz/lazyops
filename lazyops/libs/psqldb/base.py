@@ -446,10 +446,27 @@ class PostgresDBMeta(type):
     scheme: Optional[str] = 'postgresql+psycopg2'
     async_scheme: Optional[str] = 'postgresql+asyncpg'
 
+    get_settings_callable: Optional[Callable] = None
+
     @property
     def settings(cls) -> SettingsT:
+        """
+        The settings for the database
+        """
+        if cls._settings is None:
+            cls._settings = cls.get_settings()
         return cls._settings
     
+    def get_settings(cls, settings: Optional[SettingsT] = None) -> SettingsT:
+        """
+        Helper method to override and get/set the settings
+        """
+        if settings is not None:
+            cls.set_settings(settings)
+        elif cls.get_settings_callable is not None:
+            cls.set_settings(cls.get_settings_callable())
+        return cls._settings
+
     def set_settings(cls, settings: SettingsT):
         """
         Sets the settings
