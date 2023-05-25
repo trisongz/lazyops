@@ -13,6 +13,8 @@ __all__ = (
     'Data', 'AnyMany', 'TextMany', 'TextList',
     'DictList', 'DictMany', 'DictAny', 'DictAny',
     'aobject',
+    'StrEnum',
+    'UpperStrEnum',
 )
 
 import sys
@@ -66,3 +68,49 @@ def construct_union(modules: List):
 
 # def construct_union(modules: List):
 #     return Union[tuple(modules)]
+
+from enum import Enum, EnumMeta
+from functools import singledispatchmethod
+
+class StrEnumMeta(EnumMeta):
+
+    @singledispatchmethod
+    def __getitem__(self, key):
+        return super().__getitem__(key)
+
+    @__getitem__.register
+    def _(self, index: int):
+        return list(self)[index]
+
+class StrEnum(str, Enum, metaclass=StrEnumMeta):
+    """
+    StrEnum is a string enum that allows for case-insensitive comparisons
+    """
+
+    def __eq__(self, other: Any) -> bool:
+        return self.value.lower() == other.lower() if \
+            isinstance(other, str) else \
+                super().__eq__(other)
+    
+    def __ne__(self, other: Any) -> bool:
+        return self.value.lower() != other.lower() if \
+            isinstance(other, str) else \
+                super().__ne__(other)
+
+    def __str__(self) -> str:
+        return str.__str__(self)
+
+class UpperStrEnum(StrEnum):
+    """
+    UpperStrEnum is a string enum that allows for case-insensitive comparisons
+    """
+
+    def __eq__(self, other: Any) -> bool:
+        return self.value.upper() == other.upper() if \
+            isinstance(other, str) else \
+                super().__eq__(other)
+    
+    def __ne__(self, other: Any) -> bool:
+        return self.value.upper() != other.upper() if \
+            isinstance(other, str) else \
+                super().__ne__(other)
