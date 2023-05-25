@@ -37,6 +37,7 @@ def uri_builder(uri: Union[str, PostgresDsn], scheme: Optional[str] = None) -> P
     Helper to construct a PostgresDsn from a string
     """
     # print(uri)
+    if uri is None: raise ValueError('uri cannot be empty')
     if isinstance(uri, str):
         # if scheme and not uri.startswith(scheme):
         if scheme and '://' not in uri:
@@ -104,7 +105,10 @@ class Context(BaseModel):
         if self.settings:
             if hasattr(self.settings, 'logging'):
                 return getattr(self.settings.logging, 'db_verbose', False)
-            return getattr(self.settings, 'db_verbose', False)
+            if hasattr(self.settings, 'db_verbose'):
+                return getattr(self.settings, 'db_verbose', False)
+            if hasattr(self.settings, 'postgres_verbose'):
+                return getattr(self.settings, 'postgres_verbose', False)
         return os.getenv('DB_VERBOSE', 'false') in ['true', 'True', '1']
         # return cast(bool, os.getenv('DB_VERBOSE', 'false'))
     
@@ -455,6 +459,11 @@ class PostgresDBMeta(type):
         """
         if cls._settings is None:
             cls._settings = cls.get_settings()
+            if cls._settings:
+                if getattr(cls._settings, 'postgres_scheme', None):
+                    cls.scheme = cls._settings.postgres_scheme
+                if getattr(cls._settings, 'postgres_async_scheme', None):
+                    cls.async_scheme = cls._settings.postgres_async_scheme
         return cls._settings
     
     def get_settings(cls, settings: Optional[SettingsT] = None) -> SettingsT:
@@ -478,11 +487,27 @@ class PostgresDBMeta(type):
         """
         Returns the uri
         """
-        if not cls._uri:
-            if cls.settings and hasattr(cls.settings, 'pg_uri'):
+        if not cls._uri and cls.settings:
+            if getattr(cls.settings, 'pg_uri', None):
+                # This should be a PostgresDsn
                 cls._uri = cls.settings.pg_uri
-            else:
-                cls._uri = uri_builder(os.getenv('POSTGRES_URI', 'postgres@127.0.0.1:5432/postgres'), scheme=cls.scheme)
+                # logger.dev(f"Using pg_uri: {cls._uri}")
+            elif getattr(cls.settings, 'postgres_url', None):
+                # This should be a string
+                # logger.dev(f"Using postgres_url: {cls.settings.postgres_url}")
+                cls._uri = uri_builder(cls.settings.postgres_url, scheme=cls.scheme)
+            elif getattr(cls.settings, 'postgres_host', None):
+                base_uri = f"{cls.settings.postgres_host}:{getattr(cls.settings, 'postgres_port', 5432)}/{getattr(cls.settings, 'postgres_db', 'postgres')}"
+                if getattr(cls.settings, 'postgres_user', None):
+                    base_uri = (
+                        f"{cls.settings.postgres_user}:{cls.settings.postgres_password}@{base_uri}"
+                        if getattr(cls.settings, 'postgres_password', None)
+                        else f"{cls.settings.postgres_user}@{base_uri}"
+                    )
+                # logger.dev(f"Using postgres_host: {base_uri}")
+                cls._uri = uri_builder(base_uri, scheme=cls.scheme)
+        if not cls._uri:
+            cls._uri = uri_builder(os.getenv('POSTGRES_URI', 'postgres@127.0.0.1:5432/postgres'), scheme=cls.scheme)
         return cls._uri
     
     @property
@@ -527,8 +552,11 @@ class PostgresDBMeta(type):
         """
         if not cls._config:
             cls._config = {}
-            if cls.settings and hasattr(cls.settings, 'pg_config'):
-                cls._config = cls.settings.pg_config
+            if cls.settings:
+                if getattr(cls.settings, 'pg_config', None):
+                    cls._config = cls.settings.pg_config
+                elif getattr(cls.settings, 'postgres_config', None):
+                    cls._config = cls.settings.postgres_config
         return cls._config
     
     @property
