@@ -81,3 +81,25 @@ def get_pydantic_model(obj: object) -> Type[BaseModel]:
     # return _pydantic_models[obj_class_name](**obj.dict())
     return _pydantic_models[obj_class_name].from_orm(obj)
 
+
+def dict_diff(dict_a: Union[Dict[str, Any], Type[BaseModel]], dict_b: Union[Dict[str, Any], Type[BaseModel]], show_value_diff: bool = True):
+    
+    """
+    Compare two dictionaries and return the difference between them
+    """
+    if not isinstance(dict_a, dict) and hasattr(dict_a, 'dict'):
+        dict_a = dict_a.dict()
+    if not isinstance(dict_b, dict) and hasattr(dict_b, 'dict'):
+        dict_b = dict_b.dict()
+    result = {
+        'added': {k: dict_b[k] for k in set(dict_b) - set(dict_a)},
+        'removed': {k: dict_a[k] for k in set(dict_a) - set(dict_b)},
+    }
+    if show_value_diff:
+        common_keys =  set(dict_a) & set(dict_b)
+        result['value_diffs'] = {
+            k:(dict_a[k], dict_b[k])
+            for k in common_keys
+            if dict_a[k] != dict_b[k]
+        }
+    return result
