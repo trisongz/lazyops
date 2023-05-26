@@ -9,9 +9,12 @@ import uuid
 import datetime
 import contextlib
 from enum import Enum
-from typing import Dict, Any, List, Optional, Union
+from typing import Dict, Any, List, Optional, Union, Type
 from pydantic import Field, BaseModel
-from lazyops.utils import create_unique_id, create_timestamp, timer
+from sqlalchemy.types import TypeDecorator, Text, String, VARCHAR
+from sqlalchemy.sql import operators
+from sqlalchemy.dialects.postgresql import JSONB
+from lazyops.utils import create_unique_id, create_timestamp, timer, Json
 
 DatetimeT = datetime.datetime
 OptionalDatetimeT = Optional[datetime.datetime]
@@ -46,11 +49,8 @@ class PaginationParams(BaseModel):
     order_by: Optional[Any] = None # OrderBy.asc
 
 
-
 try:
     from fileio import File, FileLike
-    from sqlalchemy.types import TypeDecorator, Text
-    from sqlalchemy.sql import operators
 
     class FileField(TypeDecorator):
 
@@ -75,3 +75,43 @@ try:
 
 except ImportError:
     FileField: object = None
+
+# https://amercader.net/blog/beware-of-json-fields-in-sqlalchemy/
+
+
+class JsonString(TypeDecorator):
+    """Enables JSON storage by encoding and decoding on the fly."""
+
+    impl = String
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None: value = Json.dumps(value)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None: value = Json.loads(value)
+        return value
+    
+    def coerce_compared_value(self, op, value):
+        return Text() \
+            if op in (operators.like_op, operators.not_like_op) \
+                else self
+
+
+try:
+    from sqlalchemy_json import mutable_json_type, NestedMutable, MutableDict
+
+    JsonStringField: Type[MutableDict] = mutable_json_type(dbtype = JsonString, nested=True)
+    JsonStringNestedField: Type[NestedMutable] = mutable_json_type(dbtype = JsonString, nested = True)
+
+    JSONBField: Type[MutableDict] = mutable_json_type(dbtype = JSONB)
+    JSONBNestedField: Type[NestedMutable] = mutable_json_type(dbtype = JSONB, nested = True)
+
+
+except ImportError:
+    JsonStringField = JsonString
+    JsonStringNestedField = JsonString
+
+    JSONBField = JSONB
+    JSONBNestedField = JSONB

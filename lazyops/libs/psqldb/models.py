@@ -649,7 +649,17 @@ class AsyncORMType(object):
         Refresh a record
         """
         async with PostgresDB.async_session() as db_sess:
-            db_sess.refresh(self, **kwargs)
+            await db_sess.refresh(self, **kwargs)
+    
+    async def update_inplace(self, **kwargs):
+        """
+        Update a record inplace
+        """
+        async with PostgresDB.async_session() as db_sess:
+            db_sess.add(self)
+            await db_sess.commit()
+            await db_sess.refresh(self)
+        return self
 
     async def update(self, **kwargs) -> Type['AsyncORMType']:
         """
@@ -660,9 +670,9 @@ class AsyncORMType(object):
         async with PostgresDB.async_session() as db_sess:
             for field, value in filtered_update.items():
                 setattr(self, field, value)
-                db_sess.add(self)
-                await db_sess.commit()
-                await db_sess.refresh(self)
+            db_sess.add(self)
+            await db_sess.commit()
+            await db_sess.refresh(self)
         return self
 
 

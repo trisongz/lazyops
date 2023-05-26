@@ -26,6 +26,13 @@ except ImportError:
     psycopg2 = object
     _psycopg2_available = False
 
+try:
+    import sqlalchemy_json
+    _sqlalchemy_json_available = True
+except ImportError:
+    sqlalchemy_json = object
+    _sqlalchemy_json_available = False
+
 def resolve_sqlalchemy(
     required: bool = False,
 ):
@@ -65,6 +72,18 @@ def resolve_psycopg2(
         _psycopg2_available = True
         globals()['psycopg2'] = psycopg2
 
+def resolve_sqlalchemy_json(
+    required: bool = False,
+):
+    """
+    Ensures that `sqlalchemy_json` is available
+    """
+    global sqlalchemy_json, _sqlalchemy_json_available
+    if not _sqlalchemy_json_available:
+        resolve_missing('sqlalchemy_json', required = required)
+        import sqlalchemy_json
+        _sqlalchemy_json_available = True
+        globals()['sqlalchemy_json'] = sqlalchemy_json
 
 def require_sqlalchemy(
     required: bool = False,
@@ -85,6 +104,7 @@ def resolve_sql(
     require_sqlalchemy: bool = True,
     require_psycopg2: bool = False,
     require_asyncpg: bool = False,
+    require_sqlalchemy_json: bool = True,
 ):
     """
     Ensures that `sqlalchemy` is available
@@ -95,12 +115,15 @@ def resolve_sql(
         resolve_psycopg2(required = required)
     if require_asyncpg:
         resolve_asyncpg(required = required)
+    if require_sqlalchemy_json:
+        resolve_sqlalchemy_json(required = required)
 
 def require_sql(
     required: bool = True,
     require_sqlalchemy: bool = True,
     require_psycopg2: bool = False,
     require_asyncpg: bool = False,
+    require_sqlalchemy_json: bool = True,
 ):
     """
     Wrapper for `resolve_sqlalchemy` that can be used as a decorator
@@ -113,5 +136,6 @@ def require_sql(
             require_sqlalchemy = require_sqlalchemy,
             require_psycopg2 = require_psycopg2,
             require_asyncpg = require_asyncpg,
+            require_sqlalchemy_json = require_sqlalchemy_json,
         )
     return decorator
