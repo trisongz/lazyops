@@ -405,6 +405,7 @@ class Context(BaseModel):
                 if self.debug_enabled:
                     logger.debug('Closing Session')
                 await sess.close()
+                # await sess.dispose()
     
 
     def create_all(self, base: Optional[Any] = None):
@@ -648,7 +649,8 @@ class PostgresDBMeta(type):
         """
         Context manager for database session
         """
-        yield from cls.ctx.get_session(ro=ro, future=future, **kwargs)
+        with cls.ctx.get_session(ro=ro, future=future, **kwargs) as sess:
+            yield sess
     
     @contextlib.asynccontextmanager
     async def async_session(

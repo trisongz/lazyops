@@ -99,6 +99,9 @@ class StrEnum(str, Enum, metaclass=StrEnumMeta):
 
     def __str__(self) -> str:
         return str.__str__(self)
+    
+    def __hash__(self) -> int:
+        return id(self)
 
 class UpperStrEnum(StrEnum):
     """
@@ -114,3 +117,10 @@ class UpperStrEnum(StrEnum):
         return self.value.upper() != other.upper() if \
             isinstance(other, str) else \
                 super().__ne__(other)
+    
+
+    def __str__(self) -> str:
+        return str.__str__(self)
+    
+    def __hash__(self) -> int:
+        return id(self)

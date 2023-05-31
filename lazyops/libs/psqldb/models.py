@@ -616,7 +616,9 @@ class AsyncORMType(object):
         data = {}
         for field, value in kwargs.items():
             if not hasattr(self, field): continue
-            if getattr(self, field) == value: continue
+            if getattr(self, field) == value: 
+                # logger.warning(f"Skipping {field}={getattr(self, field)} as value is the same: {value}")
+                continue
             data[field] = value
         return data or None
 
@@ -639,26 +641,83 @@ class AsyncORMType(object):
         async with PostgresDB.async_session() as db_sess:
             new_cls = cls(**kwargs)
             db_sess.add(new_cls)
+            await db_sess.flush()
             await db_sess.commit()
+            # await db_sess.flush(new_cls)
             await db_sess.refresh(new_cls)
         return new_cls
 
+
+    @classmethod
+    def _create(cls, **kwargs) -> Type['AsyncORMType']:
+        """
+        Create a new instance of the model
+        """
+        with PostgresDB.session() as db_sess:
+            new_cls = cls(**kwargs)
+            db_sess.add(new_cls)
+            db_sess.flush()
+            db_sess.commit()
+            db_sess.refresh(new_cls)
+            
+        return new_cls
 
     async def refresh(self, **kwargs):
         """
         Refresh a record
         """
         async with PostgresDB.async_session() as db_sess:
-            await db_sess.refresh(self, **kwargs)
+            # await db_sess.expire(self)
+            local_object = await db_sess.merge(self)
+            db_sess.add(local_object)
+            await db_sess.commit()
+            await db_sess.refresh(local_object)
+
+        self = local_object
+        return local_object
+    
+    async def _update(self, **kwargs):
+        """
+        Update a record
+        """
+        async with PostgresDB.async_session() as db_sess:
+            query = sqlalchemy_update(self.__class__).where(
+                self.__class__.id == self.id).values(
+                **kwargs
+            )
+            await db_sess.execute(query)
+            await db_sess.commit()
+
+            # refresh attributes
+        self = await self.get(id = self.id)
+        # return self
+        # await db_sess.refresh(self)
+
     
     async def update_inplace(self, **kwargs):
         """
         Update a record inplace
         """
         async with PostgresDB.async_session() as db_sess:
-            db_sess.add(self)
+            local_object = await db_sess.merge(self)
+            db_sess.add(local_object)
+            await db_sess.refresh(local_object)
             await db_sess.commit()
-            await db_sess.refresh(self)
+            await db_sess.flush()
+            self = local_object
+        return self
+    
+    async def save(self, **kwargs):
+        """
+        Save a record
+        """
+        async with PostgresDB.async_session() as db_sess:
+            local_object = await db_sess.merge(self)
+            db_sess.add(local_object)
+            await db_sess.refresh(local_object)
+            await db_sess.commit()
+        
+        self = local_object
         return self
 
     async def update(self, **kwargs) -> Type['AsyncORMType']:
@@ -670,9 +729,13 @@ class AsyncORMType(object):
         async with PostgresDB.async_session() as db_sess:
             for field, value in filtered_update.items():
                 setattr(self, field, value)
-            db_sess.add(self)
+
+            local_object = await db_sess.merge(self)
+            db_sess.add(local_object)
+            await db_sess.refresh(local_object)
             await db_sess.commit()
-            await db_sess.refresh(self)
+        
+        self = local_object
         return self
 
 
@@ -692,11 +755,29 @@ class AsyncORMType(object):
         """
         async with PostgresDB.async_session(ro=readonly) as db_sess:
             query = cls._build_query(load_attrs = load_attrs, load_attr_method = load_attr_method, **kwargs)
-            # result = (await db_sess.scalars(query)).first()
-            # results = await db_sess.execute(query)
-            # (result,) = results.one()
-            # logger.info(result)
             result = (await db_sess.execute(query)).scalar_one_or_none()
+            if not result and raise_exceptions:
+                cls._handle_exception(e = NoResultFound(), verbose = _verbose)
+            if result is not None and _model_type is not None: result = cast(_model_type, result)
+        return result
+    
+    @classmethod
+    def _get(
+        cls, 
+        load_attrs: Optional[List[str]] = None,
+        load_attr_method: Optional[Union[str, Callable]] = None,
+        readonly : Optional[bool] = False,
+        raise_exceptions: Optional[bool] = True,
+        _model_type: Optional[ModelType] = None,
+        _verbose: Optional[bool] = False,
+        **kwargs,
+    ) -> Type['AsyncORMType']:
+        """
+        Get a record
+        """
+        with PostgresDB.session(ro=readonly) as db_sess:
+            query = cls._build_query(load_attrs = load_attrs, load_attr_method = load_attr_method, **kwargs)
+            result = (db_sess.execute(query)).scalar_one_or_none()
             if not result and raise_exceptions:
                 cls._handle_exception(e = NoResultFound(), verbose = _verbose)
             if result is not None and _model_type is not None: result = cast(_model_type, result)
@@ -875,6 +956,22 @@ class AsyncORMType(object):
         # except NoResultFound:
         #     _defaults = _defaults or {}
         #     return await cls.create(**{**kwargs, **_defaults}), True
+
+    @classmethod
+    def register(
+        cls, 
+        filterby: Optional[Iterable[str]] = None,
+        **kwargs
+    ) -> Tuple[Type['AsyncORMType'], bool]:
+        """
+        Create a new instance of the model, or return the existing one.
+
+        Non-async version of `get_or_create` for use in synchronous code.
+        """
+        filterby = [list(kwargs.keys())[0]] if filterby is None else filterby
+        _filterby = {key: kwargs.get(key) for key in filterby}
+        result = cls._get(**_filterby, raise_exceptions = False, _verbose = False)
+        return (result, False) if result is not None else (cls._create(**kwargs), True)
             
     @classmethod
     async def get_or_none(cls, **kwargs) -> Optional[Type['AsyncORMType']]:
@@ -904,7 +1001,10 @@ class AsyncORMType(object):
         filterby = [list(kwargs.keys())[0]] if filterby is None else filterby
         _filterby = {key: kwargs.get(key) for key in filterby}
         result = await cls.get(**_filterby, raise_exceptions = False, _verbose = False)
-        if result is None: return await cls.create(**kwargs), True
+        if result is None: 
+            new_cls = await cls.create(**kwargs)
+
+            return new_cls, True
         if update_data := result._filter_update_data(**kwargs):
             return (await result.update(**update_data), True)
         return (result, False)
@@ -931,6 +1031,8 @@ class AsyncORMType(object):
             logger.info(f"Updating {result} with {update_data}")
             return (await result.update(**update_data), True)
         return (result, False)
+    
+
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}({self.dict()})>"
