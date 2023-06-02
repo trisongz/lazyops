@@ -67,7 +67,7 @@ def resolve_psycopg2(
     """
     global psycopg2, _psycopg2_available
     if not _psycopg2_available:
-        resolve_missing('psycopg2', 'psycogpg2-binary', required = required)
+        resolve_missing('psycopg2', 'psycopg2-binary', required = required)
         import psycopg2
         _psycopg2_available = True
         globals()['psycopg2'] = psycopg2

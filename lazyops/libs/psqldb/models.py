@@ -1049,6 +1049,8 @@ class SQLModel(Base):
     Abstract base class for all SQL models.
     """
     __abstract__ = True
+    __allow_unmapped__ = True
+    
     
     id: str = Column(Text, default = create_unique_id, primary_key = True, index = True)
     created_at = Column(DateTime(timezone=True), default = create_timestamp, server_default = func.now())
