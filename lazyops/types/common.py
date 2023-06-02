@@ -103,6 +103,7 @@ class StrEnum(str, Enum, metaclass=StrEnumMeta):
     def __hash__(self) -> int:
         return id(self)
 
+
 class UpperStrEnum(StrEnum):
     """
     UpperStrEnum is a string enum that allows for case-insensitive comparisons
@@ -124,3 +125,4 @@ class UpperStrEnum(StrEnum):
     
     def __hash__(self) -> int:
         return id(self)
+    

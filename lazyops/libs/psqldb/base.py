@@ -645,12 +645,21 @@ class PostgresDBMeta(type):
     
 
     @contextlib.contextmanager
-    def session(cls, ro: Optional[bool] = False, future: bool = True, **kwargs) -> Generator[Session, None, None]:
+    def session(
+        cls, 
+        ro: Optional[bool] = False, 
+        future: bool = True, 
+        session: Optional[Session] = None,
+        **kwargs
+    ) -> Generator[Session, None, None]:
         """
         Context manager for database session
         """
-        with cls.ctx.get_session(ro=ro, future=future, **kwargs) as sess:
-            yield sess
+        if session is not None:
+            yield session
+        else:
+            with cls.ctx.get_session(ro=ro, future=future, **kwargs) as sess:
+                yield sess
     
     @contextlib.asynccontextmanager
     async def async_session(
@@ -658,13 +667,17 @@ class PostgresDBMeta(type):
         ro: Optional[bool] = False, 
         retries: Optional[int] = None,
         retry_interval: Optional[float] = None,
+        session: Optional[AsyncSession] = None,
         **kwargs
     ) -> Generator[AsyncSession, None, None]:
         """
         Async context manager for database session
         """
-        async with cls.ctx.get_async_session(ro=ro, retries = retries, retry_interval = retry_interval, **kwargs) as sess:
-            yield sess
+        if session is not None:
+            yield session
+        else:
+            async with cls.ctx.get_async_session(ro=ro, retries = retries, retry_interval = retry_interval, **kwargs) as sess:
+                yield sess
 
     
     def create_all(cls, base: Optional[Any] = None):
