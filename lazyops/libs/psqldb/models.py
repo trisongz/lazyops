@@ -1041,7 +1041,8 @@ class AsyncORMType(object):
     
 
     
-SQLModelT = Type['SQLModel']
+# SQLModelT = Type['SQLModel']
+SQLModelT = TypeVar('SQLModelT', bound = 'SQLModel')
 
 class SQLModel(Base):
     """
