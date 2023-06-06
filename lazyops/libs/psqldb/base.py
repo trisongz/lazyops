@@ -354,15 +354,22 @@ class Context(BaseModel):
 
 
     @contextlib.contextmanager
-    def get_session(self, ro: Optional[bool] = False, future: bool = True, **kwargs) -> Generator[Session, None, None]:
+    def get_session(
+        self, 
+        ro: Optional[bool] = False, 
+        future: bool = True, 
+        session: Optional[Session] = None,
+        **kwargs
+    ) -> Generator[Session, None, None]:
         """
         Context manager for database session
         """
-        sess: Session = self.get_sess(ro = ro, future = future, **kwargs)
+        sess: Session = self.get_sess(ro = ro, future = future, **kwargs) if session is None else session
         try:
             yield sess
         finally:
-            if sess is not None:
+            # Close if the session was created here
+            if sess is not None and session is None:
                 if self.debug_enabled:
                     logger.debug('Closing Session')
                 sess.close()
@@ -373,6 +380,7 @@ class Context(BaseModel):
         ro: Optional[bool] = False, 
         retries: Optional[int] = None,
         retry_interval: Optional[float] = None,
+        session: Optional[AsyncSession] = None,
         **kwargs
     ) -> Generator[AsyncSession, None, None]:
         """
@@ -382,7 +390,7 @@ class Context(BaseModel):
         
         retries = retries or self.retries
         retry_interval = retry_interval or self.retry_interval
-        sess = self.get_async_sess(ro = ro, **kwargs)
+        sess = self.get_async_sess(ro = ro, **kwargs) if session is None else session
         raw_dbapi_err: Exception = None
         try:
             for retry in range(retries):
@@ -401,7 +409,8 @@ class Context(BaseModel):
                     await asyncio.sleep(retry_interval)
 
         finally:
-            if sess is not None:
+            # Close if the session was created here
+            if sess is not None and session is None:
                 if self.debug_enabled:
                     logger.debug('Closing Session')
                 await sess.close()
@@ -655,11 +664,11 @@ class PostgresDBMeta(type):
         """
         Context manager for database session
         """
-        if session is not None:
-            yield session
-        else:
-            with cls.ctx.get_session(ro=ro, future=future, **kwargs) as sess:
-                yield sess
+        # if session is not None:
+        #     yield session
+        # else:
+        with cls.ctx.get_session(ro = ro, future = future, session = session, **kwargs) as sess:
+            yield sess
     
     @contextlib.asynccontextmanager
     async def async_session(
@@ -673,11 +682,11 @@ class PostgresDBMeta(type):
         """
         Async context manager for database session
         """
-        if session is not None:
-            yield session
-        else:
-            async with cls.ctx.get_async_session(ro=ro, retries = retries, retry_interval = retry_interval, **kwargs) as sess:
-                yield sess
+        # if session is not None:
+        #     yield session
+        # else:
+        async with cls.ctx.get_async_session(ro = ro, retries = retries, retry_interval = retry_interval, session = session, **kwargs) as sess:
+            yield sess
 
     
     def create_all(cls, base: Optional[Any] = None):

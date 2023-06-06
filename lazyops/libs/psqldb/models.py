@@ -1,4 +1,4 @@
-
+import contextlib
 from sqlalchemy import func
 from sqlalchemy import delete as sqlalchemy_delete
 from sqlalchemy import update as sqlalchemy_update
@@ -1446,6 +1446,7 @@ class SQLModel(Base):
         cls, 
         filterby: Optional[Iterable[str]] = None,
         session: Optional[AsyncSession] = None,
+        _only_new: Optional[bool] = False,
         **kwargs: Dict
     ) -> Tuple[SQLModelT, bool]:
         """
@@ -1476,7 +1477,7 @@ class SQLModel(Base):
                 await result.update(
                     session = session, 
                     **update_data
-                ), True)
+                ), (False if _only_new else True))
         return (result, False)
     
         
@@ -1485,6 +1486,7 @@ class SQLModel(Base):
         cls, 
         filterby: Optional[Iterable[str]] = None,
         session: Optional[AsyncSession] = None,
+        _only_new: Optional[bool] = False,
         **kwargs
     ) -> Tuple[SQLModelT, bool]:
         """
@@ -1513,13 +1515,113 @@ class SQLModel(Base):
                 await result.update(
                 session = session, 
                 **update_data
-                ), True
+                ), (False if _only_new else True)
             )
         return (result, False)
     
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}({self.dict()})>"
+    
+    def _supdate(
+        self, 
+        session: Optional[Session] = None,
+        **kwargs
+    ):
+        """
+        Update a record
+        """
+        with PostgresDB.session(session = session) as db_sess:
+            query = sqlalchemy_update(self.__class__).where(
+                self.__class__.id == self.id).values(
+                **kwargs
+            )
+            db_sess.execute(query)
+            db_sess.commit()
+
+            # refresh attributes
+        return self._get(id = self.id)
+
+    @classmethod
+    def _get_or_create(
+        cls, 
+        filterby: Optional[Iterable[str]] = None,
+        session: Optional[Session] = None,
+        **kwargs
+    ) -> Tuple[SQLModelT, bool]:
+        """
+        Create a new instance of the model, or return the existing one.
+        """
+        filterby = [list(kwargs.keys())[0]] if filterby is None else filterby
+        _filterby = {key: kwargs.get(key) for key in filterby}
+        # async with PostgresDB.async_session(session = session) as db_sess:
+        result = cls._get(
+            raise_exceptions = False, 
+            _verbose = False, 
+            session = session,
+            **_filterby, 
+        )
+        if result is not None: return result, False
+        return cls._create(
+            session = session, 
+            **kwargs
+        ), True
+
+    @classmethod
+    def _get_or_create_or_update(
+        cls, 
+        filterby: Optional[Iterable[str]] = None,
+        session: Optional[Session] = None,
+        _only_new: Optional[bool] = False,
+        **kwargs: Dict
+    ) -> Tuple[SQLModelT, bool]:
+        """
+        Create a new instance of the model, 
+        or return the existing one after updating it.
+
+        filterby: A list of fields to filter by when checking for an existing record.
+
+        Returns a tuple of (instance, created | updated), where created is a boolean
+        """
+        filterby = [list(kwargs.keys())[0]] if filterby is None else filterby
+        _filterby = {key: kwargs.get(key) for key in filterby}
+        # async with PostgresDB.async_session(session = session) as db_sess:
+        result = cls._get(
+            session = session, 
+            raise_exceptions = False, 
+            _verbose = False,
+            **_filterby, 
+        )
+        if result is None: 
+            new_cls = cls._create(
+                session = session,
+                **kwargs, 
+            )
+            return new_cls, True
+        if update_data := result._filter_update_data(**kwargs):
+            return (
+                result._supdate(
+                    session = session, 
+                    **update_data
+                ), (False if _only_new else True))
+        return (result, False)
+
+    @classmethod
+    def _exists(cls, session: Optional[Session] = None, **kwargs) -> bool:
+        """
+        Return True if a record exists
+        """
+        with PostgresDB.session(ro=True, session = session) as db_sess:
+            query = cls._filter(sqlalchemy_exists(), **kwargs).select()
+            res = db_sess.scalar(query)
+        return res
+    
+    @classmethod
+    def _get_or_none(cls, session: Optional[Session] = None, **kwargs) -> Optional[SQLModelT]:
+        """
+        Return an instance of the model, or None.
+        """
+        return cls._get(**kwargs, session = session, raise_exceptions = False, _verbose = False)
 
     """
     Utility Methods
@@ -1563,9 +1665,15 @@ class SQLModel(Base):
         data = {}
         for field, value in kwargs.items():
             if not hasattr(self, field): continue
-            if getattr(self, field) == value: 
-                # logger.warning(f"Skipping {field}={getattr(self, field)} as value is the same: {value}")
-                continue
+            with contextlib.suppress(ValueError):
+                if hasattr(value, 'all') and hasattr(getattr(self, field), 'all') \
+                    and getattr(self, field).all() == value.all():
+                    continue
+
+                if getattr(self, field) == value: 
+                    # logger.warning(f"Skipping {field}={getattr(self, field)} as value is the same: {value}")
+                    continue
+            
             data[field] = value
         return data or None
 

@@ -1,6 +1,7 @@
 import json
 import typing
 import datetime
+import contextlib
 from enum import Enum
 from sqlalchemy import inspect
 from lazyops.utils.serialization import object_serializer, Json
@@ -48,14 +49,21 @@ class SQLJson(Json):
 
 
 _pydantic_models: Dict[str, Type[BaseModel]] = {}
+_json_encoders = {
+    datetime.datetime: lambda v: v.isoformat(),
+    Enum: lambda v: v.value
+}
+with contextlib.suppress(ImportError):
+    import numpy as np
+    _json_encoders[np.ndarray] = lambda v: v.tolist()
+    _json_encoders[np.int64] = lambda v: int(v)
+    _json_encoders[np.float64] = lambda v: float(v)
 
 
 class BasePydanticConfig:
     orm_mode = True
-    json_encoders = {
-        datetime.datetime: lambda v: v.isoformat(),
-        Enum: lambda v: v.value,
-    }
+    arbitrary_types_allowed = True
+    json_encoders = _json_encoders
     json_loads = Json.loads
     json_dumps = Json.dumps
 
