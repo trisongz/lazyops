@@ -664,10 +664,23 @@ class AsyncORMType(object):
             
         return new_cls
 
-    async def refresh(self, **kwargs):
+    async def refresh(self, session: Optional[AsyncSession] = None, **kwargs):
         """
         Refresh a record
         """
+        # async with PostgresDB.async_session(session = session) as db_sess:
+        #     query = sqlalchemy_update(self.__class__).where(
+        #         self.__class__.id == self.id)
+        #     self = (await db_sess.execute(query)).scalar_one_or_none()
+            # await db_sess.expire(self)
+            # local_object = await db_sess.merge(self)
+            # db_sess.add(local_object)
+            # await db_sess.commit()
+            # await db_sess.refresh(local_object)
+
+        # self = local_object
+        # return local_object
+    
         async with PostgresDB.async_session() as db_sess:
             # await db_sess.expire(self)
             local_object = await db_sess.merge(self)
@@ -675,8 +688,8 @@ class AsyncORMType(object):
             await db_sess.commit()
             await db_sess.refresh(local_object)
 
-        self = local_object
-        return local_object
+            self = local_object
+        # return local_object
     
     async def _update(self, **kwargs):
         """
@@ -1040,6 +1053,7 @@ class AsyncORMType(object):
         return f"<{self.__class__.__name__}({self.dict()})>"
     
 
+
     
 # SQLModelT = Type['SQLModel']
 SQLModelT = TypeVar('SQLModelT', bound = 'SQLModel')
@@ -1147,7 +1161,7 @@ class SQLModel(Base):
         async with PostgresDB.async_session(session = session) as db_sess:
             local_object = await db_sess.merge(self)
             db_sess.add(local_object)
-            await db_sess.refresh(local_object)
+            # await db_sess.refresh(local_object)
             await db_sess.commit()
             await db_sess.flush()
             self = local_object
@@ -1160,10 +1174,10 @@ class SQLModel(Base):
         async with PostgresDB.async_session() as db_sess:
             local_object = await db_sess.merge(self)
             db_sess.add(local_object)
-            await db_sess.refresh(local_object)
+            # logger.info(f"Saving {local_object}")
+            # await db_sess.refresh(local_object)
             await db_sess.commit()
-        
-        self = local_object
+            self = local_object
         return self
 
     async def update(self, session: Optional[AsyncSession] = None, **kwargs) -> Type['AsyncORMType']:
@@ -1182,7 +1196,7 @@ class SQLModel(Base):
             # if session is None: 
             await db_sess.commit()
         
-        self = local_object
+            self = local_object
         return self
 
 
@@ -1541,6 +1555,26 @@ class SQLModel(Base):
 
             # refresh attributes
         return self._get(id = self.id)
+
+
+    def supdate(self, session: Optional[Session] = None, **kwargs):
+        """
+        Update a record
+        """
+        filtered_update = self._filter_update_data(**kwargs)
+        if not filtered_update: return self
+        with PostgresDB.session(session = session) as db_sess:
+            for field, value in filtered_update.items():
+                setattr(self, field, value)
+
+            local_object = db_sess.merge(self)
+            db_sess.add(local_object)
+            db_sess.refresh(local_object)
+            db_sess.commit()
+            self = local_object
+        return self
+
+
 
     @classmethod
     def _get_or_create(

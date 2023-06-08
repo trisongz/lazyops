@@ -506,13 +506,13 @@ class PostgresDBMeta(type):
                 # This should be a string
                 # logger.dev(f"Using postgres_url: {cls.settings.postgres_url}")
                 cls._uri = uri_builder(cls.settings.postgres_url, scheme=cls.scheme)
-            elif getattr(cls.settings, 'postgres_host', None):
-                base_uri = f"{cls.settings.postgres_host}:{getattr(cls.settings, 'postgres_port', 5432)}/{getattr(cls.settings, 'postgres_db', 'postgres')}"
-                if getattr(cls.settings, 'postgres_user', None):
+            elif postgres_host := getattr(cls.settings, 'postgres_host', os.getenv('POSTGRES_HOST')):
+                base_uri = f"{postgres_host}:{getattr(cls.settings, 'postgres_port', 5432)}/{getattr(cls.settings, 'postgres_db', 'postgres')}"
+                if postgres_user := getattr(cls.settings, 'postgres_user', os.getenv('POSTGRES_USER')):
                     base_uri = (
-                        f"{cls.settings.postgres_user}:{cls.settings.postgres_password}@{base_uri}"
+                        f"{postgres_user}:{cls.settings.postgres_password}@{base_uri}"
                         if getattr(cls.settings, 'postgres_password', None)
-                        else f"{cls.settings.postgres_user}@{base_uri}"
+                        else f"{postgres_user}@{base_uri}"
                     )
                 # logger.dev(f"Using postgres_host: {base_uri}")
                 cls._uri = uri_builder(base_uri, scheme=cls.scheme)
@@ -526,7 +526,7 @@ class PostgresDBMeta(type):
         Returns the admin user
         """
         if admin_user := cls.config.get(
-            'pg_admin_user', os.getenv('POSTGRES_USER'),
+            'pg_admin_user', os.getenv('POSTGRES_ADMIN_USER', os.getenv('POSTGRES_USER')),
         ):
             return admin_user
         return cls.uri.user
@@ -537,7 +537,7 @@ class PostgresDBMeta(type):
         Returns the admin password
         """
         if admin_password := cls.config.get(
-            'pg_admin_password', os.getenv('POSTGRES_PASSWORD'),
+            'pg_admin_password', os.getenv('POSTGRES_ADMIN_PASSWORD', os.getenv('POSTGRES_PASSWORD')),
         ):
             return admin_password
         return cls.uri.password
