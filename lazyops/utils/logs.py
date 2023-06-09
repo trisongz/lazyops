@@ -278,7 +278,7 @@ class InterceptHandler(logging.Handler):
         try:
             level = logger.level(record.levelname).name
         except ValueError:
-            level = self.loglevel_mapping.get(record.levelno, 'INFO')
+            level = self.loglevel_mapping.get(record.levelno, 'DEBUG')
         # if "Unclosed client session" in record.message:
         #     print('Has unclosed client session')
         #     return
