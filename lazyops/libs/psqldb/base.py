@@ -553,6 +553,24 @@ class PostgresDBMeta(type):
             auth += f':{cls.pg_admin_password}'
         uri = f'{auth}@{uri}'
         return uri_builder(uri, scheme = cls.scheme)
+    
+    def get_admin_uri(
+        cls, 
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        user: Optional[str] = None,
+        password: Optional[str] = None,
+        db: Optional[str] = None,
+    ) -> PostgresDsn:
+        """
+        Returns the admin uri
+        """
+        uri = f'{host or cls.uri.host}:{port or cls.uri.port}/{db or "postgres"}'
+        auth = f'{user or cls.pg_admin_user}'
+        if password or cls.pg_admin_password:
+            auth += f':{password or cls.pg_admin_password}'
+        uri = f'{auth}@{uri}'
+        return uri_builder(uri, scheme = cls.scheme)
 
     
     @property
