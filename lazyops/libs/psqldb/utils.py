@@ -68,6 +68,12 @@ class BasePydanticConfig:
     json_dumps = Json.dumps
 
 
+def get_sqlmodel_dict(obj: DeclarativeMeta) -> Dict[str, Any]:
+    """
+    Return a dictionary representation of a sqlalchemy model
+    """
+    return {c.key: getattr(obj, c.key) for c in inspect(obj).mapper.column_attrs}
+
 def get_pydantic_model(obj: object) -> Type[BaseModel]:
     """
     Create a pydantic model from a sqlalchemy model
@@ -87,6 +93,7 @@ def get_pydantic_model(obj: object) -> Type[BaseModel]:
         )
         # logger.info(f'Created pydantic model for {obj_class_name}: {_pydantic_models[obj_class_name]}: {fields}')
     # return _pydantic_models[obj_class_name](**obj.dict())
+    # print(_pydantic_models[obj_class_name].__fields__)
     return _pydantic_models[obj_class_name].from_orm(obj)
 
 

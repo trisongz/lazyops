@@ -8,6 +8,7 @@ import textwrap
 import threading
 import types
 import warnings
+from typing import TypeVar, Callable, Any, Union
 from inspect import signature
 from functools import wraps
 
@@ -551,6 +552,10 @@ def deprecated_renamed_argument(old_name, new_name, since,
 # TODO: This can still be made to work for setters by implementing an
 # accompanying metaclass that supports it; we just don't need that right this
 # second
+
+CP = TypeVar('CP', bound='classproperty')
+CPR = TypeVar('CPR')
+
 class classproperty(property):
     """
     Similar to `property`, but allows class-level properties.  That is,
@@ -649,7 +654,7 @@ class classproperty(property):
         1
     """
 
-    def __new__(cls, fget=None, doc=None, lazy=False):
+    def __new__(cls: CP, fget=None, doc=None, lazy=False) -> Union[Callable, CP]:
         if fget is None:
             # Being used as a decorator--return a wrapper that implements
             # decorator syntax
@@ -660,7 +665,7 @@ class classproperty(property):
 
         return super().__new__(cls)
 
-    def __init__(self, fget, doc=None, lazy=False):
+    def __init__(self, fget, doc=None, lazy=False) -> None:
         self._lazy = lazy
         if lazy:
             self._lock = threading.RLock()   # Protects _cache
@@ -677,7 +682,7 @@ class classproperty(property):
         if doc is not None:
             self.__doc__ = doc
 
-    def __get__(self, obj, objtype):
+    def __get__(self, obj: Any, objtype: type[CP]) -> CPR:
         if self._lazy:
             val = self._cache.get(objtype, _NotFound)
             if val is _NotFound:
@@ -694,7 +699,7 @@ class classproperty(property):
             val = self.fget.__wrapped__(objtype)
         return val
 
-    def getter(self, fget):
+    def getter(self, fget: Callable[[Any], Any]) -> CP:
         return super().getter(self._wrap_fget(fget))
 
 
@@ -711,7 +716,7 @@ class classproperty(property):
 
 
     @staticmethod
-    def _wrap_fget(orig_fget):
+    def _wrap_fget(orig_fget) -> Callable[[Any], Any]:
         if isinstance(orig_fget, classmethod):
             orig_fget = orig_fget.__func__
 
@@ -724,10 +729,10 @@ class classproperty(property):
 
         return fget
 
+
 class lazyclassproperty(classproperty):
     def __new__(cls, fget=None, doc=None):
         return super().__new__(cls, fget, doc, lazy=True)
-
 
 
 class _CachedClassProperty(object):
@@ -1173,3 +1178,23 @@ def add_doc(docstring, *args, **kwargs):
         return obj
 
     return set_docstring
+
+# Incase its not supported in lower versions of python
+try:
+    from typing import Generic
+
+    # https://discuss.python.org/t/add-a-supported-read-only-classproperty-decorator-in-the-stdlib/18090/12
+
+    T = TypeVar("T")
+    R = TypeVar("R")
+
+    class classproperty_v2(Generic[T, R]):
+        def __init__(self, func: Callable[[type[T]], R]) -> None:
+            self.func = func
+
+        def __get__(self, obj: Any, cls: type[T]) -> R:
+            return self.func(cls)
+
+except ImportError:
+    
+    classproperty_v2 = classproperty

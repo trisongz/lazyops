@@ -14,7 +14,7 @@ from lazyops.utils import create_unique_id, create_timestamp
 from lazyops.utils.logs import logger
 from lazyops.types import lazyproperty
 from lazyops.libs.psqldb.base import Base, PostgresDB, AsyncSession, Session
-from lazyops.libs.psqldb.utils import SQLJson, get_pydantic_model, object_serializer
+from lazyops.libs.psqldb.utils import SQLJson, get_pydantic_model, object_serializer, get_sqlmodel_dict
 from fastapi.exceptions import HTTPException
 from pydantic import BaseModel
 
@@ -1066,7 +1066,7 @@ class SQLModel(Base):
     __allow_unmapped__ = True
     
     
-    id: str = Column(Text, default = create_unique_id, primary_key = True, index = True)
+    id: str = Column(Text, default = create_unique_id, primary_key = True, index = True, unique = True)
     created_at = Column(DateTime(timezone=True), default = create_timestamp, server_default = func.now())
     updated_at = Column(DateTime(timezone=True), default = create_timestamp, server_default = func.now(), onupdate = create_timestamp)
 
@@ -1093,10 +1093,10 @@ class SQLModel(Base):
 
     @classmethod
     def _create(
-        cls, 
+        cls: SQLModelT, 
         session: Optional[Session] = None,
         **kwargs
-    ) -> Type['SQLModel']:
+    ) -> SQLModelT:
         """
         Create a new instance of the model
         """
@@ -1202,7 +1202,7 @@ class SQLModel(Base):
 
     @classmethod
     async def get(
-        cls, 
+        cls: SQLModelT, 
         load_attrs: Optional[List[str]] = None,
         load_attr_method: Optional[Union[str, Callable]] = None,
         readonly : Optional[bool] = False,
@@ -1225,7 +1225,7 @@ class SQLModel(Base):
     
     @classmethod
     def _get(
-        cls, 
+        cls: SQLModelT, 
         load_attrs: Optional[List[str]] = None,
         load_attr_method: Optional[Union[str, Callable]] = None,
         readonly : Optional[bool] = False,
@@ -1248,7 +1248,7 @@ class SQLModel(Base):
 
     @classmethod
     async def get_all(
-        cls,
+        cls: SQLModelT,
         skip: Optional[int] = None, 
         limit: Optional[int] = None,
         load_attrs: Optional[List[str]] = None,
@@ -1392,6 +1392,22 @@ class SQLModel(Base):
             if key in other.dict() and self.dict()[key] != other.dict()[key]
         }
     
+    def sqlmodel_dict(
+        self, 
+        exclude: Optional[List[str]] = None,
+        include: Optional[List[str]] = None,
+        exclude_none: Optional[bool] = False,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Return a dictionary representation of the model.
+        """
+        model_dict = get_sqlmodel_dict(self)
+        if exclude is not None: model_dict = {key: value for key, value in model_dict.items() if key not in exclude}
+        if include is not None: model_dict = {key: value for key, value in model_dict.items() if key in include}
+        if exclude_none: model_dict = {key: value for key, value in model_dict.items() if value is not None}
+        return model_dict
+
     @lazyproperty
     def pydantic_model(self) -> Type[BaseModel]:
         """
@@ -1428,7 +1444,7 @@ class SQLModel(Base):
 
     @classmethod
     def register(
-        cls, 
+        cls: SQLModelT, 
         filterby: Optional[Iterable[str]] = None,
         session: Optional[Session] = None,
         **kwargs
@@ -1445,7 +1461,7 @@ class SQLModel(Base):
             return (result, False) if result is not None else (cls._create(session = db_sess, **kwargs), True)
             
     @classmethod
-    async def get_or_none(cls, session: Optional[AsyncSession] = None, **kwargs) -> Optional[Type['AsyncORMType']]:
+    async def get_or_none(cls: SQLModelT, session: Optional[AsyncSession] = None, **kwargs) -> Optional[SQLModelT]:
         """
         Return an instance of the model, or None.
         """
@@ -1457,7 +1473,7 @@ class SQLModel(Base):
     
     @classmethod
     async def get_or_create_or_update(
-        cls, 
+        cls: SQLModelT, 
         filterby: Optional[Iterable[str]] = None,
         session: Optional[AsyncSession] = None,
         _only_new: Optional[bool] = False,
@@ -1471,7 +1487,8 @@ class SQLModel(Base):
 
         Returns a tuple of (instance, created | updated), where created is a boolean
         """
-        filterby = [list(kwargs.keys())[0]] if filterby is None else filterby
+        # filterby = [list(kwargs.keys())[0]] if filterby is None else filterby
+        filterby = list(kwargs.keys()) if filterby is None else filterby
         _filterby = {key: kwargs.get(key) for key in filterby}
         # async with PostgresDB.async_session(session = session) as db_sess:
         result = await cls.get(
@@ -1497,7 +1514,7 @@ class SQLModel(Base):
         
     @classmethod
     async def create_or_update(
-        cls, 
+        cls: SQLModelT, 
         filterby: Optional[Iterable[str]] = None,
         session: Optional[AsyncSession] = None,
         _only_new: Optional[bool] = False,
@@ -1578,7 +1595,7 @@ class SQLModel(Base):
 
     @classmethod
     def _get_or_create(
-        cls, 
+        cls: SQLModelT, 
         filterby: Optional[Iterable[str]] = None,
         session: Optional[Session] = None,
         **kwargs
@@ -1603,7 +1620,7 @@ class SQLModel(Base):
 
     @classmethod
     def _get_or_create_or_update(
-        cls, 
+        cls: SQLModelT, 
         filterby: Optional[Iterable[str]] = None,
         session: Optional[Session] = None,
         _only_new: Optional[bool] = False,
@@ -1663,7 +1680,7 @@ class SQLModel(Base):
     
     @classmethod
     def _filter(
-        cls, 
+        cls: SQLModelT, 
         query: Optional[Select] = None, 
         **kwargs
     ) -> Select:
@@ -1674,8 +1691,29 @@ class SQLModel(Base):
         return query.where(*[getattr(cls, key) == value for key, value in kwargs.items()])
 
     @classmethod
+    def _nested_kwarg_parser(
+        cls: SQLModelT,
+        top_level_obj: Optional[SQLModelT] = None,
+        **kwargs: Dict[str, Any],
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """
+        Parses nested dict kwargs into a flat dict
+        """
+        attrs = []
+        for key, value in kwargs.items():
+            obj_attr = getattr(cls, key, None) if top_level_obj is None else getattr(top_level_obj, key, None)
+            if obj_attr is None: continue
+            if isinstance(value, dict):
+                attrs.append(obj_attr.has(**value))
+                # attrs.extend(cls._nested_kwarg_parser(top_level_obj, **value))
+            else:
+                attrs.append(obj_attr == value)
+        logger.warning(f'{attrs}')
+        return attrs
+
+    @classmethod
     def _build_query(
-        cls,
+        cls: SQLModelT,
         query: Optional[Select] = None,
         load_attrs: Optional[List[str]] = None,
         load_attr_method: Optional[Union[str, Callable]] = None,
@@ -1686,6 +1724,7 @@ class SQLModel(Base):
         """
         query = query if query is not None else select(cls)
         query = query.where(*[getattr(cls, key) == value for key, value in kwargs.items()])
+        # query = query.where(*cls._nested_kwarg_parser(**kwargs))
         if load_attrs:
             load_attr_method = get_attr_func(load_attr_method)
             for attr in load_attrs:
