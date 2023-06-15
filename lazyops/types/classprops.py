@@ -1194,7 +1194,40 @@ try:
 
         def __get__(self, obj: Any, cls: type[T]) -> R:
             return self.func(cls)
+        
+    class lazyclassproperty_v2(Generic[T, R]):
+        def __init__(self, func: Callable[[type[T]], R]) -> None:
+            self.func = func
+            self._key = self.func.__name__
+            self._lock = threading.RLock()
+
+        def __get__(self, obj: Any, cls: type[T]) -> R:
+            try:
+                obj_dict = obj.__dict__
+                val = obj_dict.get(self._key, _NotFound)
+                if val is _NotFound:
+                    with self._lock:
+                        # Check if another thread beat us to it.
+                        val = obj_dict.get(self._key, _NotFound)
+                        if val is _NotFound:
+                            val = self.func(cls)
+                            obj_dict[self._key] = val
+                return val
+            except AttributeError:
+                if obj is None:
+                    return self
+                raise
+        
+        def __set__(self, obj: Any, value: Any) -> None:
+            obj_dict = obj.__dict__
+            obj_dict[self._key] = value
+        
+        def __delete__(self, obj: Any) -> None:
+            obj_dict = obj.__dict__
+            obj_dict.pop(self._key, None)
+
 
 except ImportError:
     
     classproperty_v2 = classproperty
+    lazyclassproperty_v2 = lazyclassproperty

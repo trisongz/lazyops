@@ -185,3 +185,33 @@ async def amap_ordered(
     """
     async for result in amap(func, iterable, limit = limit, return_when = return_when):
         yield result
+
+
+async def amap_v2(
+    func: Callable[..., Awaitable[Any]],
+    iterable: Iterable[Any], 
+    *args,
+    limit: Optional[int] = None,
+    return_when: Optional[ReturnWhenType] = ReturnWhenType.FIRST_COMPLETED,
+    **kwargs,
+):
+    """
+    Async Map
+
+    Args:
+        func (Callable[..., Awaitable[Any]]): The function to map
+        iterable (Iterable[Any]): The iterable to map
+        limit (Optional[int], optional): The limit of the concurrency. Defaults to None.
+        return_when (Optional[ReturnWhenType], optional): The return when type. Defaults to ReturnWhenType.FIRST_COMPLETED.
+    
+    Yields:
+        [type]: [description]
+    """
+    func = ensure_coro(func)
+    partial = functools.partial(func, *args, **kwargs)
+    try:
+        mapped_iterable = map(partial, iterable)
+    except TypeError:
+        mapped_iterable = (partial(x) async for x in iterable)
+    async for task in limit_concurrency(mapped_iterable, limit = limit, return_when = return_when):
+        yield await task
