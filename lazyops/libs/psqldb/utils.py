@@ -7,7 +7,7 @@ from sqlalchemy import inspect
 from lazyops.utils.serialization import object_serializer, Json
 from sqlalchemy.ext.declarative import DeclarativeMeta
 from pydantic import create_model, BaseModel, Field
-from typing import Optional, Dict, Any, List, Union, Type
+from typing import Optional, Dict, Any, List, Union, Type, cast
 
 
 # https://stackoverflow.com/questions/5022066/how-to-serialize-sqlalchemy-result-to-json
@@ -66,7 +66,23 @@ class BasePydanticConfig:
     json_encoders = _json_encoders
     json_loads = Json.loads
     json_dumps = Json.dumps
+    extra = 'allow'
 
+# from lazyops.utils import logger
+
+def cast_to_optional(t: Type[Any]) -> Optional[Type[Any]]:
+    """
+    Cast a type to an optional type
+    """
+    # logger.warning(f'Cast to optional: {t}')
+    # if isinstance(t, None):
+    if t == type(None):
+        # Turn it into Any
+        # logger.warning(f'Cast to optional from none: {t}')
+        return Optional[Any]
+    if isinstance(t, type):
+        return Optional[t]
+    return Optional[t[0]] if isinstance(t, list) else Optional[t.__args__[0]]
 
 def get_sqlmodel_dict(obj: DeclarativeMeta) -> Dict[str, Any]:
     """
@@ -74,17 +90,31 @@ def get_sqlmodel_dict(obj: DeclarativeMeta) -> Dict[str, Any]:
     """
     return {c.key: getattr(obj, c.key) for c in inspect(obj).mapper.column_attrs}
 
+def get_model_fields(obj: DeclarativeMeta) -> Dict[str, Any]:
+    """
+    Return a dictionary representation of a sqlalchemy model
+    """
+    fields = {}
+    for c in inspect(obj).mapper.column_attrs:
+        # logger.warning(f'Cast to optional: {c.key}')
+        fields[c.key] = (cast_to_optional(type(getattr(obj, c.key))), Field(None))
+    return fields
+
+
 def get_pydantic_model(obj: object) -> Type[BaseModel]:
     """
     Create a pydantic model from a sqlalchemy model
     """
     global _pydantic_models
+    
     obj_class_name = f'{obj.__class__.__module__}.{obj.__class__.__name__}Model'
     if obj_class_name not in _pydantic_models:
-        fields = {
-            c.key: (type(getattr(obj, c.key)), Field(None))
-            for c in inspect(obj).mapper.column_attrs
-        }
+        # fields = {
+        #     c.key: (cast_to_optional(type(getattr(obj, c.key))), Field(None))
+        #     for c in inspect(obj).mapper.column_attrs
+        # }
+        fields = get_model_fields(obj)
+        # logger.info(f'Creating pydantic model for {obj_class_name}: {fields}')
         _pydantic_models[obj_class_name] = create_model(
             f'{obj.__class__.__name__}Model',
             __config__ = BasePydanticConfig,
