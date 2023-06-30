@@ -98,10 +98,26 @@ def get_model_fields(obj: DeclarativeMeta) -> Dict[str, Any]:
     for c in inspect(obj).mapper.column_attrs:
         # logger.warning(f'Cast to optional: {c.key}')
         fields[c.key] = (cast_to_optional(type(getattr(obj, c.key))), Field(None))
+    # map relationships
+    # for r in inspect(obj).mapper.relationships:
+    # for r in obj.__mapper__.relationships:
+    #     if r.mapper.class_ == obj.__class__: continue
+    #     # determine if the relationship is a parent
+    #     # if it is, then we don't need to create a model for it
+    #     if r.direction.name == 'MANYTOONE':
+    #         logger.warning(f'Skip Cast to optional: {r.key}: {r.uselist} {r.mapper.class_} {r.direction.name}')
+    #         # fields[r.key] = (cast_to_optional(type(getattr(obj, r.key))), Field(None))
+    #         continue
+    #     logger.warning(f'Cast to optional: {r.key}: {r.uselist} {r.mapper.class_} {r.direction.name} {r}')
+    #     base_type = build_pydantic_model(r.mapper.class_)
+    #     if r.uselist:
+    #         fields[r.key] = (cast_to_optional(List[base_type]), Field(None))
+    #     else:
+    #         fields[r.key] = (cast_to_optional(base_type), Field(None))
+        # fields[r.key] = (cast_to_optional(List[get_pydantic_model(r.mapper.class_)]), Field(None))
     return fields
 
-
-def get_pydantic_model(obj: object) -> Type[BaseModel]:
+def build_pydantic_model(obj: DeclarativeMeta) -> Type[BaseModel]:
     """
     Create a pydantic model from a sqlalchemy model
     """
@@ -121,10 +137,36 @@ def get_pydantic_model(obj: object) -> Type[BaseModel]:
             __module__=obj.__class__.__module__,
             **fields,
         )
-        # logger.info(f'Created pydantic model for {obj_class_name}: {_pydantic_models[obj_class_name]}: {fields}')
-    # return _pydantic_models[obj_class_name](**obj.dict())
-    # print(_pydantic_models[obj_class_name].__fields__)
-    return _pydantic_models[obj_class_name].from_orm(obj)
+    return _pydantic_models[obj_class_name]
+
+
+def get_pydantic_model(obj: object) -> Type[BaseModel]:
+    """
+    Create a pydantic model from a sqlalchemy model
+    """
+    # obj_class_name = f'{obj.__class__.__module__}.{obj.__class__.__name__}Model'
+    return build_pydantic_model(obj).from_orm(obj)
+
+    # global _pydantic_models
+    
+    # obj_class_name = f'{obj.__class__.__module__}.{obj.__class__.__name__}Model'
+    # if obj_class_name not in _pydantic_models:
+    #     # fields = {
+    #     #     c.key: (cast_to_optional(type(getattr(obj, c.key))), Field(None))
+    #     #     for c in inspect(obj).mapper.column_attrs
+    #     # }
+    #     fields = get_model_fields(obj)
+    #     # logger.info(f'Creating pydantic model for {obj_class_name}: {fields}')
+    #     _pydantic_models[obj_class_name] = create_model(
+    #         f'{obj.__class__.__name__}Model',
+    #         __config__ = BasePydanticConfig,
+    #         __module__=obj.__class__.__module__,
+    #         **fields,
+    #     )
+    #     # logger.info(f'Created pydantic model for {obj_class_name}: {_pydantic_models[obj_class_name]}: {fields}')
+    # # return _pydantic_models[obj_class_name](**obj.dict())
+    # # print(_pydantic_models[obj_class_name].__fields__)
+    # return _pydantic_models[obj_class_name].from_orm(obj)
 
 
 def dict_diff(dict_a: Union[Dict[str, Any], Type[BaseModel]], dict_b: Union[Dict[str, Any], Type[BaseModel]], show_value_diff: bool = True):

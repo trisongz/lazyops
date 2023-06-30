@@ -387,7 +387,7 @@ def lazy_function(
     return wrapper_func
 
 
-def fail_after(delay: float):
+def with_fail_after(delay: float):
     """
     Creates a timeout for a function
     """
@@ -418,6 +418,22 @@ def fail_after(delay: float):
 
         return time_limited
     return wrapper
+
+
+@contextlib.contextmanager
+def fail_after(delay: Union[int, float]):
+    """
+    Creates a timeout for a function
+    """
+    def signal_handler(signum, frame):
+        raise TimeoutError(f"Timed out after {delay}s")
+    signal.signal(signal.SIGALRM, signal_handler)
+    signal.alarm(int(delay))
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+
 
 
 _background_tasks = set()
