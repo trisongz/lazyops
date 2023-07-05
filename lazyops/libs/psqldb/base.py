@@ -88,6 +88,8 @@ class Context(BaseModel):
     settings: Optional[SettingsT] = None
     config: Optional[Dict[str, Any]] = Field(default = {})
 
+    ctx: Optional[Dict[str, Any]] = Field(default = {})
+
     @property
     def debug_enabled(self) -> bool:
         """
@@ -112,7 +114,24 @@ class Context(BaseModel):
                 return getattr(self.settings, 'postgres_verbose', False)
         return os.getenv('DB_VERBOSE', 'false') in ['true', 'True', '1']
         # return cast(bool, os.getenv('DB_VERBOSE', 'false'))
-    
+
+
+    @property
+    def is_debug_mode(self) -> bool:
+        """
+        Returns the custom debug mode flag from the settings
+        """
+        if 'is_debug_mode' in self.ctx:
+            return self.ctx['is_debug_mode']
+        if self.settings and hasattr(self.settings, 'postgres_debug_mode'):
+            self.ctx['is_debug_mode'] = getattr(self.settings, 'postgres_debug_mode', False)
+            return self.ctx['is_debug_mode']
+        if self.config.get('is_debug_mode') is not None:
+            self.ctx['is_debug_mode'] = self.config.get('is_debug_mode')
+            return self.ctx['is_debug_mode']
+        return False
+
+
     @property
     def retries(self) -> int:
         """
@@ -307,20 +326,32 @@ class Context(BaseModel):
             )
         return self.sess_ro if self.sess_ro is not None else None
     
-    def get_sess(self, ro: Optional[bool] = False, **kwargs) -> Session:
+    def get_sess(self, ro: Optional[bool] = False, _session: Optional[Session] = None, **kwargs) -> Session:
         """
         Returns a session
         """
-        if ro and self.has_ro:
-            return self.session_ro(**kwargs)
+        if _session is not None and isinstance(_session, Session) and _session.bind is not None: return _session
+        if ro and self.has_ro: return self.session_ro(**kwargs)
+        
+        # Bug testing for sync sessions
+        if self.is_debug_mode:
+            if 'sync_sessions' not in self.ctx: self.ctx['sync_sessions'] = 0
+            self.ctx['sync_sessions'] += 1
+            logger.warning(f"[{self.ctx['sync_sessions']}] Using new sync session")
         return self.session(**kwargs)
     
-    def get_async_sess(self, ro: Optional[bool] = False, **kwargs) -> AsyncSession:
+    def get_async_sess(self, ro: Optional[bool] = False, _session: Optional[AsyncSession] = None, **kwargs) -> AsyncSession:
         """
         Returns an async session
         """
-        if ro and self.has_ro:
-            return self.async_session_ro(**kwargs)
+        if _session is not None and isinstance(_session, AsyncSession) and _session.bind is not None: return _session
+        if ro and self.has_ro: return self.async_session_ro(**kwargs)
+
+        # Bug testing for async sessions
+        if self.is_debug_mode:
+            if 'async_sessions' not in self.ctx: self.ctx['async_sessions'] = 0
+            self.ctx['async_sessions'] += 1
+            logger.warning(f"[{self.ctx['async_sessions']}] Using new async session")
         return self.async_session(**kwargs)
 
     
@@ -386,7 +417,8 @@ class Context(BaseModel):
         """
         Context manager for database session
         """
-        sess: Session = self.get_sess(ro = ro, future = future, **kwargs) if session is None else session
+        # sess: Session = self.get_sess(ro = ro, future = future, **kwargs) if session is None else session
+        sess: Session = self.get_sess(ro = ro, future = future, _session = session, **kwargs)
         try:
             yield sess
         finally:
@@ -412,7 +444,8 @@ class Context(BaseModel):
         
         retries = retries or self.retries
         retry_interval = retry_interval or self.retry_interval
-        sess = self.get_async_sess(ro = ro, **kwargs) if session is None else session
+        # sess = self.get_async_sess(ro = ro, **kwargs) if session is None else session
+        sess = self.get_async_sess(ro = ro, _session = session, **kwargs)
         raw_dbapi_err: Exception = None
         try:
             for retry in range(retries):
