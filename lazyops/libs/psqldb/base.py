@@ -20,6 +20,7 @@ from lazyops.types import BaseModel, lazyproperty, BaseSettings, Field
 from typing import Any, Generator, AsyncGenerator, Optional, Union, Type, Dict, cast, TYPE_CHECKING, List, Tuple, TypeVar, Callable
 from pydantic.networks import PostgresDsn
 from lazyops.libs.psqldb.retry import reconnecting_engine
+from lazyops.utils.helpers import import_string
 
 Base = declarative_base()
 
@@ -188,12 +189,13 @@ class Context(BaseModel):
         Returns the engine
         """
         if self.eng is None:
+            eng_args = self.config.get('engine_args', {})
             self.eng = create_engine(
                 self.uri,
-                future = self.config.get('future', True),
-                echo = self.config.get('echo', self.is_verbose),
-                pool_pre_ping = self.config.get('pool_pre_ping', True),
-                **self.config.get('engine_args', {}),
+                echo = get_nested_arg(eng_args, self.config, 'echo', self.is_verbose),
+                future = get_nested_arg(eng_args, self.config, 'future', True),
+                pool_pre_ping = get_nested_arg(eng_args, self.config, 'pool_pre_ping', True),
+                **eng_args,
         )
         return self.eng
 
@@ -221,13 +223,21 @@ class Context(BaseModel):
         
         if self.aeng is None:
             eng_args = self.config.get('async_engine_args', {})
+            if poolclass := get_nested_arg(eng_args, self.config, 'poolclass', None):
+                if isinstance(poolclass, str):
+                    poolclass = import_string(poolclass)
+                eng_args['poolclass'] = poolclass
+            
+            # Handle NullPool
+            if 'poolclass' in eng_args and eng_args['poolclass'] is not None and eng_args['poolclass'].__name__ == 'NullPool':
+                _ = get_nested_arg(eng_args, self.config, 'pool_size')
+            elif pool_size := get_nested_arg(eng_args, self.config, 'pool_size', 50):
+                eng_args['pool_size'] = pool_size
+
             self.aeng = create_async_engine(
                 self.async_uri,
                 echo = get_nested_arg(eng_args, self.config, 'echo', self.is_verbose),
-                # future = get_nested_arg(eng_args, self.config, 'future', True),
-                # pool_pre_ping = get_nested_arg(eng_args, self.config, 'pool_pre_ping', True),
                 json_serializer = get_nested_arg(eng_args, self.config, 'json_serializer', Json.dumps),
-                pool_size = get_nested_arg(eng_args, self.config, 'pool_size', 50),
                 **eng_args,
         )
         return self.aeng
@@ -239,13 +249,21 @@ class Context(BaseModel):
         """
         if self.aeng_ro is None and self.has_ro:
             eng_args = self.config.get('async_engine_ro_args', {})
+            if poolclass := get_nested_arg(eng_args, self.config, 'poolclass', None):
+                if isinstance(poolclass, str):
+                    poolclass = import_string(poolclass)
+                eng_args['poolclass'] = poolclass
+            
+            # Handle NullPool
+            if 'poolclass' in eng_args and eng_args['poolclass'] is not None and eng_args['poolclass'].__name__ == 'NullPool':
+                _ = get_nested_arg(eng_args, self.config, 'pool_size')
+            elif pool_size := get_nested_arg(eng_args, self.config, 'pool_size', 50):
+                eng_args['pool_size'] = pool_size
+
             self.aeng_ro = create_async_engine(
                 self.async_uri_ro,
                 echo = get_nested_arg(eng_args, self.config, 'echo', self.is_verbose),
-                # future = get_nested_arg(eng_args, self.config, 'future', True),
-                # pool_pre_ping = get_nested_arg(eng_args, self.config, 'pool_pre_ping', True),
                 json_serializer = get_nested_arg(eng_args, self.config, 'json_serializer', Json.dumps),
-                pool_size = get_nested_arg(eng_args, self.config, 'pool_size', 50),
                 execution_options = get_nested_arg(eng_args, self.config, 'execution_options', 
                     {
                         "isolation_level": "READ COMMITTED",
@@ -268,7 +286,8 @@ class Context(BaseModel):
                 bind = self.engine,
                 autoflush = get_nested_arg(sess_args, self.config, 'autoflush', True),
                 expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
-                class_ = Session,
+                class_ = get_nested_arg(sess_args, self.config, 'class_', Session),
+                **sess_args,
             )
         return self.sess
     
@@ -283,7 +302,8 @@ class Context(BaseModel):
                 bind = self.engine_ro,
                 autoflush = get_nested_arg(sess_args, self.config, 'autoflush', True),
                 expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
-                class_ = Session,
+                class_ = get_nested_arg(sess_args, self.config, 'class_', Session),
+                **sess_args,
             )
         return self.sess_ro if self.sess_ro is not None else None
     
@@ -315,7 +335,8 @@ class Context(BaseModel):
                 bind = self.async_engine,
                 autoflush = get_nested_arg(sess_args, self.config, 'autoflush', True),
                 expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
-                class_ = AsyncSession,
+                class_ = get_nested_arg(sess_args, self.config, 'class_', AsyncSession),
+                **sess_args,
             )
         return self.asess
     
@@ -330,7 +351,8 @@ class Context(BaseModel):
                 bind = self.async_engine_ro,
                 autoflush = get_nested_arg(sess_args, self.config, 'autoflush', True),
                 expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
-                class_ = AsyncSession,
+                class_ = get_nested_arg(sess_args, self.config, 'class_', AsyncSession),
+                **sess_args,
             )
         return self.asess_ro if self.asess_ro is not None else None
     
