@@ -1003,6 +1003,8 @@ class AsyncORMType(object):
     async def get_or_create_or_update(
         cls, 
         filterby: Optional[Iterable[str]] = None,
+        load_attrs: Optional[List[str]] = None,
+        load_attr_method: Optional[Union[str, Callable]] = None,
         **kwargs: Dict
     ) -> Tuple[Type['AsyncORMType'], bool]:
         """
@@ -1015,7 +1017,7 @@ class AsyncORMType(object):
         """
         filterby = [list(kwargs.keys())[0]] if filterby is None else filterby
         _filterby = {key: kwargs.get(key) for key in filterby}
-        result = await cls.get(**_filterby, raise_exceptions = False, _verbose = False)
+        result = await cls.get(**_filterby, raise_exceptions = False, _verbose = False, load_attrs = load_attrs, load_attr_method = load_attr_method)
         if result is None: 
             new_cls = await cls.create(**kwargs)
 
@@ -1029,6 +1031,8 @@ class AsyncORMType(object):
     async def create_or_update(
         cls, 
         filterby: Optional[Iterable[str]] = None,
+        load_attrs: Optional[List[str]] = None,
+        load_attr_method: Optional[Union[str, Callable]] = None,
         **kwargs
     ) -> Tuple[Type['AsyncORMType'], bool]:
         """
@@ -1040,7 +1044,7 @@ class AsyncORMType(object):
         filterby = [list(kwargs.keys())[0]] if filterby is None else filterby
         _filterby = {key: kwargs.get(key) for key in filterby}
         # if await cls.exists(**_filterby):
-        result = await cls.get(**_filterby, raise_exceptions = False, _verbose = False)
+        result = await cls.get(**_filterby, raise_exceptions = False, _verbose = False, load_attrs = load_attrs, load_attr_method = load_attr_method)
         if result is None: 
             return await cls.create(**kwargs), True
         if update_data := result._filter_update_data(**kwargs):
@@ -1487,6 +1491,8 @@ class SQLModel(Base):
     def register(
         cls: SQLModelT, 
         filterby: Optional[Iterable[str]] = None,
+        load_attrs: Optional[List[str]] = None,
+        load_attr_method: Optional[Union[str, Callable]] = None,
         session: Optional[Session] = None,
         **kwargs
     ) -> Tuple[SQLModelT, bool]:
@@ -1498,7 +1504,7 @@ class SQLModel(Base):
         filterby = [list(kwargs.keys())[0]] if filterby is None else filterby
         _filterby = {key: kwargs.get(key) for key in filterby}
         with PostgresDB.session(session = session) as db_sess:
-            result = cls._get(**_filterby, raise_exceptions = False, _verbose = False, session = db_sess)
+            result = cls._get(**_filterby, raise_exceptions = False, _verbose = False, session = db_sess, load_attrs = load_attrs, load_attr_method = load_attr_method)
             return (result, False) if result is not None else (cls._create(session = db_sess, **kwargs), True)
             
     @classmethod
@@ -1516,6 +1522,8 @@ class SQLModel(Base):
     async def get_or_create_or_update(
         cls: SQLModelT, 
         filterby: Optional[Iterable[str]] = None,
+        load_attrs: Optional[List[str]] = None,
+        load_attr_method: Optional[Union[str, Callable]] = None,
         session: Optional[AsyncSession] = None,
         _only_new: Optional[bool] = False,
         **kwargs: Dict
@@ -1534,6 +1542,8 @@ class SQLModel(Base):
         # async with PostgresDB.async_session(session = session) as db_sess:
         # result = await cls.get(
         result = await cls.get_only_one(
+            load_attrs = load_attrs,
+            load_attr_method = load_attr_method,
             session = session, 
             raise_exceptions = False, 
             _verbose = False,
@@ -1558,6 +1568,8 @@ class SQLModel(Base):
     async def create_or_update(
         cls: SQLModelT, 
         filterby: Optional[Iterable[str]] = None,
+        load_attrs: Optional[List[str]] = None,
+        load_attr_method: Optional[Union[str, Callable]] = None,
         session: Optional[AsyncSession] = None,
         _only_new: Optional[bool] = False,
         **kwargs
@@ -1573,6 +1585,8 @@ class SQLModel(Base):
         # async with PostgresDB.async_session(session = session) as db_sess:
         result = await cls.get(
             **_filterby, 
+            load_attrs = load_attrs,
+            load_attr_method = load_attr_method,
             session = session, 
             raise_exceptions = False, 
             _verbose = False
