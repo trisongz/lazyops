@@ -1254,7 +1254,8 @@ class SQLModel(Base):
                 # Delete the rest
                 for res in result[1:]:
                     await db_sess.delete(res)
-                await db_sess.flush()
+                # await db_sess.flush()
+                await db_sess.commit()
                 result = kept_result
             elif result:
                 result = result[0]
