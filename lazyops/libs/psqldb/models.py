@@ -1223,6 +1223,46 @@ class SQLModel(Base):
             if result is not None and _model_type is not None: result = cast(_model_type, result)
         return result
     
+
+    @classmethod
+    async def get_only_one(
+        cls: SQLModelT, 
+        load_attrs: Optional[List[str]] = None,
+        load_attr_method: Optional[Union[str, Callable]] = None,
+        readonly : Optional[bool] = False,
+        raise_exceptions: Optional[bool] = True,
+        session: Optional[AsyncSession] = None,
+        _model_type: Optional[ModelType] = None,
+        _verbose: Optional[bool] = False,
+        **kwargs,
+    ) -> SQLModelT:
+        """
+        Get a record
+        """
+        async with PostgresDB.async_session(ro=readonly, session = session) as db_sess:
+            query = cls._build_query(load_attrs = load_attrs, load_attr_method = load_attr_method, **kwargs)
+            query = query.order_by(cls.created_at.desc())
+            # result = (await db_sess.execute(query)).scalar_one_or_none()
+            result = (await db_sess.scalars(query)).all()
+            # logger.warning(f"Found {len(result)} results for {cls.__name__} with {kwargs}: {result}")
+            if not result and raise_exceptions:
+                cls._handle_exception(e = NoResultFound(), verbose = _verbose)
+            if len(result) > 1:
+                # Keep the latest one
+                kept_result = result[0]
+                if _verbose: logger.warning(f"Found {len(result)} results for {cls.__name__} with {kwargs}. Keeping {kept_result.id}")
+                # Delete the rest
+                for res in result[1:]:
+                    await db_sess.delete(res)
+                await db_sess.flush()
+                result = kept_result
+            elif result:
+                result = result[0]
+            else:
+                result = None
+            if result is not None and _model_type is not None: result = cast(_model_type, result)
+        return result
+    
     @classmethod
     def _get(
         cls: SQLModelT, 
@@ -1491,7 +1531,8 @@ class SQLModel(Base):
         filterby = list(kwargs.keys()) if filterby is None else filterby
         _filterby = {key: kwargs.get(key) for key in filterby}
         # async with PostgresDB.async_session(session = session) as db_sess:
-        result = await cls.get(
+        # result = await cls.get(
+        result = await cls.get_only_one(
             session = session, 
             raise_exceptions = False, 
             _verbose = False,
