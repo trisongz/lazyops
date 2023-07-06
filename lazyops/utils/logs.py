@@ -1,3 +1,4 @@
+import re
 import os
 import sys
 import logging
@@ -13,7 +14,7 @@ from loguru._logger import Core as _Core
 from loguru._logger import Logger as _Logger
 from pydantic import BaseSettings
 
-from typing import Type, Union, Optional, Any, List
+from typing import Type, Union, Optional, Any, List, Dict, Tuple, Callable
 
 # Use this section to filter out warnings from other modules
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = os.getenv('TF_CPP_MIN_LOG_LEVEL', '3')
@@ -40,11 +41,138 @@ STATUS_COLOR = {
 }
 FALLBACK_STATUS_COLOR = 'magenta'
 
+LOGLEVEL_MAPPING = {
+    50: 'CRITICAL',
+    40: 'ERROR',
+    30: 'WARNING',
+    20: 'INFO',
+    19: 'DEV',
+    10: 'DEBUG',
+    5: 'CRITICAL',
+    4: 'ERROR',
+    3: 'WARNING',
+    2: 'INFO',
+    1: 'DEBUG',
+    0: 'NOTSET',
+}
+
+COLORED_MESSAGE_MAP = {
+    '|bld|': '<bold>',
+    '|reset|': '</>',
+    '|eee|': '</></></>',
+    '|em|': '<bold>',
+    '|ee|': '</></>',
+    '|lr|': '<light-red>',
+    '|lb|': '<light-blue>',
+    '|lm|': '<light-magenta>',
+    '|lc|': '<light-cyan>',
+    '|lw|': '<light-white>',
+    '|gr|': '<gray>',
+    '|lk|': '<light-black>',
+    '|br|': "\x1b[31;1m", # Bold Red
+    '|k|': '<black>',
+    '|r|': '<red>',
+    '|m|': '<magenta>',
+    '|c|': '<cyan>',
+    '|u|': '<underline>',
+    '|i|': '<italic>',
+    '|s|': '<strike>',
+    '|e|': '</>',
+    '|g|': '<green>',
+    '|y|': '<yellow>',
+    '|b|': '<blue>',
+    '|w|': '<white>',
+}
+
+
+def _find_seps(msg: str) -> str:
+    """
+    Find any |a,b,c| and format them |a||b||c|
+
+    ex:
+      |em,b,u| -> |em||b||u|
+      |em,b| -> |em||b|
+      
+    """
+    # for sep_match in re.finditer('\|\w+,(\w+,*)+\|', msg):
+    #   s = sep_match.group()
+    #   print(s)
+      # if len(s) >= 10: continue
+    #   msg = msg.replace(s, "|".join(s.split(",")))
+    # return msg
+    return re.sub(r'\|(\w+),(\w+)\|', r'|\1||\2|', msg)
+
+    # return re.sub(r'\|(\w+)\|', r'|\1||', msg)
 
 # Setup Default Logger
 class Logger(_Logger):
 
     settings: Type[BaseSettings] = None
+    conditions: Dict[str, Tuple[Union[Callable, bool], str]] = {}
+
+    def add_if_condition(
+        self, 
+        name: str, 
+        condition: Union[Callable, bool],
+        level: Optional[Union[str, int]] = 'INFO',
+    ):
+        """
+        Adds a condition to the logger
+        """
+        self.conditions[name] = (condition, self._get_level(level))
+    
+    def remove_if_condition(self, name: str):
+        """
+        Removes a condition from the logger
+        """
+        if name in self.conditions:
+            del self.conditions[name]
+
+    def _is_dev_condition(self, record: logging.LogRecord) -> bool:
+        """
+        Returns whether the dev condition is met
+        """
+        if not self.settings: return True
+        if record.levelname == 'DEV':
+            for key in {'api_dev_mode', 'debug_enabled'}:
+                if (
+                    hasattr(self.settings, key)
+                    and getattr(self.settings, key) is False
+                ):
+                    return False
+        return True
+
+    def _filter_if(self, name: str, record: Optional[logging.LogRecord] = None, message: Optional[Any] = None, level: Optional[Union[str, int]] = None) -> Tuple[bool, str]:
+        """
+        Filters out messages based on conditions
+        """
+        if name in self.conditions:
+            condition, clevel = self.conditions[name]
+            if isinstance(condition, bool):
+                return condition, clevel
+            elif isinstance(condition, type(None)):
+                return False, clevel
+            elif isinstance(condition, Callable):
+                return condition(record or message), clevel
+        
+        return True, (record.levelname if record else self._get_level(level or 'INFO'))
+    
+    def _filter(self, record: logging.LogRecord, name: Optional[str] = None) -> bool:
+        """
+        Filters out messages based on conditions
+        """
+        if not self.conditions:
+            return True
+        if name is not None:
+            return self._filter_if(name, record)[0]
+        return not any(
+            isinstance(value, bool)
+            and value is False
+            or not isinstance(value, bool)
+            and isinstance(value, Callable)
+            and value(record) is False
+            for key, value in self.conditions.items()
+        )
 
     def _filter_dev(self, record: logging.LogRecord, **kwargs):
         if not self.settings:
@@ -59,6 +187,9 @@ class Logger(_Logger):
         return True
 
     def get_log_mode(self, level: str = "info"):
+        """
+        Returns the log mode based on the level
+        """
         return self.dev if level.upper() in {'DEV'} else getattr(self, level.lower())
     
     def opt(
@@ -73,6 +204,9 @@ class Logger(_Logger):
         depth=0,
         ansi=False
     ):
+        """
+        Return a new logger with the specified options changed.
+        """
         if ansi: colors = True
         args = self._options[-2:]
         return type(self)(self._core, exception, depth, record, lazy, colors, raw, capture, *args)
@@ -103,22 +237,161 @@ class Logger(_Logger):
         _log = self.get_log_mode(level)
         _log(__message.strip(), *args, **kwargs)
 
-    def __call__(self, message: Any, *args, level: str = 'info', **kwargs):
-        r"""Log ``message.format(*args, **kwargs)`` with severity ``'INFO'``."""
-        if isinstance(message, list):
-            __message = "".join(f'- {item}\n' for item in message)
-        elif isinstance(message, dict):
-            __message = "".join(f'- {key}: {value}\n' for key, value in message.items())
-        else:
-            __message = str(message)
-        _log = self.get_log_mode(level)
-        _log(__message.strip(), *args, **kwargs)
+
+    """
+    Newly Added APIs
+    """
+
+    def _get_level(self, level: Union[str, int]) -> str:
+        """
+        Returns the log level
+        """
+        if isinstance(level, str): level = level.upper()
+        elif isinstance(level, int): level = LOGLEVEL_MAPPING.get(level, 'INFO')
+        return level
+
+    
+    def _format_item(
+        self,
+        msg: Any,
+        max_length: Optional[int] = None,
+        _is_part: Optional[bool] = False,
+    ) -> str:
+        """
+        Formats an item
+        """
+        # Primitive Types
+        if isinstance(msg, str): return msg[:max_length] if max_length else msg
+        if isinstance(msg, (float, int, bool, type(None))): return str(msg)[:max_length] if max_length else str(msg)
+        if isinstance(msg, (list, set)):
+            _msg = str(msg) if _is_part else "".join(f'- {item}\n' for item in msg)
+            return _msg[:max_length] if max_length else _msg
+        if isinstance(msg, dict):
+            _msg = "".join(f'- <b>{key}</>: {self._format_item(value, max_length = max_length, _is_part = True)}\n' for key, value in msg.items())
+            return _msg[:max_length] if max_length else _msg
+        if isinstance(msg, tuple):
+            _msg = "".join(f'- <b>{key}</>: {self._format_item(value, max_length = max_length, _is_part = True)}\n' for key, value in zip(msg[0], msg[1]))
+            return _msg[:max_length] if max_length else _msg
+
+        # Complex Types
+        if hasattr(msg, 'dict'):
+            return self._format_item(msg.dict(), max_length = max_length, _is_part = _is_part)
+        
+        if hasattr(msg, 'json'):
+            return self._format_item(msg.json(), max_length = max_length, _is_part = _is_part)
+
+        if hasattr(msg, '__dict__'):
+            return self._format_item(msg.__dict__, max_length = max_length, _is_part = _is_part)
+        
+        return str(msg)[:max_length] if max_length else str(msg)
+
+
+    def _format_message(
+        self, 
+        message: Any, 
+        prefix: Optional[str] = None,
+        max_length: Optional[int] = None,
+        colored: Optional[bool] = False,
+    ) -> str:
+        """
+        Formats the message
+
+        "example |b|msg|e|"
+        -> "example <blue>msg</><reset>"
+        """
+        _message = ""
+        if prefix: _message += f'[{prefix}] '
+        _message += self._format_item(message, max_length = max_length)
+        if colored:
+            _message = _find_seps(_message)
+            # print(_message)
+            for key, value in COLORED_MESSAGE_MAP.items():
+                _message = _message.replace(key, value)
+            _message += STATUS_COLOR['reset']
+        return _message
+
+    def log(
+        self, 
+        level: Union[str, int], 
+        message: Any, 
+        *args, 
+        prefix: Optional[str] = None,
+        max_length: Optional[int] = None,
+        colored: Optional[bool] = False,
+        **kwargs
+    ):  # noqa: N805
+        """
+        Log ``message.format(*args, **kwargs)`` with severity ``level``.
+        """
+        level = self._get_level(level)
+        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
+        return super().log(level, message, *args, **kwargs)
+    
+    def log_if(
+        self, 
+        name: str, 
+        message: Any, 
+        *args, 
+        level: Optional[Union[str, int]] = None, 
+        **kwargs
+    ):  # noqa: N805
+        """
+        Log ``message.format(*args, **kwargs)`` with severity ``level`` if condition is met.
+        """
+        condition, clevel = self._filter_if(name, message = message, level = level)
+        if condition:
+            print(condition, clevel)
+            return super().log((level or clevel), message, *args, **kwargs)
+
+    def info(
+        self, 
+        message: Any, 
+        *args, 
+        colored: Optional[bool] = False, 
+        prefix: Optional[str] = None,
+        max_length: Optional[int] = None,
+        **kwargs
+    ):  # noqa: N805
+        """
+        Log ``message.format(*args, **kwargs)`` with severity ``'INFO'``.
+        """
+        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
+        self._log("INFO", False, self._options, message, args, kwargs)
+
+    def success(
+        self, 
+        message, 
+        *args, 
+        colored: Optional[bool] = False, 
+        prefix: Optional[str] = None,
+        max_length: Optional[int] = None,
+        **kwargs
+    ):  # noqa: N805
+        r"""Log ``message.format(*args, **kwargs)`` with severity ``'SUCCESS'``."""
+        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
+        self._log("SUCCESS", False, self._options, message, args, kwargs)
+    
+
+    def warning(
+        self, 
+        message, 
+        *args, 
+        colored: Optional[bool] = False, 
+        prefix: Optional[str] = None,
+        max_length: Optional[int] = None,
+        **kwargs
+    ):  # noqa: N805
+        r"""Log ``message.format(*args, **kwargs)`` with severity ``'WARNING'``."""
+        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
+        self._log("WARNING", False, self._options, message, args, kwargs)
+
 
     def dev(self, message: Any, *args, **kwargs):
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'DEV'``."""
         self._log('DEV', None, False, self._options, message, args, kwargs)
 
-    def trace(self, msg: Union[str, Any], level: str = "ERROR", error: Optional[Type[Exception]] = None) -> None:
+
+    def trace(self, msg: Union[str, Any], error: Optional[Type[Exception]] = None, level: str = "ERROR") -> None:
         """
         This method logs the traceback of an exception.
 
@@ -130,6 +403,40 @@ class Logger(_Logger):
         _log = self.get_log_mode(level)
         _log(_msg)
 
+    
+    def __call__(self, message: Any, *args, level: str = 'info', **kwargs):
+        r"""Log ``message.format(*args, **kwargs)`` with severity ``'INFO'``."""
+        if isinstance(message, list):
+            __message = "".join(f'- {item}\n' for item in message)
+        elif isinstance(message, dict):
+            __message = "".join(f'- {key}: {value}\n' for key, value in message.items())
+        else:
+            __message = str(message)
+        _log = self.get_log_mode(level)
+        _log(__message.strip(), *args, **kwargs)
+
+
+    # def warning(__self, __message, *args, **kwargs):  # noqa: N805
+    #     r"""Log ``message.format(*args, **kwargs)`` with severity ``'WARNING'``."""
+    #     __self._log("WARNING", False, __self._options, __message, args, kwargs)
+
+    # def error(__self, __message, *args, **kwargs):  # noqa: N805
+    #     r"""Log ``message.format(*args, **kwargs)`` with severity ``'ERROR'``."""
+    #     __self._log("ERROR", False, __self._options, __message, args, kwargs)
+
+    # def critical(__self, __message, *args, **kwargs):  # noqa: N805
+    #     r"""Log ``message.format(*args, **kwargs)`` with severity ``'CRITICAL'``."""
+    #     __self._log("CRITICAL", False, __self._options, __message, args, kwargs)
+
+    # def exception(__self, __message, *args, **kwargs):  # noqa: N805
+    #     r"""Convenience method for logging an ``'ERROR'`` with exception information."""
+    #     options = (True,) + __self._options[1:]
+    #     __self._log("ERROR", False, options, __message, args, kwargs)
+
+
+    """
+    Utilties
+    """
     def render(
         self,
         objs: Union[Any, List[Any]],
@@ -167,9 +474,7 @@ class Logger(_Logger):
             _log('\n' + yaml.dump(objs, **kwargs))
 
         
-    """
-    Utilties
-    """
+
     def mute_logger(self, modules: Optional[Union[str, List[str]]], level: str = 'WARNING'):
         """
         Helper to mute a logger from another module.
@@ -221,7 +526,6 @@ class Logger(_Logger):
 
 
 
-
 # < 0.7.0
 try:
     logger = Logger(
@@ -244,7 +548,7 @@ except Exception as e:
         depth=0,
         record=False,
         lazy=False,
-        colors=False,
+        colors=True,
         raw=False,
         capture=True,
         patchers=[],
@@ -259,20 +563,7 @@ if _defaults.LOGURU_AUTOINIT and sys.stderr:
 _atexit.register(logger.remove)
 
 class InterceptHandler(logging.Handler):
-    loglevel_mapping = {
-        50: 'CRITICAL',
-        40: 'ERROR',
-        30: 'WARNING',
-        20: 'INFO',
-        19: 'DEV',
-        10: 'DEBUG',
-        5: 'CRITICAL',
-        4: 'ERROR',
-        3: 'WARNING',
-        2: 'INFO',
-        1: 'DEBUG',
-        0: 'NOTSET',
-    }
+    loglevel_mapping = LOGLEVEL_MAPPING
 
     def emit(self, record):
         try:
@@ -341,8 +632,12 @@ class CustomizeLogger:
             colorize = True,
             level = level,
             format = cls.logger_formatter,
-            filter = logger._filter_dev,
+            # filter = logger._filter_dev,
+            filter = logger._filter,
         )
+
+        logger.add_if_condition('dev', logger._is_dev_condition)
+
         logging.basicConfig(handlers=[InterceptHandler()], level=0)
         *options, extra = logger._options
         new_logger = Logger(logger._core, *options, {**extra})
@@ -371,13 +666,13 @@ class CustomizeLogger:
                 kind_color = STATUS_COLOR.get(record.get('extra', {}).get('kind'), FALLBACK_STATUS_COLOR)
                 if not record['extra'].get('worker_name'):
                     record['extra']['worker_name'] = ''
-                extra = '<cyan>{extra[queue_name]}</>:<bold><blue>{extra[worker_name]}</></>:<bold><' + kind_color + '>{extra[kind]:<9}</></> <' + color + '>{extra[job_id]}</> '
+                extra = '<cyan>{extra[queue_name]}</>:<bold><magenta>{extra[worker_name]}</></>:<bold><' + kind_color + '>{extra[kind]:<9}</></> <' + color + '>{extra[job_id]}</> '
 
             elif record['extra'].get('kind') and record['extra'].get('queue_name'):
                 if not record['extra'].get('worker_name'):
                     record['extra']['worker_name'] = ''
                 kind_color = STATUS_COLOR.get(record.get('extra', {}).get('kind'), FALLBACK_STATUS_COLOR)
-                extra = '<cyan>{extra[queue_name]}</>:<b><blue>{extra[worker_name]}</></>:<b><' + kind_color + '>{extra[kind]:<9}</></> '
+                extra = '<cyan>{extra[queue_name]}</>:<b><magenta>{extra[worker_name]}</></>:<b><' + kind_color + '>{extra[kind]:<9}</></> '
 
 
         if 'result=tensor([' not in str(record['message']):
