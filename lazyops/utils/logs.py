@@ -94,14 +94,17 @@ def _find_seps(msg: str) -> str:
       |em,b| -> |em||b|
       
     """
-    # for sep_match in re.finditer('\|\w+,(\w+,*)+\|', msg):
-    #   s = sep_match.group()
-    #   print(s)
-      # if len(s) >= 10: continue
-    #   msg = msg.replace(s, "|".join(s.split(",")))
-    # return msg
-    return re.sub(r'\|(\w+),(\w+)\|', r'|\1||\2|', msg)
+    # v2
+    for sep_match in re.finditer('\|\w+,(\w+,*)+\|', msg):
+        s = sep_match.group()
+        # print(s)
+        if len(s) >= 10: continue
+        msg = msg.replace(s, "||".join(s.split(",")))
+        # print(msg)
+    return msg
 
+    # v1
+    # return re.sub(r'\|(\w+),(\w+)\|', r'|\1||\2|', msg)
     # return re.sub(r'\|(\w+)\|', r'|\1||', msg)
 
 # Setup Default Logger
@@ -109,6 +112,23 @@ class Logger(_Logger):
 
     settings: Type[BaseSettings] = None
     conditions: Dict[str, Tuple[Union[Callable, bool], str]] = {}
+    _colored_opts = None
+
+    @property
+    def colored_opts(self):
+        """
+        Returns the colored options
+        """
+        if not self._colored_opts:
+            (exception, depth, record, lazy, colors, raw, capture, patchers, extra) = self._options
+            self._colored_opts = (exception, depth, record, lazy, True, raw, capture, patchers, extra)
+        return self._colored_opts
+
+    def _get_opts(self, colored: Optional[bool] = False, **kwargs):
+        """
+        Returns the options
+        """
+        return self.colored_opts if colored else self._options
 
     def add_if_condition(
         self, 
@@ -303,11 +323,14 @@ class Logger(_Logger):
         if prefix: _message += f'[{prefix}] '
         _message += self._format_item(message, max_length = max_length)
         if colored:
+            # Add escape characters to prevent errors
+            _message = _message.replace("<", "\<")
             _message = _find_seps(_message)
             # print(_message)
             for key, value in COLORED_MESSAGE_MAP.items():
                 _message = _message.replace(key, value)
             _message += STATUS_COLOR['reset']
+
         return _message
 
     def log(
@@ -325,7 +348,9 @@ class Logger(_Logger):
         """
         level = self._get_level(level)
         message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
-        return super().log(level, message, *args, **kwargs)
+        self._log(level, False, self._get_opts(colored = colored), message, args, kwargs)
+        # self._log(level, False, __self._options, __message, args, kwargs)
+        # return super().log(level, message, *args, **kwargs)
     
     def log_if(
         self, 
@@ -340,8 +365,9 @@ class Logger(_Logger):
         """
         condition, clevel = self._filter_if(name, message = message, level = level)
         if condition:
-            print(condition, clevel)
-            return super().log((level or clevel), message, *args, **kwargs)
+            # print(condition, clevel)
+            return self.log((level or clevel), message, *args, **kwargs)
+            # return super().log((level or clevel), message, *args, **kwargs)
 
     def info(
         self, 
@@ -356,7 +382,8 @@ class Logger(_Logger):
         Log ``message.format(*args, **kwargs)`` with severity ``'INFO'``.
         """
         message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
-        self._log("INFO", False, self._options, message, args, kwargs)
+        # self._log("INFO", False, self._options, message, args, kwargs)
+        self._log("INFO", False, self._get_opts(colored = colored), message, args, kwargs)
 
     def success(
         self, 
@@ -369,7 +396,8 @@ class Logger(_Logger):
     ):  # noqa: N805
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'SUCCESS'``."""
         message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
-        self._log("SUCCESS", False, self._options, message, args, kwargs)
+        # self._log("SUCCESS", False, self._options, message, args, kwargs)
+        self._log("SUCCESS", False, self._get_opts(colored = colored), message, args, kwargs)
     
 
     def warning(
@@ -383,12 +411,14 @@ class Logger(_Logger):
     ):  # noqa: N805
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'WARNING'``."""
         message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
-        self._log("WARNING", False, self._options, message, args, kwargs)
+        # self._log("WARNING", False, self._options, message, args, kwargs)
+        self._log("WARNING", False, self._get_opts(colored = colored), message, args, kwargs)
 
 
     def dev(self, message: Any, *args, **kwargs):
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'DEV'``."""
-        self._log('DEV', None, False, self._options, message, args, kwargs)
+        # self._log('DEV', None, False, self._options, message, args, kwargs)
+        self._log('DEV', None, False, self._get_opts(colored = True), message, args, kwargs)
 
 
     def trace(self, msg: Union[str, Any], error: Optional[Type[Exception]] = None, level: str = "ERROR") -> None:
@@ -548,7 +578,7 @@ except Exception as e:
         depth=0,
         record=False,
         lazy=False,
-        colors=True,
+        colors=False,
         raw=False,
         capture=True,
         patchers=[],

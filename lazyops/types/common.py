@@ -125,4 +125,32 @@ class UpperStrEnum(StrEnum):
     
     def __hash__(self) -> int:
         return id(self)
-    
+
+
+
+if TYPE_CHECKING:
+    ListStr = List[str]
+
+else:
+
+    class ListStr(list):
+        """
+        Returns List[str] by splitting on delimiter ','
+        """
+
+        @classmethod
+        def __get_validators__(cls):
+            yield cls.validate
+
+        @classmethod
+        def validate(cls, value: Optional[Any]) -> Optional[List[str]]:
+            """
+            Validates the value and returns a List[str]
+            """
+            if v is None: return None
+            from lazyops.utils.serialization import parse_list_str
+            return parse_list_str(value)
+
+
+
+        

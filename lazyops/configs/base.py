@@ -143,7 +143,7 @@ class DefaultSettings(BaseSettings):
     
     @lazyproperty
     def in_colab(self) -> bool:
-        with contextlib.suppress(ImportError):
+        with contextlib.suppress(Exception):
             from importlib import import_module
             import_module('google.colab')
             return True
