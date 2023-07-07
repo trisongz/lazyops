@@ -290,8 +290,15 @@ class Logger(_Logger):
         prefix = '|g|' if colored else ''
         suffix = '|e|' if colored else ''
         if isinstance(msg, dict):
-            _msg = "".join(f'- {prefix}{key}{suffix}: {self._format_item(value, max_length = max_length, colored = colored, _is_part = True)}\n' for key, value in msg.items())
-            return _msg[:max_length] if max_length else _msg
+            _msg = ""
+            for key, value in msg.items():
+                _value = f'{value}'
+                if max_length and len(_value) > max_length:
+                    _value = f'{_value[:max_length]}...'
+                _msg += f'- {prefix}{key}{suffix}: {_value}\n'
+            # _msg = "".join(f'- {prefix}{key}{suffix}: {self._format_item(value, max_length = max_length, colored = colored, _is_part = True)}\n' for key, value in msg.items())
+            # return _msg[:max_length] if max_length else _msg
+            return _msg.strip()
         if isinstance(msg, tuple):
             _msg = "".join(f'- {prefix}{key}{suffix}: {self._format_item(value, max_length = max_length, colored = colored,  _is_part = True)}\n' for key, value in zip(msg[0], msg[1]))
             return _msg[:max_length] if max_length else _msg

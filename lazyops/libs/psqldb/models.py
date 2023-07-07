@@ -1,5 +1,5 @@
 import contextlib
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy import delete as sqlalchemy_delete
 from sqlalchemy import update as sqlalchemy_update
 from sqlalchemy import exists as sqlalchemy_exists
@@ -1647,7 +1647,39 @@ class SQLModel(Base):
             self = local_object
         return self
 
+    @classmethod
+    def query(
+        cls: SQLModelT,
+        query: str,
+        session: Optional[Session] = None,
+        **kwargs
+    ) -> Any:
+        """
+        Executes a text query
+        """
+        with PostgresDB.session(session = session) as db_sess:
+            query = query.replace('[table]', cls.__tablename__)
+            stmt = text(query)
+            result = db_sess.execute(stmt, kwargs)
+            db_sess.commit()
+        return result
 
+    @classmethod
+    async def aquery(
+        cls: SQLModelT,
+        query: str,
+        session: Optional[AsyncSession] = None,
+        **kwargs
+    ) -> Any:
+        """
+        Executes a text query
+        """
+        async with PostgresDB.async_session(session = session) as db_sess:
+            query = query.replace('[table]', cls.__tablename__)
+            stmt = text(query)
+            result = await db_sess.execute(stmt, kwargs)
+            await db_sess.commit()
+        return result
 
     @classmethod
     def _get_or_create(
