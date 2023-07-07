@@ -275,8 +275,9 @@ class Logger(_Logger):
         self,
         msg: Any,
         max_length: Optional[int] = None,
+        colored: Optional[bool] = False,
         _is_part: Optional[bool] = False,
-    ) -> str:
+    ) -> str:  # sourcery skip: low-code-quality
         """
         Formats an item
         """
@@ -286,22 +287,37 @@ class Logger(_Logger):
         if isinstance(msg, (list, set)):
             _msg = str(msg) if _is_part else "".join(f'- {item}\n' for item in msg)
             return _msg[:max_length] if max_length else _msg
+        prefix = '|g|' if colored else ''
+        suffix = '|e|' if colored else ''
         if isinstance(msg, dict):
-            _msg = "".join(f'- <b>{key}</>: {self._format_item(value, max_length = max_length, _is_part = True)}\n' for key, value in msg.items())
+            _msg = "".join(f'- {prefix}{key}{suffix}: {self._format_item(value, max_length = max_length, colored = colored, _is_part = True)}\n' for key, value in msg.items())
             return _msg[:max_length] if max_length else _msg
         if isinstance(msg, tuple):
-            _msg = "".join(f'- <b>{key}</>: {self._format_item(value, max_length = max_length, _is_part = True)}\n' for key, value in zip(msg[0], msg[1]))
+            _msg = "".join(f'- {prefix}{key}{suffix}: {self._format_item(value, max_length = max_length, colored = colored,  _is_part = True)}\n' for key, value in zip(msg[0], msg[1]))
             return _msg[:max_length] if max_length else _msg
 
         # Complex Types
-        if hasattr(msg, 'dict'):
-            return self._format_item(msg.dict(), max_length = max_length, _is_part = _is_part)
+        if hasattr(msg, 'dict') and hasattr(msg, 'Config'):
+            # Likely Pydantic Model
+            _msg = f'{prefix}[{msg.__class__.__name__}]{suffix}'
+            fields = msg.__fields__.keys()
+            for field in fields:
+                field_str = f'{prefix}{field}{suffix}'
+                val_s = f'\n  {field_str}: {getattr(msg, field)!r}'
+                if max_length is not None and len(val_s) > max_length:
+                    val_s = f'{val_s[:max_length]}...'
+                _msg += val_s
+            return _msg
+            # return self._format_item(msg.dict(), max_length = max_length, colored = colored, _is_part = _is_part)
         
+        if hasattr(msg, 'dict'):
+            return self._format_item(msg.dict(), max_length = max_length, colored = colored, _is_part = _is_part)
+
         if hasattr(msg, 'json'):
-            return self._format_item(msg.json(), max_length = max_length, _is_part = _is_part)
+            return self._format_item(msg.json(), max_length = max_length, colored = colored, _is_part = _is_part)
 
         if hasattr(msg, '__dict__'):
-            return self._format_item(msg.__dict__, max_length = max_length, _is_part = _is_part)
+            return self._format_item(msg.__dict__, max_length = max_length, colored = colored, _is_part = _is_part)
         
         return str(msg)[:max_length] if max_length else str(msg)
 
@@ -309,6 +325,7 @@ class Logger(_Logger):
     def _format_message(
         self, 
         message: Any, 
+        *args,
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
         colored: Optional[bool] = False,
@@ -321,7 +338,11 @@ class Logger(_Logger):
         """
         _message = ""
         if prefix: _message += f'[{prefix}] '
-        _message += self._format_item(message, max_length = max_length)
+        _message += self._format_item(message, max_length = max_length, colored = colored)
+        if args:
+            for arg in args:
+                _message += "\n"
+                _message += self._format_item(arg, max_length = max_length, colored = colored)
         if colored:
             # Add escape characters to prevent errors
             _message = _message.replace("<", "\<")
@@ -381,7 +402,7 @@ class Logger(_Logger):
         """
         Log ``message.format(*args, **kwargs)`` with severity ``'INFO'``.
         """
-        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
+        message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored)
         # self._log("INFO", False, self._options, message, args, kwargs)
         self._log("INFO", False, self._get_opts(colored = colored), message, args, kwargs)
 
@@ -395,7 +416,7 @@ class Logger(_Logger):
         **kwargs
     ):  # noqa: N805
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'SUCCESS'``."""
-        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
+        message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored)
         # self._log("SUCCESS", False, self._options, message, args, kwargs)
         self._log("SUCCESS", False, self._get_opts(colored = colored), message, args, kwargs)
     
