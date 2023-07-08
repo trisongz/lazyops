@@ -130,6 +130,8 @@ class Table(SQLBase, Grantable):
         return text(
             "SELECT privilege_type FROM information_schema.table_privileges WHERE table_name=:table_name  AND grantee=:grantee_name"
         ).bindparams(table_name=self.name, grantee_name=grantee.name)
+        # .bindparams(table_name=self.name, grantee_name=grantee.encoded_name)
+        # .bindparams(table_name=self.name, grantee_name=grantee.name)
 
     def _revoke(self, grantee: Role, privileges: set[Privilege]) -> None:
         self._commit_sql(

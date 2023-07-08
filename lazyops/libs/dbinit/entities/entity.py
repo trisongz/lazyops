@@ -43,6 +43,13 @@ class Entity(ABC):
         self.depends_on: Sequence["Entity"] = depends_on
 
         self.__class__._register(self)
+    
+    @property
+    def encoded_name(self) -> str:
+        """
+        Returns the encoded name of the entity.
+        """
+        return f'"{self.name}"' if '-' in self.name or '_' in self.name else self.name
 
     def __hash__(self) -> int:
         return hash((self.name, self.__class__.__name__))

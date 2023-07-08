@@ -598,11 +598,22 @@ class PostgresDBMeta(type):
         return cls.uri.password
     
     @property
+    def pg_admin_db(cls) -> str:
+        """
+        Returns the admin db
+        """
+        if admin_db := cls.config.get(
+            'pg_admin_db', os.getenv('POSTGRES_ADMIN_DB', os.getenv('POSTGRES_DB')),
+        ):
+            return admin_db
+        return cls.uri.path[1:]
+    
+    @property
     def admin_uri(cls) -> PostgresDsn:
         """
         Returns the admin uri
         """
-        uri = f'{cls.uri.host}:{cls.uri.port}/postgres'
+        uri = f'{cls.uri.host}:{cls.uri.port}/{cls.pg_admin_db}'
         auth = f'{cls.pg_admin_user}'
         if cls.pg_admin_password:
             auth += f':{cls.pg_admin_password}'
@@ -620,7 +631,7 @@ class PostgresDBMeta(type):
         """
         Returns the admin uri
         """
-        uri = f'{host or cls.uri.host}:{port or cls.uri.port}/{db or "postgres"}'
+        uri = f'{host or cls.uri.host}:{port or cls.uri.port}/{db or cls.pg_admin_db}'
         auth = f'{user or cls.pg_admin_user}'
         if password or cls.pg_admin_password:
             auth += f':{password or cls.pg_admin_password}'
@@ -887,11 +898,12 @@ class PostgresDB(metaclass=PostgresDBMeta):
                 engine.execute(statement = statement)
         
         if grant_public_schema:
+            pg_user_encoded = f'"{pg_user}"' if '_' in pg_user or '-' in pg_user else pg_user
             schema_statements = [
-                f"GRANT ALL PRIVILEGES ON SCHEMA public TO {pg_user}",
+                f"GRANT ALL PRIVILEGES ON SCHEMA public TO {pg_user_encoded}",
                 f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO {pg_user}",
-                f"GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO {pg_user}",
-                f"GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO {pg_user}",
+                f"GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO {pg_user_encoded}",
+                f"GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO {pg_user_encoded}",
             ]
             if statements: schema_statements = [statement for statement in schema_statements if statement not in statements]
             for statement in schema_statements:

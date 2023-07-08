@@ -29,6 +29,13 @@ class Grantable(ABC):
         self._grant_name = name
         if grants:
             self.grant(grants=grants)
+    
+    @property
+    def encoded_grant_name(self) -> str:
+        """
+        Returns the encoded name of the grantable.
+        """
+        return f'"{self._grant_name}"' if '-' in self._grant_name or '_' in self._grant_name else self._grant_name
 
     def grant(self, grants: Sequence[GrantTo]) -> None:
         """
@@ -122,7 +129,8 @@ class Grantable(ABC):
         """
         return [
             text(
-                f"GRANT {self._format_privileges(privileges)} ON {self.__class__.__name__} {self._grant_name} TO {grantee.name}"
+                f"GRANT {self._format_privileges(privileges)} ON {self.__class__.__name__} {self.encoded_grant_name} TO {grantee.encoded_name}"
+                # f"GRANT {self._format_privileges(privileges)} ON {self.__class__.__name__} {self._grant_name} TO {grantee.name}"
             )
         ]
 
@@ -135,7 +143,8 @@ class Grantable(ABC):
         """
         return [
             text(
-                f"REVOKE {self._format_privileges(privileges)} ON {self.__class__.__name__} {self._grant_name} FROM {grantee.name}"
+                # f"REVOKE {self._format_privileges(privileges)} ON {self.__class__.__name__} {self._grant_name} FROM {grantee.name}"
+                f"REVOKE {self._format_privileges(privileges)} ON {self.__class__.__name__} {self.encoded_grant_name} FROM {grantee.encoded_name}"
             )
         ]
 

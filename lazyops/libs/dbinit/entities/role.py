@@ -82,7 +82,8 @@ class Role(ClusterEntity):
         super().__init__(name=name, depends_on=depends_on, check_if_exists=check_if_exists)
 
     def _create_statements(self) -> Sequence[TextClause]:
-        statement = f"CREATE ROLE {self.name}"
+        # statement = f"CREATE ROLE {self.name}"
+        statement = f"CREATE ROLE {self.encoded_name}"
         props = self._get_passed_args()
 
         for k, v in props.items():
@@ -118,10 +119,12 @@ class Role(ClusterEntity):
         return [text(statement)]
 
     def _exists_statement(self) -> TextClause:
+        # return text("SELECT EXISTS(SELECT 1 FROM pg_authid WHERE rolname=:role)").bindparams(role=self.encoded_name)
         return text("SELECT EXISTS(SELECT 1 FROM pg_authid WHERE rolname=:role)").bindparams(role=self.name)
 
     def _drop_statements(self) -> Sequence[TextClause]:
-        return [text(f"DROP ROLE {self.name}")]
+        return [text(f"DROP ROLE {self.encoded_name}")]
+        # return [text(f"DROP ROLE {self.name}")]
 
     def grant(self, grants: Sequence[GrantOn]) -> None:
         """

@@ -47,10 +47,12 @@ class Schema(DatabaseSqlEntity, Grantable):
         )
 
     def _create_statements(self) -> Sequence[TextClause]:
-        statement = f"CREATE SCHEMA {self.name}"
+        # statement = f"CREATE SCHEMA {self.name}"
+        statement = f"CREATE SCHEMA {self.encoded_name}"
 
         if self.owner:
-            statement = f"{statement} AUTHORIZATION {self.owner.name}"
+            statement = f"{statement} AUTHORIZATION {self.owner.encoded_name}"
+            # statement = f"{statement} AUTHORIZATION {self.owner.name}"
 
         return [text(statement)]
 
@@ -58,7 +60,8 @@ class Schema(DatabaseSqlEntity, Grantable):
         return text("SELECT EXISTS(SELECT 1 FROM pg_namespace WHERE nspname=:schema)").bindparams(schema=self.name)
 
     def _drop_statements(self) -> Sequence[TextClause]:
-        return [text(f"DROP SCHEMA {self.name}")]
+        return [text(f"DROP SCHEMA {self.encoded_name}")]
+        # return [text(f"DROP SCHEMA {self.name}")]
 
     def _grant(self, grantee: Role, privileges: set[Privilege]) -> None:
         self._commit_sql(

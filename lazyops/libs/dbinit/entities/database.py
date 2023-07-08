@@ -75,7 +75,8 @@ class Database(ClusterEntity, Grantable):
         ClusterEntity.__init__(self, name=name, depends_on=depends_on, check_if_exists=check_if_exists)
 
     def _create_statements(self) -> Sequence[TextClause]:
-        statement = f"CREATE DATABASE {self.name}"
+        # statement = f"CREATE DATABASE {self.name}"
+        statement = f"CREATE DATABASE {self.encoded_name}"
 
         props = self._get_passed_args()
 
@@ -83,7 +84,8 @@ class Database(ClusterEntity, Grantable):
         for k, v in props.items():
             # case owner and type Role, use role.name
             if k == "owner" and isinstance(v, Role):
-                statement = f"{statement} OWNER={v.name}"
+                # statement = f"{statement} OWNER={v.name}"
+                statement = f"{statement} OWNER={v.encoded_name}"
 
             elif k != "grants":
                 statement = f"{statement} {k.upper()}={v}"
@@ -91,14 +93,17 @@ class Database(ClusterEntity, Grantable):
         return [text(statement)]
 
     def _exists_statement(self) -> TextClause:
+        # return text("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=:db)").bindparams(db=self.encoded_name)
         return text("SELECT EXISTS(SELECT 1 FROM pg_database WHERE datname=:db)").bindparams(db=self.name)
 
     def _drop_statements(self) -> Sequence[TextClause]:
         statements = []
         if self.is_template:
             # cannot drop a template, must set is_template to false before drop
-            statements.append(text(f"ALTER DATABASE {self.name} is_template false"))
-        statements.append(text(f"DROP DATABASE {self.name} (FORCE)"))
+            statements.append(text(f"ALTER DATABASE {self.encoded_name} is_template false"))
+            # statements.append(text(f"ALTER DATABASE {self.name} is_template false"))
+        # statements.append(text(f"DROP DATABASE {self.name} (FORCE)"))
+        statements.append(text(f"DROP DATABASE {self.encoded_name} (FORCE)"))
         return statements
 
     def _grant(self, grantee: Role, privileges: set[Privilege]) -> None:
@@ -123,6 +128,7 @@ class Database(ClusterEntity, Grantable):
         :return: A single :class:`sqlalchemy.TextClause` containing the SQL to check what grants exist on this entity.
         """
         return text("SELECT unnest(datacl) AS acl FROM pg_catalog.pg_database WHERE datname=:db_name").bindparams(
+            # db_name=self.encoded_name
             db_name=self.name
         )
 
