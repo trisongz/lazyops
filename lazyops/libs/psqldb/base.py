@@ -901,7 +901,7 @@ class PostgresDB(metaclass=PostgresDBMeta):
             pg_user_encoded = f'"{pg_user}"' if '_' in pg_user or '-' in pg_user else pg_user
             schema_statements = [
                 f"GRANT ALL PRIVILEGES ON SCHEMA public TO {pg_user_encoded}",
-                f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO {pg_user}",
+                f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL PRIVILEGES ON TABLES TO {pg_user_encoded}",
                 f"GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO {pg_user_encoded}",
                 f"GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO {pg_user_encoded}",
             ]
