@@ -836,6 +836,7 @@ class PostgresDB(metaclass=PostgresDBMeta):
         statements: Optional[List[str]] = None,
         grant_public_schema: Optional[bool] = True,
         verbose: Optional[bool] = True,
+        raise_exception: Optional[bool] = False,
         **kwargs,
 
     ):  # sourcery skip: low-code-quality
@@ -870,8 +871,7 @@ class PostgresDB(metaclass=PostgresDBMeta):
                 superuser = role_superuser,
                 **role_options
             )
-        if verbose:
-            logger.info(f"Creating Role {pg_user}: {role}")
+        if verbose: logger.info(f"Creating Role {pg_user}: {role}")
         pg_db = db_name or cls.ctx.uri.path[1:]
         db_owner = role if db_owner is None else Role(name = db_owner)
         if not db_grants: 
@@ -889,13 +889,22 @@ class PostgresDB(metaclass=PostgresDBMeta):
         )
         if verbose: logger.info(f"Creating Database {pg_db}: {db}")
         db_admin_uri = db_admin_uri or cls.admin_uri
-        Controller.run_all(engine = create_engine(url = db_admin_uri))
+        try:
+            Controller.run_all(engine = create_engine(url = db_admin_uri))
+        except Exception as e:
+            logger.trace(f"Error creating database: {pg_db}", error = e)
+            if raise_exception: raise e
 
-        engine = create_engine(url = cls.ctx.uri)
+        # engine = create_engine(url = cls.ctx.uri)
+        engine = create_engine(url = cls.get_admin_uri(db = pg_db))
         if statements:
             for statement in statements:
                 if verbose: logger.info(f"Executing statement: {statement}")
-                engine.execute(statement = statement)
+                try:
+                    engine.execute(statement = statement)
+                except Exception as e:
+                    logger.trace(f"Error executing statement: {statement}", error = e)
+                    if raise_exception: raise e
         
         if grant_public_schema:
             pg_user_encoded = f'"{pg_user}"' if '_' in pg_user or '-' in pg_user else pg_user
@@ -908,7 +917,11 @@ class PostgresDB(metaclass=PostgresDBMeta):
             if statements: schema_statements = [statement for statement in schema_statements if statement not in statements]
             for statement in schema_statements:
                 if verbose: logger.info(f"Executing statement: {statement}")
-                engine.execute(statement = statement)
+                try:
+                    engine.execute(statement = statement)
+                except Exception as e:
+                    logger.trace(f"Error executing statement: {statement}", error = e)
+                    if raise_exception: raise e
 
         if verbose: logger.info("Completed DB initialization")
 
