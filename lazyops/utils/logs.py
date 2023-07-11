@@ -650,57 +650,33 @@ class CustomizeLogger:
         cls, 
         level: Union[str, int] = "INFO",
         settings: Optional[Type[BaseSettings]] = None,
+        format: Optional[Callable] = None,
+        filter: Optional[Callable] = None,
+        handlers: Optional[List[logging.Handler]] = None,
         **kwargs,
     ):
         # todo adjust this later to use a ConfigModel
-        if isinstance(level, str):
-            level = level.upper()
+        if isinstance(level, str): level = level.upper()
         logger.remove()
-        # if settings:
-        #     try:
-        #         dev_level = logger.level(name='DEV', no=19, color="<blue>", icon="@")
-        #         logger.__class__.dev = functools.partialmethod(logger.__class__.log, 'DEV')
-
-        #         def _filter_dev(record: dict, **kwargs):
-
-        #             for key in {'api_dev_mode', 'debug_enabled'}:
-        #                 if hasattr(settings, key):
-        #                     return getattr(settings, key, False) and record['level'].name == 'DEV'
-        #             return False
-                
-        #         logger._core.levels["DEV"] = 19
-        #         logger.add(
-        #             sys.stdout,
-        #             enqueue = True,
-        #             backtrace = True,
-        #             colorize = True,
-        #             level = 19,
-        #             format = cls.logger_formatter,
-        #             filter = _filter_dev,
-        #         )
-        #     except Exception as e:
-        #         pass
-        #     #    print("Error adding DEV level to logger: ", e) 
-        #     #     # pass
-        
         logger.add(
             sys.stdout,
             enqueue = True,
             backtrace = True,
             colorize = True,
             level = level,
-            format = cls.logger_formatter,
-            # filter = logger._filter_dev,
-            filter = logger._filter,
+            format = format if format is not None else cls.logger_formatter,
+            filter = filter if filter is not None else logger._filter,
         )
 
         logger.add_if_condition('dev', logger._is_dev_condition)
 
-        logging.basicConfig(handlers=[InterceptHandler()], level=0)
+        logging.basicConfig(
+            handlers = handlers or [InterceptHandler()], 
+            level = 0
+        )
         *options, extra = logger._options
         new_logger = Logger(logger._core, *options, {**extra})
         if settings: new_logger.settings = settings
-        # dev_level = new_logger.level(name='DEV', no=19, color="<blue>", icon="@")
         return new_logger
 
 
