@@ -13,7 +13,7 @@ import signal
 
 
 from frozendict import frozendict
-from typing import Dict, Callable, List, Any, Union, Coroutine, TYPE_CHECKING
+from typing import Dict, Callable, List, Any, Union, Coroutine, TypeVar, TYPE_CHECKING
 from lazyops.utils.logs import default_logger
 
 from lazyops.utils.serialization import (
@@ -112,8 +112,9 @@ def retryable(limit: int = 3, delay: int = 3):
     return decorator
 
 
+T = TypeVar('T')
 
-def get_batches_from_generator(iterable: typing.Iterable, n: int) -> typing.Generator[typing.List, None, None]:
+def get_batches_from_generator(iterable: typing.Iterable[T], n: int) -> typing.Generator[typing.List[T], None, None]:
     """
     Batch elements of an iterable into fixed-length chunks or blocks.
     """
@@ -121,7 +122,7 @@ def get_batches_from_generator(iterable: typing.Iterable, n: int) -> typing.Gene
     while x := tuple(itertools.islice(it, n)):
         yield x
 
-def split_into_batches(items: List[Any], n: int):
+def split_into_batches(items: List[T], n: int) -> typing.Iterable[typing.List[T]]:
     """
     Splits the items into n amount of equal items
 
@@ -132,7 +133,7 @@ def split_into_batches(items: List[Any], n: int):
     k, m = divmod(len(items), n)
     return (items[i * k + min(i, m):(i + 1) * k + min(i + 1, m)] for i in range(n))
 
-def split_into_batches_of_n(iterable: typing.Iterable, n: int) -> typing.Iterable[typing.List]:
+def split_into_batches_of_n(iterable: typing.Iterable[T], n: int) -> typing.Iterable[typing.List[T]]:
     """
     Splits the items into fixed-length chunks or blocks.
 
@@ -142,7 +143,7 @@ def split_into_batches_of_n(iterable: typing.Iterable, n: int) -> typing.Iterabl
     return list(get_batches_from_generator(iterable, n))
 
 
-def split_into_n_batches(iterable: typing.Iterable, size: int) -> typing.Iterable[typing.List]:
+def split_into_n_batches(iterable: typing.Iterable[T], size: int) -> typing.Iterable[typing.List[T]]:
     """
     Splits the items into n amount of equal items
 
@@ -151,7 +152,7 @@ def split_into_n_batches(iterable: typing.Iterable, size: int) -> typing.Iterabl
     """
     return split_into_batches(iterable, size)
 
-def build_batches(iterable: typing.Iterable, size: int, fixed_batch_size: bool = True) -> typing.Iterable[typing.List]:
+def build_batches(iterable: typing.Iterable[T], size: int, fixed_batch_size: bool = True) -> typing.Iterable[typing.List[T]]:
     """
     Builds batches of a given size from an iterable.
     """
