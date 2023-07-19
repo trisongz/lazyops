@@ -250,7 +250,7 @@ class Context(BaseModel):
             # Handle NullPool
             if 'poolclass' in eng_args and eng_args['poolclass'] is not None and eng_args['poolclass'].__name__ == 'NullPool':
                 _ = get_nested_arg(eng_args, self.config, 'pool_size')
-            elif pool_size := get_nested_arg(eng_args, self.config, 'pool_size', 50):
+            elif pool_size := get_nested_arg(eng_args, self.config, 'pool_size', 50) is not None:
                 eng_args['pool_size'] = pool_size
 
             self.aeng = create_async_engine(
@@ -276,7 +276,7 @@ class Context(BaseModel):
             # Handle NullPool
             if 'poolclass' in eng_args and eng_args['poolclass'] is not None and eng_args['poolclass'].__name__ == 'NullPool':
                 _ = get_nested_arg(eng_args, self.config, 'pool_size')
-            elif pool_size := get_nested_arg(eng_args, self.config, 'pool_size', 50):
+            elif pool_size := get_nested_arg(eng_args, self.config, 'pool_size', 50) is not None:
                 eng_args['pool_size'] = pool_size
 
             self.aeng_ro = create_async_engine(
@@ -301,13 +301,24 @@ class Context(BaseModel):
         """
         if self.sess is None:
             sess_args = self.config.get('session_args', {})
+            if class_ := get_nested_arg(sess_args, self.config, 'class_', Session):
+                if isinstance(class_, str):
+                    class_ = import_string(class_)
+                sess_args['class_'] = class_
+            
+            if event_hooks := get_nested_arg(sess_args, self.config, 'event_hooks', []):
+                self.ctx['session_hooks'] = event_hooks
+            
             self.sess = sessionmaker(
                 bind = self.engine,
                 autoflush = get_nested_arg(sess_args, self.config, 'autoflush', True),
                 expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
-                class_ = get_nested_arg(sess_args, self.config, 'class_', Session),
                 **sess_args,
             )
+            if event_hooks := self.ctx.get('session_hooks'):
+                for sess_hook in event_hooks:
+                    event_name, hook = sess_hook
+                    event.listen(self.sess, event_name, hook)
         return self.sess
     
     @property
@@ -317,13 +328,24 @@ class Context(BaseModel):
         """
         if self.sess_ro is None and self.has_ro:
             sess_args = self.config.get('session_ro_args', {})
+            if class_ := get_nested_arg(sess_args, self.config, 'class_', Session):
+                if isinstance(class_, str):
+                    class_ = import_string(class_)
+                sess_args['class_'] = class_
+            
+            if event_hooks := get_nested_arg(sess_args, self.config, 'event_hooks', []):
+                self.ctx['session_ro_hooks'] = event_hooks
+
             self.sess_ro = sessionmaker(
                 bind = self.engine_ro,
                 autoflush = get_nested_arg(sess_args, self.config, 'autoflush', True),
                 expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
-                class_ = get_nested_arg(sess_args, self.config, 'class_', Session),
                 **sess_args,
             )
+            if event_hooks := self.ctx.get('session_ro_hooks'):
+                for sess_hook in event_hooks:
+                    event_name, hook = sess_hook
+                    event.listen(self.sess_ro, event_name, hook)
         return self.sess_ro if self.sess_ro is not None else None
     
     def get_sess(self, ro: Optional[bool] = False, _session: Optional[Session] = None, **kwargs) -> Session:
@@ -345,14 +367,26 @@ class Context(BaseModel):
         Returns an async session
         """
         if _session is not None and isinstance(_session, AsyncSession) and _session.bind is not None: return _session
-        if ro and self.has_ro: return self.async_session_ro(**kwargs)
+        if ro and self.has_ro: 
+            _session = self.async_session_ro(**kwargs)
+            if event_hooks := self.ctx.get('async_session_ro_hooks'):
+                for sess_hook in event_hooks:
+                    event_name, hook = sess_hook
+                    event.listen(_session.sync_session, event_name, hook)
+            return _session
 
         # Bug testing for async sessions
         if self.is_debug_mode:
             if 'async_sessions' not in self.ctx: self.ctx['async_sessions'] = 0
             self.ctx['async_sessions'] += 1
             logger.warning(f"[{self.ctx['async_sessions']}] Using new async session")
-        return self.async_session(**kwargs)
+        
+        _session = self.async_session(**kwargs)
+        if self.ctx.get('async_session_hooks'):
+            for sess_hook in self.ctx['async_session_hooks']:
+                event_name, hook = sess_hook
+                event.listen(_session.sync_session, event_name, hook)
+        return _session
 
     
     @property
@@ -362,11 +396,18 @@ class Context(BaseModel):
         """
         if self.asess is None:
             sess_args = self.config.get('async_session_args', {})
-            self.asess = sessionmaker(
+            if class_ := get_nested_arg(sess_args, self.config, 'class_', AsyncSession):
+                if isinstance(class_, str):
+                    class_ = import_string(class_)
+                sess_args['class_'] = class_
+            
+            if event_hooks := get_nested_arg(sess_args, self.config, 'event_hooks', None):
+                self.ctx['async_session_hooks'] = event_hooks
+
+            self.asess: AsyncSession = sessionmaker(
                 bind = self.async_engine,
                 autoflush = get_nested_arg(sess_args, self.config, 'autoflush', True),
                 expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
-                class_ = get_nested_arg(sess_args, self.config, 'class_', AsyncSession),
                 **sess_args,
             )
         return self.asess
@@ -378,13 +419,21 @@ class Context(BaseModel):
         """
         if self.asess_ro is None and self.has_ro:
             sess_args = self.config.get('async_session_ro_args', {})
+            if class_ := get_nested_arg(sess_args, self.config, 'class_', AsyncSession):
+                if isinstance(class_, str):
+                    class_ = import_string(class_)
+                sess_args['class_'] = class_
+            
+            if event_hooks := get_nested_arg(sess_args, self.config, 'event_hooks', []):
+                self.ctx['async_session_ro_hooks'] = event_hooks
+            
             self.asess_ro = sessionmaker(
                 bind = self.async_engine_ro,
                 autoflush = get_nested_arg(sess_args, self.config, 'autoflush', True),
                 expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
-                class_ = get_nested_arg(sess_args, self.config, 'class_', AsyncSession),
                 **sess_args,
             )
+
         return self.asess_ro if self.asess_ro is not None else None
     
     @classmethod
