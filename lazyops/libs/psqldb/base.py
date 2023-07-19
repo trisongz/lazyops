@@ -10,9 +10,9 @@ require_sql(required=True, require_asyncpg=True, require_psycopg2=True)
 from sqlalchemy import create_engine, event, exc
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, scoped_session
 from sqlalchemy.pool import NullPool
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine, async_scoped_session
 
 from lazyops.utils.logs import logger
 from lazyops.utils import Json
@@ -28,12 +28,22 @@ EngineT = Union[Engine, AsyncEngine]
 SessionT = Union[Session, AsyncSession]
 SettingsT = Union[Type[BaseSettings], Any]
 
+class SafePostgresDsn(PostgresDsn):
+
+    @property
+    def safestr(self) -> str:
+        """
+        Returns the safe string
+        """
+        s = str(self)
+        if self.password: s = s.replace(self.password, '********', 1)
+        return s
 
 
 class Dummy(BaseModel):
-    dsn: PostgresDsn
+    dsn: SafePostgresDsn
 
-def uri_builder(uri: Union[str, PostgresDsn], scheme: Optional[str] = None) -> PostgresDsn:
+def uri_builder(uri: Union[str, SafePostgresDsn], scheme: Optional[str] = None) -> SafePostgresDsn:
     """
     Helper to construct a PostgresDsn from a string
     """
@@ -68,7 +78,7 @@ def get_nested_arg(
 
 
 class Context(BaseModel):
-    uri: PostgresDsn
+    uri: SafePostgresDsn
 
     scheme: Optional[str] = 'postgresql+psycopg2'
     async_scheme: Optional[str] = 'postgresql+asyncpg'
@@ -309,12 +319,18 @@ class Context(BaseModel):
             if event_hooks := get_nested_arg(sess_args, self.config, 'event_hooks', []):
                 self.ctx['session_hooks'] = event_hooks
             
+            if is_scoped_session := get_nested_arg(sess_args, self.config, 'is_scoped_session', False):
+                self.ctx['is_scoped_session'] = is_scoped_session
+            
             self.sess = sessionmaker(
                 bind = self.engine,
                 autoflush = get_nested_arg(sess_args, self.config, 'autoflush', True),
                 expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
                 **sess_args,
             )
+            if is_scoped_session := self.ctx.get('is_scoped_session'):
+                self.sess = scoped_session(self.sess)
+            
             if event_hooks := self.ctx.get('session_hooks'):
                 for sess_hook in event_hooks:
                     event_name, hook = sess_hook
@@ -335,6 +351,10 @@ class Context(BaseModel):
             
             if event_hooks := get_nested_arg(sess_args, self.config, 'event_hooks', []):
                 self.ctx['session_ro_hooks'] = event_hooks
+            
+
+            if is_scoped_session := get_nested_arg(sess_args, self.config, 'is_scoped_session', False):
+                self.ctx['is_scoped_session_ro'] = is_scoped_session
 
             self.sess_ro = sessionmaker(
                 bind = self.engine_ro,
@@ -342,12 +362,78 @@ class Context(BaseModel):
                 expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
                 **sess_args,
             )
+
+            if is_scoped_session := self.ctx.get('is_scoped_session_ro'):
+                self.sess_ro = scoped_session(self.sess_ro)
+
             if event_hooks := self.ctx.get('session_ro_hooks'):
                 for sess_hook in event_hooks:
                     event_name, hook = sess_hook
                     event.listen(self.sess_ro, event_name, hook)
         return self.sess_ro if self.sess_ro is not None else None
     
+
+    @property
+    def async_session(self) -> AsyncSession:
+        """
+        Returns the async session
+        """
+        if self.asess is None:
+            sess_args = self.config.get('async_session_args', {})
+            if class_ := get_nested_arg(sess_args, self.config, 'class_', AsyncSession):
+                if isinstance(class_, str):
+                    class_ = import_string(class_)
+                sess_args['class_'] = class_
+            
+            if event_hooks := get_nested_arg(sess_args, self.config, 'event_hooks', None):
+                self.ctx['async_session_hooks'] = event_hooks
+            
+
+            if is_scoped_session := get_nested_arg(sess_args, self.config, 'is_scoped_session', False):
+                self.ctx['is_scoped_async_session'] = is_scoped_session
+
+            self.asess: AsyncSession = sessionmaker(
+                bind = self.async_engine,
+                autoflush = get_nested_arg(sess_args, self.config, 'autoflush', True),
+                expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
+                **sess_args,
+            )
+            if is_scoped_session := self.ctx.get('is_scoped_async_session'):
+                self.asess = async_scoped_session(self.asess, scopefunc = asyncio.current_task)
+            
+        return self.asess
+    
+    @property
+    def async_session_ro(self) -> Optional[AsyncSession]:
+        """
+        Returns the read-only async session
+        """
+        if self.asess_ro is None and self.has_ro:
+            sess_args = self.config.get('async_session_ro_args', {})
+            if class_ := get_nested_arg(sess_args, self.config, 'class_', AsyncSession):
+                if isinstance(class_, str):
+                    class_ = import_string(class_)
+                sess_args['class_'] = class_
+            
+            if event_hooks := get_nested_arg(sess_args, self.config, 'event_hooks', []):
+                self.ctx['async_session_ro_hooks'] = event_hooks
+            
+
+            if is_scoped_session := get_nested_arg(sess_args, self.config, 'is_scoped_session', False):
+                self.ctx['is_scoped_async_session_ro'] = is_scoped_session
+            
+            self.asess_ro = sessionmaker(
+                bind = self.async_engine_ro,
+                autoflush = get_nested_arg(sess_args, self.config, 'autoflush', True),
+                expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
+                **sess_args,
+            )
+
+            if is_scoped_session := self.ctx.get('is_scoped_async_session_ro'):
+                self.asess_ro = async_scoped_session(self.asess_ro, scopefunc = asyncio.current_task)
+
+        return self.asess_ro if self.asess_ro is not None else None
+
     def get_sess(self, ro: Optional[bool] = False, _session: Optional[Session] = None, **kwargs) -> Session:
         """
         Returns a session
@@ -389,52 +475,6 @@ class Context(BaseModel):
         return _session
 
     
-    @property
-    def async_session(self) -> AsyncSession:
-        """
-        Returns the async session
-        """
-        if self.asess is None:
-            sess_args = self.config.get('async_session_args', {})
-            if class_ := get_nested_arg(sess_args, self.config, 'class_', AsyncSession):
-                if isinstance(class_, str):
-                    class_ = import_string(class_)
-                sess_args['class_'] = class_
-            
-            if event_hooks := get_nested_arg(sess_args, self.config, 'event_hooks', None):
-                self.ctx['async_session_hooks'] = event_hooks
-
-            self.asess: AsyncSession = sessionmaker(
-                bind = self.async_engine,
-                autoflush = get_nested_arg(sess_args, self.config, 'autoflush', True),
-                expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
-                **sess_args,
-            )
-        return self.asess
-    
-    @property
-    def async_session_ro(self) -> Optional[AsyncSession]:
-        """
-        Returns the read-only async session
-        """
-        if self.asess_ro is None and self.has_ro:
-            sess_args = self.config.get('async_session_ro_args', {})
-            if class_ := get_nested_arg(sess_args, self.config, 'class_', AsyncSession):
-                if isinstance(class_, str):
-                    class_ = import_string(class_)
-                sess_args['class_'] = class_
-            
-            if event_hooks := get_nested_arg(sess_args, self.config, 'event_hooks', []):
-                self.ctx['async_session_ro_hooks'] = event_hooks
-            
-            self.asess_ro = sessionmaker(
-                bind = self.async_engine_ro,
-                autoflush = get_nested_arg(sess_args, self.config, 'autoflush', True),
-                expire_on_commit = get_nested_arg(sess_args, self.config, 'expire_on_commit', False),
-                **sess_args,
-            )
-
-        return self.asess_ro if self.asess_ro is not None else None
     
     @classmethod
     def from_uri(
@@ -596,8 +636,9 @@ class PostgresDBMeta(type):
         """
         cls._settings = settings
 
+
     @property
-    def uri(cls) -> Union[str, PostgresDsn]:
+    def uri(cls) -> Union[str, SafePostgresDsn]:
         """
         Returns the uri
         """
@@ -624,6 +665,13 @@ class PostgresDBMeta(type):
             cls._uri = uri_builder(os.getenv('POSTGRES_URI', 'postgres@127.0.0.1:5432/postgres'), scheme=cls.scheme)
         return cls._uri
     
+    @property
+    def safe_uri(cls) -> str:
+        """
+        Returns the safe uri for logging
+        """
+        return cls.uri.safestr
+
     @property
     def pg_admin_user(cls) -> str:
         """
@@ -658,7 +706,7 @@ class PostgresDBMeta(type):
         return cls.uri.path[1:]
     
     @property
-    def admin_uri(cls) -> PostgresDsn:
+    def admin_uri(cls) -> SafePostgresDsn:
         """
         Returns the admin uri
         """
@@ -676,7 +724,7 @@ class PostgresDBMeta(type):
         user: Optional[str] = None,
         password: Optional[str] = None,
         db: Optional[str] = None,
-    ) -> PostgresDsn:
+    ) -> SafePostgresDsn:
         """
         Returns the admin uri
         """

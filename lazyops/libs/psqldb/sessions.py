@@ -7,9 +7,10 @@ from __future__ import annotations
 import weakref
 import sqlalchemy as sa
 from sqlalchemy import orm
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_object_session
 
-class CarefulAsyncSession(AsyncSession):
+
+class CarefulSession(orm.Session):
 
     def add(self, object_):
         # Get the session that contains the object, if there is one.
@@ -20,6 +21,19 @@ class CarefulAsyncSession(AsyncSession):
             object_session.expunge(object_)
             object_._prev_session = weakref.ref(object_session)
         return super().add(object_)
+
+class CarefulAsyncSession(AsyncSession):
+
+    def add(self, object_):
+        # Get the session that contains the object, if there is one.
+        object_session = async_object_session(object_)
+        if object_session and object_session is not self:
+            # Remove the object from the other session, but keep
+            # a reference so we can reinstate it.
+            object_session.expunge(object_)
+            object_._prev_session = weakref.ref(object_session)
+        return super().add(object_)
+
 
 # @sa.event.listens_for(CarefulAsyncSession.sync_session, 'after_commit')
 def receive_after_commit(session):
