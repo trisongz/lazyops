@@ -13,6 +13,7 @@ try:
 except ImportError:
     np = None
 
+
 # try:
 #     import ruamel.yaml.scalarstring as yaml
 # except ImportError:
@@ -49,6 +50,39 @@ def guess_json_utf(data: bytes) -> typing.Optional[str]:
         if sample[1:] == _null3:
             return "utf-32-le"
     return None
+
+
+def parse_list_str(
+    line: typing.Optional[typing.Union[typing.List[str], str]],
+    default: typing.Optional[typing.List[str]] = None,
+    seperators: typing.Optional[typing.List[str]] = None,
+) -> typing.Optional[typing.List[str]]:
+    """
+    Try to parse a string as a list of strings
+
+    Args:
+        line (typing.Optional[typing.Union[typing.List[str], str]]): [description]
+        default (typing.Optional[typing.List[str]], optional): [description]. Defaults to None.
+        seperators (typing.Optional[typing.List[str]], optional): [description]. Defaults to None.
+    
+    """
+    if line is None: return default
+    if seperators is None: seperators = [',', '|', ';']
+    if isinstance(line, list): return line
+    if isinstance(line, str):
+        if '[' in line and ']' in line:
+            if '"' in line or "'" in line:
+                try:
+                    line = json.loads(line)
+                    return line
+                except Exception: line = line.replace("'", '').replace('"', '')
+            line = line.replace('[', '').replace(']', '')
+        for seperator in seperators:
+            if seperator in line:
+                return line.split(seperator)
+        line = [line]
+    return line
+    
 
 
 def object_serializer(obj: typing.Any) -> typing.Any:
@@ -180,6 +214,37 @@ def object_deserializer(obj: typing.Dict) -> typing.Dict:
     return results
 
 
+if typing.TYPE_CHECKING:
+    from lazyops.types import BaseModel
+
+from .lazy import lazy_import, get_obj_class_name
+
+def object_model_serializer(obj: typing.Union['BaseModel', typing.Any]) -> typing.Any:
+    """
+    Hooks for the object serializer for BaseModels
+    """
+    if not hasattr(obj, "Config") and not hasattr(obj, "dict"):
+        return object_serializer(obj)
+    return {
+        "__jsontype__": "model",
+        "__model__": get_obj_class_name(obj),
+        "__data__": obj.dict(),
+    }
+
+
+def object_model_deserializer(obj: typing.Any) -> typing.Union['BaseModel', typing.Any]:
+    """
+    Hooks for the object deserializer for BaseModels
+    """
+    if not isinstance(obj, dict): return obj
+    if any(key not in obj for key in ["__jsontype__", "__model__", "__data__"]):
+        return object_deserializer(obj)
+
+    
+    model = lazy_import(obj["__model__"])
+    return model(**obj["__data__"])
+
+
 class ObjectEncoder(json.JSONEncoder):
     
     def default(self, obj: typing.Any):   # pylint: disable=arguments-differ,method-hidden
@@ -195,6 +260,23 @@ class ObjectDecoder(json.JSONDecoder):
     
     def __init__(self, *args, object_hook: typing.Optional[typing.Callable] = None, **kwargs):
         object_hook = object_hook or object_deserializer
+        super().__init__(*args, object_hook = object_hook, **kwargs)
+
+class ObjectModelEncoder(json.JSONEncoder):
+    """
+    Object Model Encoder
+    """
+    def default(self, obj: typing.Any):   # pylint: disable=arguments-differ,method-hidden
+        with contextlib.suppress(Exception):
+            return object_model_serializer(obj)
+        return json.JSONEncoder.default(self, obj)
+        
+class ObjectModelDecoder(json.JSONDecoder):
+    """
+    Object Model Decoder
+    """
+    def __init__(self, *args, object_hook: typing.Optional[typing.Callable] = None, **kwargs):
+        object_hook = object_hook or object_model_deserializer
         super().__init__(*args, object_hook = object_hook, **kwargs)
 
 
@@ -230,35 +312,109 @@ class Json:
                 return _fallback_method(data, *args, **kwargs)
             raise e
 
+class JsonModelSerializer:
 
-def parse_list_str(
-    line: typing.Optional[typing.Union[typing.List[str], str]],
-    default: typing.Optional[typing.List[str]] = None,
-    seperators: typing.Optional[typing.List[str]] = None,
-) -> typing.Optional[typing.List[str]]:
     """
-    Try to parse a string as a list of strings
+    Encoder and Decoder for Pydantic Models
+    for optimal performance in deep serialization
+    """
 
-    Args:
-        line (typing.Optional[typing.Union[typing.List[str], str]]): [description]
-        default (typing.Optional[typing.List[str]], optional): [description]. Defaults to None.
-        seperators (typing.Optional[typing.List[str]], optional): [description]. Defaults to None.
-    
-    """
-    if line is None: return default
-    if seperators is None: seperators = [',', '|', ';']
-    if isinstance(line, list): return line
-    if isinstance(line, str):
-        if '[' in line and ']' in line:
-            if '"' in line or "'" in line:
-                try:
-                    line = json.loads(line)
-                    return line
-                except Exception: line = line.replace("'", '').replace('"', '')
-            line = line.replace('[', '').replace(']', '')
-        for seperator in seperators:
-            if seperator in line:
-                return line.split(seperator)
-        line = [line]
-    return line
-    
+    @staticmethod
+    def dumps(
+        obj: typing.Dict[typing.Any, typing.Any], 
+        *args, 
+        default: typing.Dict[typing.Any, typing.Any] = None, 
+        cls: typing.Type[json.JSONEncoder] = ObjectModelEncoder,
+        _fallback_method: typing.Optional[typing.Callable] = None,
+        **kwargs
+    ) -> str:
+        """
+        Serializes a dict into a JSON string using the ObjectModelEncoder
+        """
+        try:
+            return json.dumps(obj, *args, default = default, cls = cls, **kwargs)
+        except Exception as e:
+            if _fallback_method is not None:
+                return _fallback_method(obj, *args, default = default, **kwargs)
+            raise e
+
+    @staticmethod
+    def loads(
+        data: typing.Union[str, bytes], 
+        *args, 
+        cls: typing.Type[json.JSONDecoder] = ObjectModelDecoder,
+        _fallback_method: typing.Optional[typing.Callable] = None,
+        **kwargs
+    ) -> typing.Union[typing.Dict[typing.Any, typing.Any], typing.List[str]]:
+        """
+        Loads a JSON string into a dict using the ObjectModelDecoder
+        """
+        try:
+            return json.loads(data, *args, cls = cls, **kwargs)
+        except json.JSONDecodeError as e:
+            if _fallback_method is not None:
+                return _fallback_method(data, *args, **kwargs)
+            raise e
+
+# Add simdjson support if available
+try:
+    import simdjson
+
+    _parser = simdjson.Parser()
+
+    class SimdJson:
+
+        """
+        JSON Encoder and Decoder using simdjson
+        """
+
+        @staticmethod
+        def dumps(
+            obj: typing.Dict[typing.Any, typing.Any], 
+            *args, 
+            default: typing.Dict[typing.Any, typing.Any] = None, 
+            cls: typing.Type[json.JSONEncoder] = ObjectModelEncoder,
+            _fallback_method: typing.Optional[typing.Callable] = None,
+            **kwargs
+        ) -> str:
+            """
+            Serializes a dict into a JSON string using the ObjectModelEncoder
+            """
+            try:
+                return json.dumps(obj, *args, default = default, cls = cls, **kwargs)
+            except Exception as e:
+                if _fallback_method is not None:
+                    return _fallback_method(obj, *args, default = default, **kwargs)
+                raise e
+
+        @staticmethod
+        def loads(
+            data: typing.Union[str, bytes], 
+            *args, 
+            object_hook: typing.Optional[typing.Callable] = object_model_deserializer,
+            recursive: typing.Optional[bool] = True,
+            _raw: typing.Optional[bool] = False,
+            _fallback_method: typing.Optional[typing.Callable] = None,
+            **kwargs
+        ) -> typing.Union[typing.Dict[typing.Any, typing.Any], typing.List[str]]:
+            """
+            Loads a JSON string into a dict using the ObjectModelDecoder
+            """
+            try:
+                value = _parser.parse(data, recursive)
+                return value if _raw or not object_hook else object_hook(value)
+            
+            except Exception as e:
+                if _fallback_method is not None:
+                    return _fallback_method(data, *args, **kwargs)
+                raise e
+
+
+
+except ImportError:
+    _parser = None
+
+    SimdJson = JsonModelSerializer
+
+
+

@@ -22,6 +22,17 @@ from lazyops.utils.serialization import (
     Json,
 )
 
+# For backwards compatibility
+from lazyops.utils.lazy import (
+    import_string,
+    import_function, 
+    get_obj_class_name,
+    fetch_property,
+    is_coro_func,
+    lazy_function,
+    lazy_import,
+)
+
 if TYPE_CHECKING:
     from lazyops.types import BaseModel
 
@@ -32,43 +43,56 @@ def timer(t: typing.Optional[float] = None, msg: typing.Optional[str] = None, lo
     if msg: logger.info(f'{msg} in {done_time:.2f} secs')
     return done_time
 
-def timed(func: typing.Callable):
+# def timed(func: typing.Callable):
+#     """
+#     Decorator to time a function
+#     """
+#     _func_name = func.__name__
+#     @functools.wraps(func)
+#     async def fx(*args, **kwargs):
+#         start = time.perf_counter()
+#         if inspect.iscoroutinefunction(func): result = await func(*args, **kwargs)
+#         else: result = func(*args, **kwargs)
+#         end = time.perf_counter()
+#         default_logger.info(f'{_func_name}: {end - start:.4f} secs')
+#         return result
+#     return fx
+
+
+def timed(verbose: typing.Optional[bool] = False):
     """
     Decorator to time a function
     """
-    _func_name = func.__name__
-    @functools.wraps(func)
-    async def fx(*args, **kwargs):
-        start = time.perf_counter()
-        if inspect.iscoroutinefunction(func): result = await func(*args, **kwargs)
-        else: result = func(*args, **kwargs)
-        end = time.perf_counter()
-        default_logger.info(f'{_func_name}: {end - start:.4f} secs')
-        return result
-    return fx
+    def decorator(func):
+        if inspect.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def wrapper(*args, **kwargs):
+                start = time.perf_counter()
+                result = await func(*args, **kwargs)
+                end = time.perf_counter()
+                if verbose: default_logger.info(f"took {end - start:.2f} secs with args: {args} and kwargs: {kwargs}", prefix = f"{func.__module__}.|g|{func.__name__}|e|", colored = True)
+                else: default_logger.info(f"took {end - start:.2f} secs", prefix = f"{func.__module__}.|g|{func.__name__}|e|", colored = True)
+                return result
+            return wrapper
+        
+        else:        
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                start = time.perf_counter()
+                result = func(*args, **kwargs)
+                end = time.perf_counter()
+                if verbose: default_logger.info(f"took {end - start:.2f} secs with args: {args} and kwargs: {kwargs}", prefix = f"{func.__module__}.|g|{func.__name__}|e|", colored = True)
+                else: default_logger.info(f"took {end - start:.2f} secs", prefix = f"{func.__module__}.|g|{func.__name__}|e|", colored = True)
+                return result
+            return wrapper
+    
+    return decorator
 
 
 def merge_dicts(x: Dict, y: Dict):
     z = x.copy()
     z.update(y)
     return z
-
-def is_coro_func(obj, func_name: str = None):
-    """
-    This is probably in the library elsewhere but returns bool
-    based on if the function is a coro
-    """
-    try:
-        if inspect.iscoroutinefunction(obj): return True
-        if inspect.isawaitable(obj): return True
-        if func_name and hasattr(obj, func_name) and inspect.iscoroutinefunction(getattr(obj, func_name)):
-            return True
-        return bool(hasattr(obj, '__call__') and inspect.iscoroutinefunction(obj.__call__))
-
-    except Exception:
-        return False
-
-
 
 def exponential_backoff(
     attempts: int,
@@ -161,46 +185,6 @@ def build_batches(iterable: typing.Iterable[T], size: int, fixed_batch_size: boo
     return split_into_n_batches(iterable, size)
 
 
-def import_string(dotted_path: str) -> Any:
-    """
-    Taken from pydantic.utils.
-    """
-    from importlib import import_module
-
-    try:
-        module_path, class_name = dotted_path.strip(' ').rsplit('.', 1)
-    except ValueError as e:
-        raise ImportError(f'"{dotted_path}" doesn\'t look like a module path') from e
-
-    module = import_module(module_path)
-    try:
-        return getattr(module, class_name)
-    except AttributeError as e:
-        raise ImportError(f'Module "{module_path}" does not define a "{class_name}" attribute') from e
-
-def get_obj_class_name(obj: Any, is_parent: bool = False) -> str:
-    """
-    Returns the module name + class name of an object
-
-    args:
-        obj: the object to get the class name of
-        is_parent: if True, then it treats the object as unitialized and gets the class name of the parent
-    """
-    if is_parent:
-        return f'{obj.__module__}.{obj.__name__}'
-    return f'{obj.__class__.__module__}.{obj.__class__.__name__}'
-
-
-def fetch_property(
-    obj: typing.Union[typing.Type['BaseModel'], Dict],
-    key: str,
-    default: typing.Optional[Any] = None
-):  
-    """
-    Fetches a property from a dict or object
-    """
-    return obj.get(key, default) if isinstance(obj, dict) else getattr(obj, key, default)
-
 
 def create_unique_id(
     method: typing.Optional[str] = 'uuid4',
@@ -246,12 +230,6 @@ def create_secret(
     import secrets
     return secrets.token_hex(nbytes)
 
-@functools.lru_cache()
-def import_function(func: typing.Union[str, Callable]) -> Callable:
-    """
-    Imports a function from a string
-    """
-    return func if callable(func) else import_string(func)
 
 def suppress(
     *exceptions: typing.Optional[typing.Union[typing.Tuple[Exception], Exception]],
@@ -356,36 +334,6 @@ def timed_cache(
 
     return wrapper_cache
         
-        
-
-def lazy_function(
-    validator: Callable,
-    function: Callable,
-    *args,
-    **kwargs,
-):
-    """
-    Creates an empty function wrapper
-    args:
-        validator: function to validate the arguments
-        func: function to call
-        
-    """
-    def wrapper_func(func):
-        if not validator():
-            return func
-        
-        if is_coro_func(func):
-            @functools.wraps(func)
-            async def wrapped_func(*args, **kwargs):
-                return await function(*args, **kwargs)
-        
-        else:
-            @functools.wraps(func)
-            def wrapped_func(*args, **kwargs):
-                return function(*args, **kwargs)
-        return wrapped_func
-    return wrapper_func
 
 
 def with_fail_after(delay: float):
