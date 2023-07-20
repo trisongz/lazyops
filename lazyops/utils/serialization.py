@@ -381,7 +381,7 @@ try:
             Serializes a dict into a JSON string using the ObjectModelEncoder
             """
             try:
-                return json.dumps(obj, *args, default = default, cls = cls, **kwargs)
+                return simdjson.dumps(obj, *args, default = default, cls = cls, **kwargs)
             except Exception as e:
                 if _fallback_method is not None:
                     return _fallback_method(obj, *args, default = default, **kwargs)
@@ -396,7 +396,7 @@ try:
             _raw: typing.Optional[bool] = False,
             _fallback_method: typing.Optional[typing.Callable] = None,
             **kwargs
-        ) -> typing.Union[typing.Dict[typing.Any, typing.Any], typing.List[str]]:
+        ) -> typing.Union[typing.Dict[typing.Any, typing.Any], typing.List[str], simdjson.Object, simdjson.Array]:
             """
             Loads a JSON string into a dict using the ObjectModelDecoder
             """
