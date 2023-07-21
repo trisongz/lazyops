@@ -384,18 +384,35 @@ def fail_after(delay: Union[int, float]):
         signal.alarm(0)
 
 
+async def run_as_coro(
+    func: Callable,
+    *args,
+    **kwargs
+) -> Any:
+    """
+    Runs a function as a coroutine
+    """
+    from .pooler import ThreadPooler
+    return await ThreadPooler.asyncish(func, *args, **kwargs)
+
 
 _background_tasks = set()
 
 
-def create_background_task(async_func: Union[Callable, Coroutine], *args, **kwargs):
+def create_background_task(func: Union[Callable, Coroutine], *args, **kwargs):
     """
     Creates a background task and adds it to the global set of background tasks
     """
-    if inspect.isawaitable(async_func):
-        task = asyncio.create_task(async_func)
+    if inspect.isawaitable(func):
+        task = asyncio.create_task(func)
     else:
-        task = asyncio.create_task(async_func(*args, **kwargs))
+        task = asyncio.create_task(
+            run_as_coro(
+                func,
+                *args,
+                **kwargs
+            )
+        )
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
     return task

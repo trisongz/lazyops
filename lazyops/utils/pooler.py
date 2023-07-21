@@ -6,7 +6,7 @@ from concurrent import futures
 
 from typing import Callable, Coroutine, Any, Union, List, Optional
 from anyio._core._eventloop import threadlocals
-from lazyops.utils.helpers import is_coro_func
+from lazyops.utils.lazy import is_coro_func
 
 class ThreadPooler:
     pool: futures.ThreadPoolExecutor = None
