@@ -208,6 +208,11 @@ async def amap_v2(
         [type]: [description]
     """
     func = ensure_coro(func)
+    # Deal with Tuples and Lists in the iterable
+    # if isinstance(iterable, (tuple, list)):
+    #     iterable = [func(x, *args, **kwargs) for x in iterable]
+    # else:
+    #     iterable = (func(x, *args, **kwargs) for x in iterable)
     partial = functools.partial(func, *args, **kwargs)
     try:
         mapped_iterable = map(partial, iterable)

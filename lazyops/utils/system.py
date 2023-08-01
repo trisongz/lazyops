@@ -23,17 +23,18 @@ __all__ = [
 # Lazily get these libraries
 
 @lru_cache()
-def get_torch_device_name():
+def get_torch_device_name(mps_enabled: bool = False):
     with contextlib.suppress(ImportError):
         import torch
         if torch.cuda.is_available(): return 'cuda'
+        if mps_enabled and torch.torch.backends.mps.is_available(): return 'mps'
     return 'cpu'
 
 @lru_cache()
-def get_torch_device():
+def get_torch_device(mps_enabled: bool = False):
     with contextlib.suppress(ImportError):
         import torch
-        return torch.device(get_torch_device_name())
+        return torch.device(get_torch_device_name(mps_enabled))
     return 'cpu'
 
 @lru_cache()
