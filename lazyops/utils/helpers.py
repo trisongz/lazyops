@@ -393,7 +393,11 @@ async def run_as_coro(
     Runs a function as a coroutine
     """
     from .pooler import ThreadPooler
-    return await ThreadPooler.asyncish(func, *args, **kwargs)
+    try:
+        return await ThreadPooler.asyncish(func, *args, **kwargs)
+    except Exception as e:
+        default_logger.trace(f'Error running as coro', error = e)
+        raise e
 
 
 _background_tasks = set()
