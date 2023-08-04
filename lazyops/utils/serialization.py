@@ -367,6 +367,7 @@ try:
         """
         JSON Encoder and Decoder using simdjson
         """
+        parser = _parser
 
         @staticmethod
         def dumps(
@@ -415,6 +416,8 @@ try:
         """
         JSON Encoder and Decoder using simdjson
         """
+
+        parser = _parser
 
         @staticmethod
         def dumps(
