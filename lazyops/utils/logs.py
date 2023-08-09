@@ -465,7 +465,7 @@ class Logger(_Logger):
         :param error: The exception to log.
         """
         _msg = msg if isinstance(msg, str) else pprint.pformat(msg)
-        _msg += f": {traceback.format_exc(chain = chain, depth = (depth if depth is not None else self.default_trace_depth))}"
+        _msg += f": {traceback.format_exc(chain = chain, limit = (depth if depth is not None else self.default_trace_depth))}"
         if error: _msg += f" - {error}"
         _log = self.get_log_mode(level)
         _log(_msg)
