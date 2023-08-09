@@ -112,7 +112,9 @@ class Logger(_Logger):
 
     settings: Type[BaseSettings] = None
     conditions: Dict[str, Tuple[Union[Callable, bool], str]] = {}
+    default_trace_depth: Optional[int] = None
     _colored_opts = None
+
 
     @property
     def colored_opts(self):
@@ -449,14 +451,21 @@ class Logger(_Logger):
         self._log('DEV', None, False, self._get_opts(colored = True), message, args, kwargs)
 
 
-    def trace(self, msg: Union[str, Any], error: Optional[Type[Exception]] = None, level: str = "ERROR") -> None:
+    def trace(
+        self, 
+        msg: Union[str, Any], 
+        error: Optional[Type[Exception]] = None, 
+        level: str = "ERROR",
+        depth: Optional[int] = None,
+        chain: Optional[bool] = True,
+    ) -> None:
         """
         This method logs the traceback of an exception.
 
         :param error: The exception to log.
         """
         _msg = msg if isinstance(msg, str) else pprint.pformat(msg)
-        _msg += f": {traceback.format_exc()}"
+        _msg += f": {traceback.format_exc(chain = chain, depth = (depth if depth is not None else self.default_trace_depth))}"
         if error: _msg += f" - {error}"
         _log = self.get_log_mode(level)
         _log(_msg)
