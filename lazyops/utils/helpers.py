@@ -185,14 +185,14 @@ def build_batches(iterable: typing.Iterable[T], size: int, fixed_batch_size: boo
     return split_into_n_batches(iterable, size)
 
 
-def split_into_batches_with_index(iterable: typing.Iterable[T], n: int) -> typing.Iterable[typing.Tuple[int, List[T]]]:
+def split_into_batches_with_index(iterable: typing.Iterable[T], n: int, start: typing.Optional[int] = None) -> typing.Iterable[typing.Tuple[int, List[T]]]:
     """
     Splits the items into fixed-length chunks or blocks.
 
     >>> list(split_into_batches_of_n(range(11), 3))
     [(0, [0, 1, 2]), (1, [3, 4, 5]), (2, [6, 7, 8]), (3, [9, 10])]
     """
-    return list(enumerate(get_batches_from_generator(iterable, n)))
+    return list(enumerate(get_batches_from_generator(iterable, n), start = start or 0))
 
 def create_unique_id(
     method: typing.Optional[str] = 'uuid4',
