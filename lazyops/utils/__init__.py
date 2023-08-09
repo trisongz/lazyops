@@ -33,6 +33,7 @@ from lazyops.utils.helpers import (
     build_batches,
     get_batches_from_generator,
     split_into_batches,
+    split_into_batches_with_index,
 
     create_timestamp,
     create_unique_id,
