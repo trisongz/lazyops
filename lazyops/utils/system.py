@@ -5,7 +5,7 @@ import pathlib
 import tempfile
 import contextlib
 
-from typing import Union
+from typing import Union, Optional
 from functools import lru_cache
 
 __all__ = [
@@ -165,4 +165,40 @@ def get_k8s_kubeconfig(
             if _k8s_kubeconfig is None:
                 _k8s_kubeconfig = os.path.expanduser('~/.kube/config')
     return _k8s_kubeconfig
+
+
+# Local K8s
+_kubeconfig_dir: str = None
+
+def get_local_kubeconfig_dir(
+    env_var: str = 'KUBECONFIG_DIR',
+    default: str = None,
+) -> str:
+    """
+    Get the local kubernetes kubeconfig.
+    """
+    global _kubeconfig_dir
+    if _kubeconfig_dir is None:
+        _kubeconfig_dir = os.getenv(env_var, default) or os.path.expanduser('~/.kube')
+    return _kubeconfig_dir
+
+@lru_cache()
+def get_local_kubeconfig(
+    name: Optional[str] = None,
+    set_as_envval: bool = False,
+) -> str:
+    """
+    Get the local kubernetes kubeconfig
+    - this assumes that it's not the default one.
+    """
+    if name is None: return get_k8s_kubeconfig()
+    p = os.path.join(get_local_kubeconfig_dir(), name)
+    for stem in ('', '-cluster', '-admin-config', '-config', '-kubeconfig'):
+        for ext in ('', '.yaml', '.yml'):
+            if os.path.isfile(p + stem + ext): 
+                px = os.path.abspath(p + stem + ext)
+                if set_as_envval:
+                    os.environ['KUBECONFIG'] = px
+                return px
+    raise FileNotFoundError(f'Could not find kubeconfig file: {name} @ {p}')
 
