@@ -55,6 +55,7 @@ LOGLEVEL_MAPPING = {
     1: 'DEBUG',
     0: 'NOTSET',
 }
+REVERSE_LOGLEVEL_MAPPING = {v: k for k, v in LOGLEVEL_MAPPING.items()}
 
 COLORED_MESSAGE_MAP = {
     '|bld|': '<bold>',
@@ -378,7 +379,15 @@ class Logger(_Logger):
         """
         level = self._get_level(level)
         message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
-        self._log(level, False, self._get_opts(colored = colored), message, args, kwargs)
+        try:
+            self._log(level, False, self._get_opts(colored = colored), message, args, kwargs)
+        except TypeError:
+            # Compatibility with < 0.6.0
+            # level_id, static_level_no, from_decorator, options, message, args, kwargs
+            static_log_no = REVERSE_LOGLEVEL_MAPPING.get(level, 20)
+            self._log(level, static_log_no, False, self._get_opts(colored = colored), message, args, kwargs)
+
+        # self._logcompat(level, False, self._get_opts(colored = colored), message, args, kwargs)
         # self._log(level, False, __self._options, __message, args, kwargs)
         # return super().log(level, message, *args, **kwargs)
     
@@ -413,7 +422,13 @@ class Logger(_Logger):
         """
         message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored)
         # self._log("INFO", False, self._options, message, args, kwargs)
-        self._log("INFO", False, self._get_opts(colored = colored), message, args, kwargs)
+        # level, from_decorator, options, message, args, kwargs
+        # self._logcompat("INFO", True, self._get_opts(colored = colored), message, args, kwargs)
+        try:
+            self._log("INFO", False, self._get_opts(colored = colored), message, args, kwargs)
+        except TypeError:
+            # Compatibility with < 0.6.0
+            self._log("INFO", 20, False, self._get_opts(colored = colored), message, args, kwargs)
 
     def success(
         self, 
@@ -427,7 +442,11 @@ class Logger(_Logger):
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'SUCCESS'``."""
         message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored)
         # self._log("SUCCESS", False, self._options, message, args, kwargs)
-        self._log("SUCCESS", False, self._get_opts(colored = colored), message, args, kwargs)
+        try:
+            self._log("SUCCESS", False, self._get_opts(colored = colored), message, args, kwargs)
+        except TypeError:
+            # Compatibility with < 0.6.0
+            self._log("SUCCESS", 20, False, self._get_opts(colored = colored), message, args, kwargs)
     
 
     def warning(
@@ -442,13 +461,17 @@ class Logger(_Logger):
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'WARNING'``."""
         message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
         # self._log("WARNING", False, self._options, message, args, kwargs)
-        self._log("WARNING", False, self._get_opts(colored = colored), message, args, kwargs)
+        try:
+            self._log("WARNING", False, self._get_opts(colored = colored), message, args, kwargs)
+        except TypeError:
+            # Compatibility with < 0.6.0
+            self._log("WARNING", 30, False, self._get_opts(colored = colored), message, args, kwargs)
 
 
     def dev(self, message: Any, *args, **kwargs):
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'DEV'``."""
         # self._log('DEV', None, False, self._options, message, args, kwargs)
-        self._log('DEV', None, False, self._get_opts(colored = True), message, args, kwargs)
+        self._logcompat('DEV', None, False, self._get_opts(colored = True), message, args, kwargs)
 
 
     def trace(
@@ -481,6 +504,20 @@ class Logger(_Logger):
             __message = str(message)
         _log = self.get_log_mode(level)
         _log(__message.strip(), *args, **kwargs)
+    
+    def _logcompat(
+        self, level, from_decorator, options, message, args, kwargs
+    ):
+        """
+        Compatible to < 0.6.0
+        """
+        try:
+            self._log(level, from_decorator, options, message, args, kwargs)
+        except TypeError:
+            # Compatibility with < 0.6.0
+            # level_id, static_level_no, from_decorator, options, message, args, kwargs
+            static_log_no = REVERSE_LOGLEVEL_MAPPING.get(level, 20)
+            self._log(level, static_log_no, from_decorator, options, message, args, kwargs)
 
 
     # def warning(__self, __message, *args, **kwargs):  # noqa: N805
