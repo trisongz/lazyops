@@ -3,7 +3,7 @@ from __future__ import annotations
 # Lazily handle stuff
 import functools
 import inspect
-from typing import Any, Dict, Callable, Union, Optional, Type, TYPE_CHECKING
+from typing import Any, Dict, Callable, Union, Optional, Type, TypeVar, List, Tuple, TYPE_CHECKING
 
 
 if TYPE_CHECKING:
@@ -135,3 +135,28 @@ def lazy_function(
                 return function(*args, **kwargs)
         return wrapped_func
     return wrapper_func
+
+
+
+MT = TypeVar("MT", bound="BaseModel")
+
+
+
+_extracted_base_model_kws: Dict[str, List[str]] = {}
+
+def extract_base_model_kws(
+    model: MT,
+    kwargs: Dict[str, Any],
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    """
+    Extracts the kwargs from the resource and returns the kwargs and the model kwargs
+    """
+    global _extracted_base_model_kws
+    base_model_name = f"{model.__module__}.{model.__name__}"
+    if base_model_name not in _extracted_base_model_kws:
+        resource_kws = list(model.__fields__.keys())
+        _extracted_base_model_kws[base_model_name] = resource_kws
+    model_kwargs = {
+        key: kwargs.pop(key) for key in kwargs if key in _extracted_base_model_kws[base_model_name]
+    }
+    return kwargs, model_kwargs

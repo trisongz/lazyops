@@ -21,6 +21,7 @@ from lazyops.utils.lazy import (
     import_function,
     validate_callable,
     fetch_property,
+    extract_base_model_kws,
 
 )
 from lazyops.utils.helpers import (

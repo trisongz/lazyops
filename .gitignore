@@ -24,3 +24,4 @@ lazyops/libs/stream_unzip/lib.py
 lazyops/libs/stream_unzip/inflate.py
 lazyops/libs/stream_unzip/exceptions.py
 lazyops/libs/stream_unzip/constants.py
+tests/test_shelve.db.db
