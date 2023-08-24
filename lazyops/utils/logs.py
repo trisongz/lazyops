@@ -12,14 +12,17 @@ import functools
 from loguru import _defaults
 from loguru._logger import Core as _Core
 from loguru._logger import Logger as _Logger
-from pydantic import BaseSettings
+# from pydantic import BaseSettings
 
-from typing import Type, Union, Optional, Any, List, Dict, Tuple, Callable
+from typing import Type, Union, Optional, Any, List, Dict, Tuple, Callable, TYPE_CHECKING
 
 # Use this section to filter out warnings from other modules
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = os.getenv('TF_CPP_MIN_LOG_LEVEL', '3')
 warnings.filterwarnings('ignore', message='Unverified HTTPS request')
 warnings.filterwarnings("ignore", message = "Unclosed client session")
+
+if TYPE_CHECKING:
+    from lazyops.types.models import BaseSettings
 
 
 STATUS_COLOR = {
@@ -111,7 +114,7 @@ def _find_seps(msg: str) -> str:
 # Setup Default Logger
 class Logger(_Logger):
 
-    settings: Type[BaseSettings] = None
+    settings: Type['BaseSettings'] = None
     conditions: Dict[str, Tuple[Union[Callable, bool], str]] = {}
     default_trace_depth: Optional[int] = None
     _colored_opts = None
@@ -695,7 +698,7 @@ class CustomizeLogger:
     def make_default_logger(
         cls, 
         level: Union[str, int] = "INFO",
-        settings: Optional[Type[BaseSettings]] = None,
+        settings: Optional[Type['BaseSettings']] = None,
         format: Optional[Callable] = None,
         filter: Optional[Callable] = None,
         handlers: Optional[List[logging.Handler]] = None,

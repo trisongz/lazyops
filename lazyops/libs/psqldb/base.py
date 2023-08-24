@@ -452,7 +452,8 @@ class Context(BaseModel):
         """
         Returns an async session
         """
-        if _session is not None and isinstance(_session, AsyncSession) and _session.bind is not None: return _session
+        # if _session is not None and isinstance(_session, AsyncSession) and _session.bind is not None: return _session
+        if _session is not None and isinstance(_session, AsyncSession): return _session
         if ro and self.has_ro: 
             _session = self.async_session_ro(**kwargs)
             if event_hooks := self.ctx.get('async_session_ro_hooks'):
