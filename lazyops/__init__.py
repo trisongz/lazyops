@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 
 from lazyops.types.classprops import lazyproperty, classproperty, cached_classproperty
-from lazyops.types.models import (
+from lazyops.types import (
     BaseModel, 
     BaseSettings, 
     Field, 
