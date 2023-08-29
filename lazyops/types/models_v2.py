@@ -8,13 +8,30 @@ from lazyops.types.formatting import to_camel_case, to_snake_case, to_graphql_fo
 from lazyops.types.classprops import classproperty, lazyproperty
 from lazyops.utils.serialization import Json
 
-from pydantic import BaseSettings as _BaseSettings
-from pydantic import BaseModel as _BaseModel
-
 """
 WIP Migration to pydantic v2
 """
 
+# For backwards compatibility
+try:
+    from pydantic_settings import BaseSettings as _BaseSettings
+    from pydantic.v1 import BaseModel as _BaseModel
+    PYDANTIC_V2 = True
+except ImportError:
+    from pydantic import BaseSettings as _BaseSettings
+    from pydantic import BaseModel as _BaseModel
+    PYDANTIC_V2 = False
+
+# if pydantic_version.startswith('2.0'):
+#     from pydantic_settings import BaseSettings as _BaseSettings
+#     PYDANTIC_V2 = True
+# else:
+#     from pydantic import BaseSettings as _BaseSettings
+#     PYDANTIC_V2 = False
+
+if TYPE_CHECKING:
+    from pydantic.main import IncEx
+    from pydantic_settings import BaseSettings as _BaseSettings
 
 class BaseSettings(_BaseSettings):
 
@@ -22,6 +39,29 @@ class BaseSettings(_BaseSettings):
         env_prefix: str = ""
         case_sensitive: bool = False
 
+    # Maintain backwards compatibility
+    if PYDANTIC_V2:
+        def dict(  # noqa: D102
+            self,
+            *,
+            include: 'IncEx' = None,
+            exclude: 'IncEx' = None,
+            by_alias: bool = False,
+            exclude_unset: bool = False,
+            exclude_defaults: bool = False,
+            exclude_none: bool = False,
+        ) -> Dict[str, Any]:  # noqa UP006
+            """
+            Model to dict
+            """
+            return self.model_dump(
+                include=include,
+                exclude=exclude,
+                by_alias=by_alias,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+            )
 
     def update_config(self, **kwargs):
         """
@@ -31,7 +71,7 @@ class BaseSettings(_BaseSettings):
             if not hasattr(self, k): continue
             if isinstance(getattr(self, k), pathlib.Path):
                 setattr(self, k, pathlib.Path(v))
-            elif isinstance(getattr(self, k), self.__class__):
+            elif isinstance(getattr(self, k), BaseSettings):
                 val = getattr(self, k)
                 if hasattr(val, 'update_config'):
                     val.update_config(**v)
@@ -69,6 +109,12 @@ class BaseModel(_BaseModel):
             if not hasattr(self, k): continue
             setattr(self, k, v)
 
+    if PYDANTIC_V2:
+        def parse_obj(self, obj: Any, **kwargs) -> 'BaseModel':
+            """
+            Parse an object into a model
+            """
+            return self.model_validate(obj, **kwargs)
 
     @classmethod
     def create_one(
@@ -79,11 +125,16 @@ class BaseModel(_BaseModel):
         Extracts the resource from the kwargs and returns the resource 
         and the remaining kwargs
         """
-        resource_fields = [field.name for field in cls.__fields__.values()]
+        if PYDANTIC_V2:
+            resource_fields = [field.name for field in cls.model_fields.values()]
+        else:
+            resource_fields = [field.name for field in cls.__fields__.values()]
         resource_kwargs = {k: v for k, v in kwargs.items() if k in resource_fields}
         return_kwargs = {k: v for k, v in kwargs.items() if k not in resource_fields}
-        
-        resource_obj = cls.parse_obj(resource_kwargs)
+        if PYDANTIC_V2:
+            resource_obj = cls.model_validate(resource_kwargs)
+        else:
+            resource_obj = cls.parse_obj(resource_kwargs)
         return resource_obj, return_kwargs
     
     @classmethod
@@ -91,20 +142,23 @@ class BaseModel(_BaseModel):
         """
         Create a list of resources from a list of dicts
         """
-        return [cls.parse_obj(d) for d in data]
+        if PYDANTIC_V2:
+            return [cls.model_validate(**d) for d in data]
+        else:
+            return [cls.parse_obj(d) for d in data]
     
-
-    @classproperty
-    def model_fields(cls) -> List[str]:
-        """
-        Returns the model fields names
-        """
-        return [field.name for field in cls.__fields__.values()]
+    if not PYDANTIC_V2:
+        @classproperty
+        def _model_fields(cls) -> List[str]:
+            return [field.name for field in cls.__fields__.values()]
         
     def get_model_fields(self) -> List[str]:
         """
         Get the model fields
         """
+        if PYDANTIC_V2:
+            return [field.name for field in self.model_fields.values()]
+
         return [field.name for field in self.__fields__.values()]
 
     def replace(self, obj: Type['BaseModel']):
@@ -113,6 +167,27 @@ class BaseModel(_BaseModel):
             if hasattr(self, field):
                 setattr(self, field, getattr(obj, field))
     
+    # Maintain backwards compatibility
+    if PYDANTIC_V2:
+        def dict(  # noqa: D102
+            self,
+            *,
+            include: 'IncEx' = None,
+            exclude: 'IncEx' = None,
+            by_alias: bool = False,
+            exclude_unset: bool = False,
+            exclude_defaults: bool = False,
+            exclude_none: bool = False,
+        ) -> Dict[str, Any]:  # noqa UP006
+            return self.model_dump(
+                include=include,
+                exclude=exclude,
+                by_alias=by_alias,
+                exclude_unset=exclude_unset,
+                exclude_defaults=exclude_defaults,
+                exclude_none=exclude_none,
+            )
+
     def graphql(
         self,
         *,
