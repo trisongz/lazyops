@@ -8,7 +8,7 @@ import textwrap
 import threading
 import types
 import warnings
-from typing import TypeVar, Callable, Any, Union
+from typing import TypeVar, Type, Callable, Any, Union
 from inspect import signature
 from functools import wraps
 
@@ -1189,19 +1189,19 @@ try:
     R = TypeVar("R")
 
     class classproperty_v2(Generic[T, R]):
-        def __init__(self, func: Callable[[type[T]], R]) -> None:
+        def __init__(self, func: Callable[[Type[T]], R]) -> None:
             self.func = func
 
-        def __get__(self, obj: Any, cls: type[T]) -> R:
+        def __get__(self, obj: Any, cls: Type[T]) -> R:
             return self.func(cls)
         
     class lazyclassproperty_v2(Generic[T, R]):
-        def __init__(self, func: Callable[[type[T]], R]) -> None:
+        def __init__(self, func: Callable[[Type[T]], R]) -> None:
             self.func = func
             self._key = self.func.__name__
             self._lock = threading.RLock()
 
-        def __get__(self, obj: Any, cls: type[T]) -> R:
+        def __get__(self, obj: Any, cls: Type[T]) -> R:
             try:
                 obj_dict = obj.__dict__
                 val = obj_dict.get(self._key, _NotFound)
@@ -1227,7 +1227,6 @@ try:
             obj_dict.pop(self._key, None)
 
 
-except ImportError:
-    
+except Exception:
     classproperty_v2 = classproperty
     lazyclassproperty_v2 = lazyclassproperty
