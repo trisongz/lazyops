@@ -682,7 +682,7 @@ class classproperty(property):
         if doc is not None:
             self.__doc__ = doc
 
-    def __get__(self, obj: Any, objtype: type[CP]) -> CPR:
+    def __get__(self, obj: Any, objtype: Type[CP]) -> CPR:
         if self._lazy:
             val = self._cache.get(objtype, _NotFound)
             if val is _NotFound:
