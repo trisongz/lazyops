@@ -2,6 +2,7 @@ import uuid
 import json
 import typing
 import codecs
+import hashlib
 import datetime
 import contextlib
 import dataclasses
@@ -469,4 +470,43 @@ except ImportError:
     SimdJsonModelSerializer = JsonModelSerializer
 
 
+
+"""
+Hashing Functions
+"""
+
+
+def create_hash_key(
+    args: typing.Optional[tuple] = None, 
+    kwargs: typing.Optional[dict] = None, 
+    typed: typing.Optional[bool] = False,
+    key_base: typing.Optional[tuple] = None,
+    exclude: typing.Optional[typing.List[str]] = None,
+    hashfunc: typing.Optional[str] = 'md5',
+    separator: typing.Optional[str] = ':',
+):
+    """
+    Create hash key out of function arguments.
+    :param tuple base: base of key
+    :param tuple args: function arguments
+    :param dict kwargs: function keyword arguments
+    :param bool typed: include types in cache key
+    :return: cache key tuple
+    """
+
+    hash_key = key_base or ()
+    if args: hash_key += args
+    if kwargs:
+        if exclude: kwargs = {k: v for k, v in kwargs.items() if k not in exclude}
+        sorted_items = sorted(kwargs.items())
+        for item in sorted_items:
+            hash_key += item
+
+    if typed:
+        hash_key += tuple(type(arg) for arg in args)
+        if kwargs: hash_key += tuple(type(value) for _, value in sorted_items)
+
+    cache_key = f'{separator}'.join(str(k) for k in hash_key)
+    func = getattr(hashlib, hashfunc)
+    return func(cache_key.encode()).hexdigest()
 
