@@ -3,6 +3,7 @@ from lazyops.types.models import BaseModel
 from lazyops.types.static import VALID_REQUEST_KWARGS
 from lazyops.types.classprops import lazyproperty
 from lazyops.imports._aiohttpx import aiohttpx
+from lazyops.imports._pydantic import get_pyd_fields, pyd_parse_obj, get_pyd_dict
 from typing import Optional, Dict, Any, Tuple, Type, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -35,10 +36,11 @@ class BaseResource(BaseModel):
         Extracts the resource from the kwargs and returns the resource 
         and the remaining kwargs
         """
-        resource_fields = [field.name for field in cls.__fields__.values()]
+        resource_fields = [field.name for field in get_pyd_fields(cls)]
         resource_kwargs = {k: v for k, v in kwargs.items() if k in resource_fields}
         return_kwargs = {k: v for k, v in kwargs.items() if k not in resource_fields and k in VALID_REQUEST_KWARGS}
-        resource_obj = cls.parse_obj(resource_kwargs)
+        # resource_obj = cls.parse_obj(resource_kwargs)
+        resource_obj = pyd_parse_obj(cls, resource_kwargs)
         return resource_obj, return_kwargs
 
 
@@ -51,10 +53,10 @@ class BaseResource(BaseModel):
         Extracts the resource from the kwargs and returns the resource 
         and the remaining kwargs
         """
-        resource_fields = [field.name for field in resource.__fields__.values()]
+        resource_fields = [field.name for field in get_pyd_fields(resource)]
         resource_kwargs = {k: v for k, v in kwargs.items() if k in resource_fields}
         return_kwargs = {k: v for k, v in kwargs.items() if k not in resource_fields and k in VALID_REQUEST_KWARGS}
-        resource_obj = resource.parse_obj(resource_kwargs)
+        resource_obj = pyd_parse_obj(resource, resource_kwargs)
         return resource_obj, return_kwargs
     
 
@@ -75,8 +77,7 @@ class BaseResource(BaseModel):
         if exclude is None: exclude = set()
         if self.exclude_fields:
             exclude = set(exclude) | self.exclude_fields
-
-        return super().dict(
+        return get_pyd_dict(
             include = include, 
             exclude = exclude, 
             by_alias = by_alias,
@@ -85,6 +86,15 @@ class BaseResource(BaseModel):
             exclude_defaults = exclude_defaults,
             exclude_none = exclude_none if exclude_none is not None else self.exclude_none
         )
+        # return super().dict(
+        #     include = include, 
+        #     exclude = exclude, 
+        #     by_alias = by_alias,
+        #     skip_defaults = skip_defaults,
+        #     exclude_unset = exclude_unset,
+        #     exclude_defaults = exclude_defaults,
+        #     exclude_none = exclude_none if exclude_none is not None else self.exclude_none
+        # )
 
     def parse_data(
         self,

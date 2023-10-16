@@ -152,9 +152,12 @@ def extract_base_model_kws(
     Extracts the kwargs from the resource and returns the kwargs and the model kwargs
     """
     global _extracted_base_model_kws
+
     base_model_name = f"{model.__module__}.{model.__name__}"
     if base_model_name not in _extracted_base_model_kws:
-        resource_kws = list(model.__fields__.keys())
+        from lazyops.types.models import get_pyd_field_names
+        resource_kws = get_pyd_field_names(model)
+        # resource_kws = list(model.__fields__.keys())
         _extracted_base_model_kws[base_model_name] = resource_kws
     model_kwargs = {
         key: kwargs.pop(key) for key in kwargs if key in _extracted_base_model_kws[base_model_name]

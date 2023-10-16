@@ -2,28 +2,19 @@ import os
 import pathlib
 
 from typing import Any, Type, Tuple, Dict, List, Union, Optional, TYPE_CHECKING
+from pydantic import Field, validator
+from pydantic.networks import AnyUrl
 from lazyops.types.formatting import to_camel_case, to_snake_case, to_graphql_format
 from lazyops.types.classprops import classproperty, lazyproperty
 from lazyops.utils.serialization import Json
 
-from pydantic import Field
-from pydantic.networks import AnyUrl
-from lazyops.imports._pydantic import BaseSettings as _BaseSettings
-from lazyops.imports._pydantic import BaseModel as _BaseModel
-from lazyops.imports._pydantic import (
-    validator, 
-    root_validator, 
-    pre_root_validator, 
-    get_pyd_dict, 
-    get_pyd_fields, 
-    get_pyd_field_names,
-    get_pyd_fields_dict,
-    pyd_parse_obj,
-)
+from pydantic import BaseSettings as _BaseSettings
+from pydantic import BaseModel as _BaseModel
 
 """
-Migration to pydantic v2 with backwards compatibility
+WIP Migration to pydantic v2
 """
+
 
 class BaseSettings(_BaseSettings):
 
@@ -54,7 +45,7 @@ class BaseSettings(_BaseSettings):
         """
         Update the Env variables for the current session
         """
-        data = get_pyd_dict(self, exclude_none=True)
+        data = self.dict(exclude_none=True)
         for k, v in data.items():
             if isinstance(v, BaseSettings):
                 v.set_env()
@@ -71,15 +62,9 @@ class BaseModel(_BaseModel):
         alias_generator = to_snake_case
         
     def get(self, name, default: Any = None):
-        """
-        Get an attribute from the model
-        """
         return getattr(self, name, default)
     
     def update(self, **kwargs):
-        """
-        Update the model attributes
-        """
         for k, v in kwargs.items():
             if not hasattr(self, k): continue
             setattr(self, k, v)
@@ -94,13 +79,11 @@ class BaseModel(_BaseModel):
         Extracts the resource from the kwargs and returns the resource 
         and the remaining kwargs
         """
-        resource_fields = get_pyd_field_names(cls)
-        # resource_fields = [field.name for field in cls.__fields__.values()]
-
+        resource_fields = [field.name for field in cls.__fields__.values()]
         resource_kwargs = {k: v for k, v in kwargs.items() if k in resource_fields}
         return_kwargs = {k: v for k, v in kwargs.items() if k not in resource_fields}
-        resource_obj = pyd_parse_obj(cls, resource_kwargs)
-        # resource_obj = cls.parse_obj(resource_kwargs)
+        
+        resource_obj = cls.parse_obj(resource_kwargs)
         return resource_obj, return_kwargs
     
     @classmethod
@@ -108,8 +91,7 @@ class BaseModel(_BaseModel):
         """
         Create a list of resources from a list of dicts
         """
-        return [pyd_parse_obj(cls, d) for d in data]
-        # return [cls.parse_obj(d) for d in data]
+        return [cls.parse_obj(d) for d in data]
     
 
     @classproperty
@@ -117,15 +99,13 @@ class BaseModel(_BaseModel):
         """
         Returns the model fields names
         """
-        return get_pyd_field_names(cls)
-        # return [field.name for field in cls.__fields__.values()]
+        return [field.name for field in cls.__fields__.values()]
         
     def get_model_fields(self) -> List[str]:
         """
         Get the model fields
         """
-        return get_pyd_field_names(self.__class__)
-        # return [field.name for field in self.__fields__.values()]
+        return [field.name for field in self.__fields__.values()]
 
     def replace(self, obj: Type['BaseModel']):
         """Replace current attributes with `obj` attributes."""
@@ -147,19 +127,12 @@ class BaseModel(_BaseModel):
         """
         Return the data in `graphql` format
         """
-        data = get_pyd_dict(
+        data = self.dict(
             include = include, exclude = exclude, \
             by_alias = by_alias, skip_defaults = skip_defaults, \
             exclude_unset = exclude_unset, exclude_defaults = exclude_defaults, \
             exclude_none = exclude_none
         )
-
-        # data = self.dict(
-        #     include = include, exclude = exclude, \
-        #     by_alias = by_alias, skip_defaults = skip_defaults, \
-        #     exclude_unset = exclude_unset, exclude_defaults = exclude_defaults, \
-        #     exclude_none = exclude_none
-        # )
         return to_graphql_format(data)
 
 
