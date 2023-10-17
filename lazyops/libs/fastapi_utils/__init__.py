@@ -6,10 +6,12 @@ FastAPI Utilities
 
 from .openapi import (
     OpenAPIStoplight,
+    get_server_domain,
     patch_openapi_schema,
     create_openapi_schema_patch, 
     create_openapi_schema_by_role_function,
-    UserRole
+    UserRole,
+    OpenAPIRoleSpec,
 )
 
 from .processes import (
