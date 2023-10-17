@@ -5,7 +5,7 @@ import sys
 import asyncio
 import functools
 
-from typing import Optional, Any, Callable, Awaitable, Union, TypeVar, Coroutine, Iterable, AsyncIterable, AsyncIterator
+from typing import Optional, Any, Callable, Awaitable, Union, TypeVar, Coroutine, Iterable, AsyncIterable, AsyncIterator, AsyncGenerator
 from lazyops.utils.system import get_cpu_count
 from lazyops.utils.pooler import ThreadPooler
 from lazyops.types.common import UpperStrEnum
@@ -20,6 +20,7 @@ if sys.version_info < (3, 10):
     
 
 _concurrency_limit: Optional[int] = None
+RT = TypeVar("RT")
 
 def set_concurrency_limit(
     limit: Optional[int] = None
@@ -213,6 +214,36 @@ async def amap_v2(
     #     iterable = [func(x, *args, **kwargs) for x in iterable]
     # else:
     #     iterable = (func(x, *args, **kwargs) for x in iterable)
+    partial = functools.partial(func, *args, **kwargs)
+    try:
+        mapped_iterable = map(partial, iterable)
+    except TypeError:
+        mapped_iterable = (partial(x) async for x in iterable)
+    async for task in limit_concurrency(mapped_iterable, limit = limit, return_when = return_when):
+        yield await task
+
+
+async def async_map(
+    func: Callable[..., Awaitable[Any]],
+    iterable: Iterable[Any], 
+    *args,
+    limit: Optional[int] = None,
+    return_when: Optional[ReturnWhenType] = ReturnWhenType.FIRST_COMPLETED,
+    **kwargs,
+) -> AsyncGenerator[RT, None]:
+    """
+    Async Map of a function with args and kwargs
+
+    Args:
+        func (Callable[..., Awaitable[Any]]): The function to map
+        iterable (Iterable[Any]): The iterable to map
+        limit (Optional[int], optional): The limit of the concurrency. Defaults to None.
+        return_when (Optional[ReturnWhenType], optional): The return when type. Defaults to ReturnWhenType.FIRST_COMPLETED.
+    
+    Yields:
+        [type]: [description]
+    """
+    func = ensure_coro(func)
     partial = functools.partial(func, *args, **kwargs)
     try:
         mapped_iterable = map(partial, iterable)

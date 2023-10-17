@@ -27,6 +27,13 @@ extras = {
         'kubernetes_asyncio',
         'kopf',
         'aiocache',
+    ],
+    'fastapi': [
+        'pydantic-settings',
+        'fastapi',
+        'uvicorn',
+        'filelock',
+        'python-multipart',
     ]
 }
 args = {

@@ -19,6 +19,7 @@ from lazyops.imports._pydantic import (
     get_pyd_field_names,
     get_pyd_fields_dict,
     pyd_parse_obj,
+    PYD_VERSION,
 )
 
 """
@@ -169,7 +170,8 @@ class Schema(BaseModel):
     class Config:
         extra = 'allow'
         arbitrary_types_allowed = True
-        json_dumps = Json.dumps
+        if PYD_VERSION == 1:
+            json_dumps = Json.dumps
         # alias_generator = to_camel_case
 
     # @lazyproperty

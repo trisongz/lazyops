@@ -20,8 +20,7 @@ try:
         """
         def decorator(func):
             _pre_kw = kwargs.pop('pre', None)
-            if _pre_kw is True:
-                kwargs['mode'] = 'before'
+            kwargs['mode'] = 'before' if _pre_kw is True else kwargs.get('mode', 'wrap')
             return base_root_validator(*args, **kwargs)(func)
         return decorator
 
@@ -56,6 +55,57 @@ except ImportError:
         from pydantic_settings import BaseSettings
     else:
         from pydantic import BaseSettings
+
+import inspect
+import pkg_resources
+from pathlib import Path
+
+class BaseAppSettings(BaseSettings):
+    """
+    BaseSettings with additional helpers
+    """
+
+    @property
+    def module_path(self) -> Path:
+        """
+        Gets the module root path
+
+        https://stackoverflow.com/questions/25389095/python-get-path-of-root-project-structure
+        """
+        return Path(pkg_resources.get_distribution(self.module_name).location)
+
+    @property
+    def module_config_path(self) -> Path:
+        """
+        Returns the config module path
+        """
+        return Path(inspect.getfile(self.__class__)).parent
+
+    @property
+    def module_name(self) -> str:
+        """
+        Returns the module name
+        """
+        return self.__class__.__module__.split(".")[0]
+    
+    @property
+    def module_version(self) -> str:
+        """
+        Returns the module version
+        """
+        return pkg_resources.get_distribution(self.module_name).version
+    
+    @property
+    def module_pkg_name(self) -> str:
+        """
+        Returns the module pkg name
+        
+        {pkg}/src   -> src
+        {pkg}/{pkg} -> {pkg}
+        """
+        config_path = self.module_config_path.as_posix()
+        module_path = self.module_path.as_posix()
+        return config_path.replace(module_path, "").strip().split("/", 2)[1]
 
 
 from pydantic import BaseModel
@@ -92,3 +142,65 @@ def pyd_parse_obj(model: typing.Type[typing.Union[BaseModel, BaseSettings]], obj
     Parse an object into a pydantic model
     """
     return model.model_validate(obj, **kwargs) if PYD_VERSION == 2 else model.parse_obj(obj)
+
+# https://github.com/pydantic/pydantic/issues/6763
+# Patch until `pydantic-core` gets updated
+
+# if PYD_VERSION == 2:
+#     import pkg_resources
+
+
+#     # If the module is < 2.10.1, then we need to patch it
+#     pyd_core_version = pkg_resources.get_distribution('pydantic-core').version.split('.')
+#     pyd_core_version_major = int(pyd_core_version[0])
+#     pyd_core_version_minor = int(pyd_core_version[1])
+#     pyd_core_version_patch = int(pyd_core_version[2])
+
+#     if pyd_core_version_minor < 10 or pyd_core_version_patch < 2:
+
+#         import weakref
+#         import pydantic
+#         # from pydantic.type_adapter import SchemaSerializer
+#         from pydantic._internal._model_construction import SchemaSerializer
+#         # from pydantic.schema import SchemaSerializer
+
+#         class PickleableSchemaSerializer:
+#             def __init__(self, schema, core_config):
+#                 self._schema = schema
+#                 self._core_config = core_config
+#                 self._schema_serializer = SchemaSerializer(self._schema, self._core_config)
+
+#             def __reduce__(self):
+#                 return PickleableSchemaSerializer, (self._schema, self._core_config)
+
+#             def __getattr__(self, attr: str):
+#                 return getattr(self._schema_serializer, attr)
+
+#         # class PickleableSchemaSerializer(SchemaSerializer):
+#         #     def __init__(self, schema, core_config):
+#         #         self._schema = schema
+#         #         self._core_config = core_config
+#         #         # No need for `super().__init__()` because `SchemaSerializer` initialization happens in `__new__`.
+
+#         #     def __reduce__(self):
+#         #         return PickleableSchemaSerializer, (self._schema, self._core_config)
+
+
+#         class WeakRefWrapper:
+#             def __init__(self, obj: typing.Any):
+#                 self._wr = None if obj is None else weakref.ref(obj)
+
+#             def __reduce__(self):
+#                 return WeakRefWrapper, (self(),)
+
+#             def __call__(self) -> typing.Any:
+#                 return None if self._wr is None else self._wr()
+        
+#         pydantic._internal._model_construction.SchemaSerializer = PickleableSchemaSerializer
+#         pydantic._internal._dataclasses.SchemaSerializer = PickleableSchemaSerializer
+#         pydantic.type_adapter.SchemaSerializer = PickleableSchemaSerializer
+
+#         # Override all usages of `_PydanticWeakRef` (obviously not needed if we upstream the above wrapper):
+#         pydantic._internal._model_construction._PydanticWeakRef = WeakRefWrapper
+
+    
