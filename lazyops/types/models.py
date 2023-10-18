@@ -18,6 +18,7 @@ from lazyops.imports._pydantic import (
     get_pyd_fields, 
     get_pyd_field_names,
     get_pyd_fields_dict,
+    get_pyd_schema,
     pyd_parse_obj,
     PYD_VERSION,
 )

@@ -161,6 +161,13 @@ def pyd_parse_obj(model: typing.Type[typing.Union[BaseModel, BaseSettings]], obj
     """
     return model.model_validate(obj, **kwargs) if PYD_VERSION == 2 else model.parse_obj(obj)
 
+def get_pyd_schema(model: typing.Type[typing.Union[BaseModel, BaseSettings]], **kwargs) -> typing.Dict[str, typing.Any]:
+    """
+    Get a pydantic schema
+    """
+    return model.schema(**kwargs) if PYD_VERSION == 2 else model.model_json_schema(**kwargs)
+
+
 # https://github.com/pydantic/pydantic/issues/6763
 # Patch until `pydantic-core` gets updated
 
