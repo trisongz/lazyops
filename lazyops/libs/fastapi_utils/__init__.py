@@ -4,6 +4,10 @@ from __future__ import annotations
 FastAPI Utilities
 """
 
+from .configs import (
+    WorkerSettings
+)
+
 from .openapi import (
     OpenAPIStoplight,
     get_server_domain,
@@ -31,3 +35,4 @@ from .tasks import (
 from .utils import (
     create_function_wrapper
 )
+

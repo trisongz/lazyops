@@ -107,6 +107,24 @@ class BaseAppSettings(BaseSettings):
         module_path = self.module_path.as_posix()
         return config_path.replace(module_path, "").strip().split("/", 2)[1]
 
+    @property
+    def in_k8s(self) -> bool:
+        """
+        Returns whether the app is running in kubernetes
+        """
+        from lazyops.utils.system import is_in_kubernetes
+        return is_in_kubernetes()
+    
+    @property
+    def host_name(self) -> str:
+        """
+        Returns the hostname
+        """
+        from lazyops.utils.system import get_host_name
+        return get_host_name()
+
+
+
 
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo

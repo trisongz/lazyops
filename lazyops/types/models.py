@@ -1,7 +1,7 @@
 import os
 import pathlib
 
-from typing import Any, Type, Tuple, Dict, List, Union, Optional, TYPE_CHECKING
+from typing import Any, Type, Tuple, Dict, List, Union, Optional, Callable, TYPE_CHECKING
 from lazyops.types.formatting import to_camel_case, to_snake_case, to_graphql_format
 from lazyops.types.classprops import classproperty, lazyproperty
 from lazyops.utils.serialization import Json
@@ -62,7 +62,28 @@ class BaseSettings(_BaseSettings):
             else:
                 os.environ[self.Config.env_prefix + k.upper()] = str(v)
     
-    
+
+class ProxySettings:
+    def __init__(
+        self,
+        settings_cls: Optional[Type[BaseSettings]] = None,
+        settings_getter: Optional[Union[Callable, str]] = None,
+    ):
+        assert settings_cls or settings_getter, "Either settings_cls or settings_getter must be provided"
+        self._settings_cls = settings_cls
+        self._settings_getter = settings_getter
+        if self._settings_getter and isinstance(self._settings_getter, str):
+            from lazyops.utils.helpers import import_string
+            self._settings_getter = import_string(self._settings_getter)
+        self._settings = None
+
+    def __getattr__(self, name):
+        if self._settings is None:
+            if self._settings_getter:
+                self._settings = self._settings_getter()
+            elif self._settings_cls:
+                self._settings = self._settings_cls()
+        return getattr(self._settings, name)
 
 
 class BaseModel(_BaseModel):
@@ -114,14 +135,14 @@ class BaseModel(_BaseModel):
     
 
     @classproperty
-    def model_fields(cls) -> List[str]:
+    def model_field_names(cls) -> List[str]:
         """
         Returns the model fields names
         """
         return get_pyd_field_names(cls)
         # return [field.name for field in cls.__fields__.values()]
         
-    def get_model_fields(self) -> List[str]:
+    def get_model_field_names(self) -> List[str]:
         """
         Get the model fields
         """
@@ -130,7 +151,7 @@ class BaseModel(_BaseModel):
 
     def replace(self, obj: Type['BaseModel']):
         """Replace current attributes with `obj` attributes."""
-        for field in obj.get_model_fields():
+        for field in obj.get_model_field_names():
             if hasattr(self, field):
                 setattr(self, field, getattr(obj, field))
     
