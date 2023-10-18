@@ -11,6 +11,7 @@ from lazyops.utils.imports import resolve_missing
 try:
     from pydantic import validator as _validator
     from pydantic import model_validator as base_root_validator
+    from pydantic import ConfigDict
 
     PYD_VERSION = 2
 
@@ -20,7 +21,7 @@ try:
         """
         def decorator(func):
             _pre_kw = kwargs.pop('pre', None)
-            kwargs['mode'] = 'before' if _pre_kw is True else kwargs.get('mode', 'wrap')
+            kwargs['mode'] = 'before' if _pre_kw is True else ('after' if _pre_kw is False else kwargs.get('mode', 'wrap'))
             return base_root_validator(*args, **kwargs)(func)
         return decorator
 
@@ -36,6 +37,8 @@ try:
 
 except ImportError:
     from pydantic import root_validator, validator
+
+    ConfigDict = typing.Dict[str, typing.Any]
 
     PYD_VERSION = 1
 

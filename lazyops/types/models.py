@@ -20,6 +20,7 @@ from lazyops.imports._pydantic import (
     get_pyd_fields_dict,
     get_pyd_schema,
     pyd_parse_obj,
+    ConfigDict,
     PYD_VERSION,
 )
 
@@ -88,11 +89,16 @@ class ProxySettings:
 
 
 class BaseModel(_BaseModel):
-    class Config:
-        extra = 'allow'
-        arbitrary_types_allowed = True
-        alias_generator = to_snake_case
+
+    if PYD_VERSION == 1:
+        class Config:
+            extra = 'allow'
+            arbitrary_types_allowed = True
+            alias_generator = to_snake_case
+    else:
+        model_config = ConfigDict(extra = 'allow', arbitrary_types_allowed = True)
         
+                
     def get(self, name, default: Any = None):
         """
         Get an attribute from the model
@@ -184,6 +190,31 @@ class BaseModel(_BaseModel):
         #     exclude_none = exclude_none
         # )
         return to_graphql_format(data)
+
+    @classmethod
+    def parse_obj(
+        cls,
+        obj: Any,
+        strict: Optional[bool] = False,
+        from_attributes: Optional[bool] = True,
+        **kwargs
+    ) -> 'BaseModel':
+        """
+        Parses an object into the resource
+        """
+        return pyd_parse_obj(cls, obj, strict = strict, from_attributes = from_attributes, **kwargs)
+    
+    def dict(self, **kwargs):
+        """
+        Returns the dict representation of the response
+        """
+        return get_pyd_dict(self, **kwargs)
+
+    def schema(self, **kwargs):
+        """
+        Returns the dict representation of the response
+        """
+        return get_pyd_schema(self, **kwargs)
 
 
 
