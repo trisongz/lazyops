@@ -14,6 +14,7 @@ version = root.joinpath(f'{pkg_name}/version.py').read_text().split('VERSION = '
 requirements = [
     'loguru',
     'pydantic',
+    'pydantic-settings',
     'frozendict',
     'async_lru',
 ]
@@ -29,7 +30,6 @@ extras = {
         'aiocache',
     ],
     'fastapi': [
-        'pydantic-settings',
         'fastapi',
         'uvicorn',
         'filelock',
