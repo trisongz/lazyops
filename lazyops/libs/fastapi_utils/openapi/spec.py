@@ -376,6 +376,7 @@ def create_openapi_schema_by_role_function(
         # Remove schemas
         # Compile the schemas to remove
         if 'components' not in schema: return schema
+        if 'schemas' not in schema['components']: return schema
         _schemas_to_remove = []
         for schema_name in role_spec.excluded_schemas:
             if '*' in schema_name:
