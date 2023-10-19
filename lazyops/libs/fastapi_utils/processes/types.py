@@ -341,7 +341,7 @@ class GlobalContextMeta(type):
             return
         from .workers import terminate_worker
         await terminate_worker(name = name, kind = kind)
-        cls.stop_worker_processes(kind = kind, name = name, verbose = verbose, timeout = timeout)
+        cls.stop_worker_processes(name = name, verbose = verbose, timeout = timeout, kind = kind)
     
     def start_server_process(cls, cmd: str, verbose: bool = True):
         """
@@ -381,7 +381,7 @@ class GlobalContextMeta(type):
         """
         for kind, names in cls.worker_processes.items():
             for name in names:
-                cls.stop_worker_processes(kind, name, verbose = verbose, timeout = timeout)
+                cls.stop_worker_processes(name = name, verbose = verbose, timeout = timeout, kind = kind)
         cls.stop_server_processes(verbose = verbose, timeout = timeout)
         cls.logger.info("Terminated all processes")
 
