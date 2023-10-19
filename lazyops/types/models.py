@@ -141,19 +141,20 @@ class BaseModel(_BaseModel):
         # return [cls.parse_obj(d) for d in data]
     
 
-    @classproperty
-    def model_field_names(cls) -> List[str]:
-        """
-        Returns the model fields names
-        """
-        return get_pyd_field_names(cls)
+    # @classproperty
+    # def model_field_names(cls) -> List[str]:
+    #     """
+    #     Returns the model fields names
+    #     """
+    #     return get_pyd_field_names(cls)
         # return [field.name for field in cls.__fields__.values()]
-        
-    def get_model_field_names(self) -> List[str]:
+    
+    @classmethod
+    def get_model_field_names(cls) -> List[str]:
         """
         Get the model fields
         """
-        return get_pyd_field_names(self.__class__)
+        return get_pyd_field_names(cls)
         # return [field.name for field in self.__fields__.values()]
 
     def replace(self, obj: Type['BaseModel']):

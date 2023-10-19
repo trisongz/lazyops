@@ -6,7 +6,7 @@ import contextlib
 import multiprocessing
 
 from typing import Optional, List, TypeVar, Callable, Dict, Any, Union, TYPE_CHECKING
-
+from lazyops.utils.lazy import lazy_import
 
 if TYPE_CHECKING:
     from lazyops.utils.logs import Logger
@@ -46,7 +46,7 @@ class GlobalContextMeta(type):
 
     on_close_funcs: List[Callable] = []
 
-    settings_func: Optional[Callable] = None # type: ignore
+    settings_func: Optional[Union[Callable, str]] = None # type: ignore
     settings_config_func: Optional[Union[Callable, str]] = None # type: ignore
     get_worker_func: Optional[Union[Callable, str]] = None # type: ignore
     get_num_worker_func: Optional[Union[Callable, str]] = None # type: ignore
@@ -59,7 +59,7 @@ class GlobalContextMeta(type):
     def configure(
         cls,
         queue_types: Optional[List[str]] = None,
-        settings_func: Optional[Callable] = None, # type: ignore
+        settings_func: Optional[Union[Callable, str]] = None, # type: ignore
         settings_config_func: Optional[Union[Callable, str]] = None, # type: ignore
         get_worker_func: Optional[Union[Callable, str]] = None, # type: ignore
         get_num_worker_func: Optional[Union[Callable, str]] = None, # type: ignore
@@ -73,6 +73,8 @@ class GlobalContextMeta(type):
                 cls.add_queue_type(kind)
         
         if settings_func is not None:
+            if isinstance(settings_func, str):
+                settings_func = lazy_import(settings_func)
             cls.settings_func = settings_func
         
         if settings_config_func is not None:
@@ -115,7 +117,7 @@ class GlobalContextMeta(type):
         """
         Returns if this is the leader process
         """
-        return cls.state.is_leader_process
+        return cls.state.is_leader_process or multiprocessing.parent_process() is None
     
     def get_settings_func(cls, func: Union[Callable, str]) -> Callable:
         """
