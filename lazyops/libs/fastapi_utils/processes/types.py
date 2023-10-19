@@ -225,7 +225,9 @@ class GlobalContextMeta(type):
             kwargs['index'] = worker_index
             p = context.Process(target = spawn_worker_func, args = (name,), kwargs = kwargs)
             p.start()
-            if verbose: cls.logger.info(f"- |g|[{kind.capitalize()}]|e| Started: [ {n + 1}/{num_workers} ] {name}-{worker_index} (Process ID: {p.pid})", colored = True)
+            if verbose: 
+                log_name = f'{name}-{worker_index}'
+                cls.logger.info(f"- |g|[{kind.capitalize()}]|e| Started: [ {n + 1}/{num_workers} ] `|g|{log_name:20s}|e|` (Process ID: {p.pid})", colored = True)
             procs.append(p)
         cls.add_worker_processes(kind = kind, name = name, procs = procs)
         return procs
@@ -249,7 +251,7 @@ class GlobalContextMeta(type):
         settings_config_func: Optional[Union[Callable, str]] = None,
         get_worker_names_func: Optional[Union[Callable, str]] = None,
         **kwargs
-    ):
+    ):  # sourcery skip: low-code-quality
         """
         Starts all the workers
         """
@@ -263,7 +265,7 @@ class GlobalContextMeta(type):
                 enabled_workers = enabled_workers,
                 disabled_workers = disabled_workers,
             )
-        if verbose:  cls.logger.info(f"[|g|{kind.capitalize()}|e|] Starting Workers: {worker_names}", colored = True)
+        if verbose: cls.logger.info(f"[|g|{kind.capitalize()}|e|] Starting {len(worker_names)} Workers: {worker_names}", colored = True)
         context = multiprocessing.get_context('spawn')
         if base_index == 'auto': base_index = get_base_worker_index()
         if num_worker_func is None: num_worker_func = cls.get_settings_func(cls.get_num_worker_func)
@@ -293,7 +295,9 @@ class GlobalContextMeta(type):
                 kwargs['index'] = worker_index
                 p = context.Process(target = spawn_new_worker, args = (name,), kwargs = kwargs)
                 p.start()
-                if verbose: cls.logger.info(f"- [|g|{kind.capitalize()}|e|] Started: [ {n + 1}/{num_workers} ] {name}-{worker_index} (Process ID: {p.pid})", colored = True)
+                if verbose: 
+                    log_name = f'`|g|{name}-{worker_index}|e|`'
+                    cls.logger.info(f"- [|g|{kind.capitalize():7s}|e|] Started: [ {n + 1}/{num_workers} ] {log_name:20s} (Process ID: {p.pid})", colored = True)
                 if is_primary_worker:
                     cls.state.add_leader_process_id(p.pid, kind)
                 
@@ -302,6 +306,7 @@ class GlobalContextMeta(type):
         return procs
 
     def stop_worker_processes(cls,  name: str, verbose: bool = True, timeout: float = 5.0, kind: Optional[str] = None):
+        # sourcery skip: low-code-quality
         """
         Stops the worker processes
         """
@@ -310,26 +315,28 @@ class GlobalContextMeta(type):
             if verbose: cls.logger.warning(f"[{kind.capitalize()}] No worker processes found for {name}")
             return
         curr_proc, n_procs = 0, len(cls.worker_processes[kind][name])
+
         while cls.worker_processes[kind][name]:
             proc = cls.worker_processes[kind][name].pop()
             if proc._closed: continue
-            if verbose: cls.logger.info(f"[{kind.capitalize()}] Stopping worker process for {name} ({curr_proc}/{n_procs})")
+            log_name = f'`|g|{name}-{curr_proc}|e|`'
+            if verbose: 
+                cls.logger.info(f"- [|y|{kind.capitalize():7s}|e|] Stopping: [ {curr_proc + 1}/{n_procs} ] {log_name:20s} (Process ID: {proc.pid})", colored = True)
             proc.join(timeout)
             proc.terminate()
             try:
                 proc.close()
             except Exception as e:
-                if verbose: cls.logger.warning(f"[{kind.capitalize()}] Failed to close worker process for {name} ({curr_proc}/{n_procs})")
+                if verbose: cls.logger.info(f"|y|[{kind.capitalize():7s}]|e| Failed Stop: [ {curr_proc + 1}/{n_procs} ] {log_name:20s} (Error: |r|{e}|e|)", colored = True)
                 try:
                     signal.pthread_kill(proc.ident, signal.SIGKILL)
                     proc.join(timeout)
                     proc.terminate()
                 except Exception as e:
-                    if verbose: cls.logger.warning(f"[{kind.capitalize()}] Failed to kill worker process for {name} ({curr_proc}/{n_procs})")
+                    if verbose: cls.logger.info(f"|r|[{kind.capitalize():7s}]|e| Failed Kill: [ {curr_proc + 1}/{n_procs} ] {log_name:20s} (Error: |r|{e}|e|)", colored = True)
                 proc.kill()
                 proc.close()
             curr_proc += 1
-        if verbose: cls.logger.info(f"[{kind.capitalize()}] Stopped all {curr_proc} worker processes for {name}")
 
     async def astop_worker_processes(cls, name: str, verbose: bool = True, timeout: float = 5.0, kind: Optional[str] = None):
         """
@@ -360,20 +367,29 @@ class GlobalContextMeta(type):
         Stops the server processes
         """
         curr_proc, n_procs = 0, len(cls.server_processes)
+        kind = 'Server'
         while cls.server_processes:
             proc = cls.server_processes.pop()
             if proc._closed: continue
-            if verbose: cls.logger.info(f"Stopping server process ({curr_proc}/{n_procs})")
+            log_name = f'`|g|app-{curr_proc}|e|`'
+            if verbose: 
+                cls.logger.info(f"- [|y|{kind:7s}|e|] Stopping: [ {curr_proc + 1}/{n_procs} ] {log_name:20s} (Process ID: {proc.pid})", colored = True)
             proc.join(timeout)
             proc.terminate()
             try:
                 proc.close()
             except Exception as e:
-                if verbose: cls.logger.warning(f"Failed to close server process ({curr_proc}/{n_procs})")
+                if verbose: cls.logger.info(f"|y|[{kind:7s}]|e| Failed Stop: [ {curr_proc + 1}/{n_procs} ] {log_name:20s} (Error: |r|{e}|e|)", colored = True)
+                try:
+                    signal.pthread_kill(proc.ident, signal.SIGKILL)
+                    proc.join(timeout)
+                    proc.terminate()
+                except Exception as e:
+                    if verbose: cls.logger.info(f"|r|[{kind:7s}]|e| Failed Kill: [ {curr_proc + 1}/{n_procs} ] {log_name:20s} (Error: |r|{e}|e|)", colored = True)
                 proc.kill()
                 proc.close()
             curr_proc += 1
-        if verbose: cls.logger.info(f"Stopped all {curr_proc} server processes")
+        # if verbose: cls.logger.info(f"Stopped all {curr_proc} server processes")
     
     def end_all_processes(cls, verbose: bool = True, timeout: float = 5.0):
         """
@@ -383,7 +399,7 @@ class GlobalContextMeta(type):
             for name in names:
                 cls.stop_worker_processes(name = name, verbose = verbose, timeout = timeout, kind = kind)
         cls.stop_server_processes(verbose = verbose, timeout = timeout)
-        cls.logger.info("Terminated all processes")
+        # cls.logger.info("Terminated all processes")
 
     def register_on_close(cls, func: Callable, *args, **kwargs):
         """

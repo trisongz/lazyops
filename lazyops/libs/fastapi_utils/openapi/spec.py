@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 KEY_START = '[x-repl-start]'
 KEY_END = '[x-repl-end]'
 KEY_SEP = '||'
+DOMAIN_KEY = 'DOMAIN'
 
 def json_replace(
     schema: Dict[str, Any],
@@ -51,7 +52,7 @@ def json_replace(
         if not src_value and sep_char in segment:
             src_value = segment.split(sep_char, 1)[-1].rsplit(' ', 1)[0].strip()
         plaintext = plaintext.replace(segment, src_value)
-        if verbose: logger.info(f"Replaced {segment} -> {src_value}", colored = True, prefix = "|g|OpenAPI|e|")
+        if verbose: logger.info(f"Replaced `{segment}` -> `{src_value}`", colored = True, prefix = "|g|OpenAPI|e|")
         if f'{key_start} {key}' not in plaintext:
             break
     schema = json.loads(plaintext)
@@ -89,7 +90,7 @@ def patch_openapi_schema(
     """
     global _openapi_schemas
     if module_name not in _openapi_schemas or overwrite:
-        if verbose: logger.warning(f"[{module_name}] Patching OpenAPI Schema")
+        if verbose: logger.info(f"[|g|{module_name}|e|] Patching OpenAPI Schema", colored = True)
         for path, patch in schemas_patches.items():
             with contextlib.suppress(Exception):
                 patch_source = openapi_schema['components']['schemas'].pop(patch['source'], None)
@@ -134,6 +135,7 @@ def create_openapi_schema_patch(
     replace_key_start: Optional[str] = KEY_START,
     replace_key_end: Optional[str] = KEY_END,
     replace_sep_char: Optional[str] = KEY_SEP,
+    replace_domain_key: Optional[str] = DOMAIN_KEY,
 
 ) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
     """
@@ -192,7 +194,7 @@ def get_server_domain(
             _server_domains[module_name] = f'{request.url.scheme}://{request.url.hostname}'
             if request.url.port and request.url.port not in {80, 443}:
                 _server_domains[module_name] += f':{request.url.port}'
-            if verbose: logger.info(f"[{module_name}] Setting Server Domain: {_server_domains[module_name]} from {request.url}")
+            if verbose: logger.info(f"[|g|{module_name}|e|] Setting Server Domain: {_server_domains[module_name]} from {request.url}", colored = True)
     return _server_domains.get(module_name)
 
 
@@ -307,6 +309,7 @@ def create_openapi_schema_by_role_function(
     module_name: str,
     roles: List[OpenAPIRoleSpec],
     module_domains: Optional[List[str]] = None,
+    domain_name: Optional[str] = None,
 
     default_exclude_paths: Optional[List[str]] = None,
 
@@ -314,6 +317,7 @@ def create_openapi_schema_by_role_function(
     replace_key_start: Optional[str] = KEY_START,
     replace_key_end: Optional[str] = KEY_END,
     replace_sep_char: Optional[str] = KEY_SEP,
+    replace_domain_key: Optional[str] = DOMAIN_KEY,
     verbose: Optional[bool] = True,
     **kwargs
 ) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
@@ -332,10 +336,14 @@ def create_openapi_schema_by_role_function(
         """
         Patch the openapi schema description
         """
-        if domain_name := get_server_domain(request = request, module_name = module_name, module_domains = module_domains, verbose = verbose):
+        nonlocal domain_name
+        if domain_name is None: domain_name = get_server_domain(request = request, module_name = module_name, module_domains = module_domains, verbose = verbose)
+        if domain_name:
+            replace_domain_start = f'<<{replace_domain_key}>>'
+            replace_domain_end = f'>>{replace_domain_key}<<'
             schema['info']['description'] = schema['info']['description'].replace(
-                '<<DOMAIN>>', domain_name
-            ).replace('>>DOMAIN<<', domain_name)
+                replace_domain_start, domain_name
+            ).replace(replace_domain_end, domain_name)
             if role_spec.has_description_callable:
                 schema['info']['description'] = role_spec.description_callable(
                     schema['info']['description'],
