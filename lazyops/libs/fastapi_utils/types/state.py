@@ -282,7 +282,7 @@ class AppState(BaseModel):
         Called on exit
         """
         if 'stx' in self.ctx and self.process_id == self.stx['primary_process_id']:
-            logger.info(f"Removing STX File: {self.ctx['stx_filepath']}", colored = True, prefix = "|r|State|e|")
+            logger.info(f"Removing AppState File: {self.ctx['stx_filepath']}", colored = True, prefix = f"|r|State: {self.app_module_name}|e|")
             with contextlib.suppress(FileNotFoundError):
                 self.stx.close()
                 os.unlink(self.ctx['stx_filepath'])
