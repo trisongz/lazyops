@@ -188,5 +188,6 @@ class TemporaryData(abc.ABC):
         from lazyops.utils.assets import get_module_path
         module_path = get_module_path(module_name)
         module_dir = module_path.joinpath(data_dir)
+        module_dir.mkdir(parents = True, exist_ok = True)
         filepath = module_dir.joinpath(f'{module_name}.tmp.json')
         return cls(filepath = filepath, is_multithreaded = is_multithreaded, **kwargs)
