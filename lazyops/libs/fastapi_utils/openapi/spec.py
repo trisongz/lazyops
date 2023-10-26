@@ -178,6 +178,7 @@ def get_server_domain(
     module_domains: Optional[List[str]] = None,
     module_name: Optional[str] = None, # this will get injected
     verbose: Optional[bool] = True,
+    force_https: Optional[bool] = None,
 ) -> Optional[str]:
     """
     Get the server domain that the app is hosted on
@@ -191,7 +192,7 @@ def get_server_domain(
             domain in request.url.hostname for 
             domain in module_domains
         ):
-            scheme = 'https' if request.url.port == 443 else 'http'
+            scheme = 'https' if (force_https or request.url.port == 443) else request.url.scheme
             # _server_domains[module_name] = f'{request.url.scheme}://{request.url.hostname}'
             _server_domains[module_name] = f'{scheme}://{request.url.hostname}'
             if request.url.port and request.url.port not in {80, 443}:
@@ -312,6 +313,7 @@ def create_openapi_schema_by_role_function(
     roles: List[OpenAPIRoleSpec],
     module_domains: Optional[List[str]] = None,
     domain_name: Optional[str] = None,
+    domain_name_force_https: Optional[bool] = None,
 
     default_exclude_paths: Optional[List[str]] = None,
 
@@ -334,12 +336,19 @@ def create_openapi_schema_by_role_function(
         role_spec: OpenAPIRoleSpec,
         schema: Dict[str, Union[Dict[str, Union[Dict[str, Any], Any]], Any]],
         request: Optional['Request'] = None,
+        force_https: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """
         Patch the openapi schema description
         """
         nonlocal domain_name
-        if domain_name is None: domain_name = get_server_domain(request = request, module_name = module_name, module_domains = module_domains, verbose = verbose)
+        if domain_name is None: domain_name = get_server_domain(
+            request = request, 
+            module_name = module_name, 
+            module_domains = module_domains, 
+            verbose = verbose,
+            force_https = domain_name_force_https or force_https,
+        )
         if domain_name:
             replace_domain_start = f'<<{replace_domain_key}>>'
             replace_domain_end = f'>>{replace_domain_key}<<'
@@ -407,6 +416,7 @@ def create_openapi_schema_by_role_function(
         user_role: Optional[Union['UserRole', str]] = None,
         request: Optional['Request'] = None,
         app: Optional['FastAPI'] = None,
+        force_https: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """
         Get the openapi schema by role
@@ -422,6 +432,7 @@ def create_openapi_schema_by_role_function(
                 role_spec = role_spec,
                 schema = schema,
                 request = request,
+                force_https = domain_name_force_https or force_https,
             )
             patch_openapi_paths(
                 role_spec = role_spec,
