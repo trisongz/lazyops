@@ -28,6 +28,16 @@ from lazyops.imports._pydantic import (
 Migration to pydantic v2 with backwards compatibility
 """
 
+
+def schema_extra(schema: dict, _):
+    props = {
+        k: v
+        for k, v in schema.get('properties', {}).items()
+        if not v.get("hidden", False) and not k.startswith('_')
+    }
+    schema["properties"] = props
+
+
 class BaseSettings(_BaseSettings):
 
     class Config:

@@ -1,6 +1,27 @@
+import json
 import inspect
 from lazyops.utils.helpers import is_coro_func
-from typing import Callable
+from typing import Callable, Optional, List
+
+
+def parse_to_list(value: Optional[str] = None) -> Optional[List[str]]:
+    """
+    Parses a string to a list
+    """
+    if value is None: return None
+    if '[' in value and ']' in value: 
+        if '"' in value or "'" in value:
+            return json.loads(value)
+        value = value.replace('[', '').replace(']', '')
+    return next(
+        (
+            [v.strip() for v in value.split(sep) if v.strip()]
+            for sep in [',', ';', '|']
+            if sep in value
+        ),
+        [value],
+    )
+
 
 def create_function_wrapper(function: Callable):
     """
