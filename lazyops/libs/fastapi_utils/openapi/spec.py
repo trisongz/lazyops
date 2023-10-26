@@ -13,8 +13,10 @@ import copy
 import contextlib
 
 from abc import ABC
+from pydantic import BaseModel
 from typing import Any, Dict, List, Optional, Union, Callable, Tuple, TYPE_CHECKING
 from lazyops.utils import logger
+from lazyops.utils.lazy import lazy_import
 from lazyops.libs.fastapi_utils.types.user_roles import UserRole
 
 if TYPE_CHECKING:
@@ -221,6 +223,8 @@ class OpenAPIRoleSpec(ABC):
     openapi_schema: Optional[Dict[str, Any]] = None
     description_callable: Optional[Callable] = None
 
+    extra_schemas: Optional[List[Union[BaseModel, Dict[str, Any], str]]] = None
+
     def __init__(
         self, 
         role: Optional['UserRole'] = None,
@@ -233,6 +237,9 @@ class OpenAPIRoleSpec(ABC):
         openapi_schema: Optional[Dict[str, Any]] = None,
 
         description_callable: Optional[Callable] = None,
+        extra_schemas: Optional[List[Union[BaseModel, Dict[str, Any], str]]] = None,
+        extra_schema_prefix: Optional[str] = None,
+        extra_schema_name_mapping: Optional[Dict[str, str]] = None,
         **kwargs
     ):
         self.role = role or UserRole.ANON
@@ -244,6 +251,12 @@ class OpenAPIRoleSpec(ABC):
         self.excluded_schemas = excluded_schemas or []
         self.openapi_schema = openapi_schema
         self.description_callable = description_callable
+        if extra_schemas is not None:
+            self.extra_schemas = extra_schemas
+        self.extra_schema_prefix = extra_schema_prefix
+        self.extra_schema_name_mapping = extra_schema_name_mapping
+        self.extra_schemas_populated = False
+        self.extra_schemas_data: Dict[str, Dict[str, Any]] = None
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -253,6 +266,32 @@ class OpenAPIRoleSpec(ABC):
         Check if the role spec has a description callable
         """
         return self.description_callable is not None
+    
+    def populate_extra_schemas(self):
+        """
+        Populate the extra schemas
+        """
+        if self.extra_schemas_populated: return
+        if not self.extra_schemas: return
+        self.extra_schemas_data = {}
+        for schema in self.extra_schemas:
+            if isinstance(schema, str):
+                schema = lazy_import(schema)
+            if isinstance(schema, type(BaseModel)):
+                schema_name = schema.__name__
+                schema = schema.model_json_schema()
+            elif isinstance(schema, dict):
+                schema_name = schema['title']
+            else:
+                logger.warning(f"Invalid Extra Schema: {schema}")
+                continue
+            if self.extra_schema_name_mapping and schema_name in self.extra_schema_name_mapping:
+                schema['title'] = self.extra_schema_name_mapping[schema_name]
+            elif self.extra_schema_prefix:
+                schema['title'] = f'{self.extra_schema_prefix}{schema_name}'
+            self.extra_schemas_data[schema_name] = schema
+        self.extra_schemas_populated = True
+
 
     
 
@@ -408,6 +447,12 @@ def create_openapi_schema_by_role_function(
         _schemas_to_remove = list(set(_schemas_to_remove))
         for schema_name in _schemas_to_remove:
             schema['components']['schemas'].pop(schema_name, None)
+        if role_spec.extra_schemas:
+            role_spec.populate_extra_schemas()
+            # if verbose:
+            #     logger.info(f"Populating Extra Schemas for {role_spec.role}\n{list(role_spec.extra_schemas_data.keys())}", prefix = module_name)
+            
+            schema['components']['schemas'].update(role_spec.extra_schemas_data)
         schema['components']['schemas'] = dict(sorted(schema['components']['schemas'].items()))
         return schema
 
