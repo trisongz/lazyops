@@ -11,6 +11,7 @@ import re
 import json
 import copy
 import contextlib
+import operator
 
 from abc import ABC
 from pydantic import BaseModel
@@ -466,9 +467,8 @@ def create_openapi_schema_by_role_function(
             role_spec.populate_extra_schemas()
             # if verbose:
             #     logger.info(f"Populating Extra Schemas for {role_spec.role}\n{list(role_spec.extra_schemas_data.keys())}", prefix = module_name)
-            
             schema['components']['schemas'].update(role_spec.extra_schemas_data)
-        schema['components']['schemas'] = dict(sorted(schema['components']['schemas'].items()))
+        schema['components']['schemas'] = dict(sorted(schema['components']['schemas'].items(), key = lambda x: operator.itemgetter('title')(x[1])))
         return schema
 
 
