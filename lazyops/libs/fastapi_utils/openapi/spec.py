@@ -240,6 +240,7 @@ class OpenAPIRoleSpec(ABC):
         extra_schemas: Optional[List[Union[BaseModel, Dict[str, Any], str]]] = None,
         extra_schema_prefix: Optional[str] = None,
         extra_schema_name_mapping: Optional[Dict[str, str]] = None,
+        extra_schema_ref_template: Optional[str] = '#/components/schemas/{model}',
         **kwargs
     ):
         self.role = role or UserRole.ANON
@@ -257,6 +258,7 @@ class OpenAPIRoleSpec(ABC):
         self.extra_schema_name_mapping = extra_schema_name_mapping
         self.extra_schemas_populated = False
         self.extra_schemas_data: Dict[str, Dict[str, Any]] = None
+        self.extra_schema_ref_template = extra_schema_ref_template
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -284,7 +286,9 @@ class OpenAPIRoleSpec(ABC):
             if isinstance(schema, type(BaseModel)):
                 schema_name = schema.__name__
                 try:
-                    schema = schema.model_json_schema()
+                    schema = schema.model_json_schema(
+                        ref_template = self.extra_schema_ref_template
+                    )
                 except Exception as e:
                     logger.warning(f"Invalid Extra Schema: {schema}, {e}")
                     continue
