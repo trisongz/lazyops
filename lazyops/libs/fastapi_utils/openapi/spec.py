@@ -276,11 +276,22 @@ class OpenAPIRoleSpec(ABC):
         self.extra_schemas_data = {}
         for schema in self.extra_schemas:
             if isinstance(schema, str):
-                schema = lazy_import(schema)
+                try:
+                    schema = lazy_import(schema)
+                except Exception as e:
+                    logger.warning(f"Invalid Extra Schema: {schema}, {e}")
+                    continue
             if isinstance(schema, type(BaseModel)):
                 schema_name = schema.__name__
-                schema = schema.model_json_schema()
+                try:
+                    schema = schema.model_json_schema()
+                except Exception as e:
+                    logger.warning(f"Invalid Extra Schema: {schema}, {e}")
+                    continue
             elif isinstance(schema, dict):
+                if 'title' not in schema:
+                    logger.warning(f"Invalid Extra Schema. Does not contain `title` in schema: {schema}")
+                    continue
                 schema_name = schema['title']
             else:
                 logger.warning(f"Invalid Extra Schema: {schema}")
