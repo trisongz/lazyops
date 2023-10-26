@@ -315,8 +315,6 @@ class OpenAPIRoleSpec(ABC):
                     schema['example'] = schema_example
             elif self.extra_schema_example_mapping and schema_name in self.extra_schema_example_mapping:
                 schema['example'] = self.extra_schema_example_mapping[schema_name]
-
-            # schema['example'] = {'text': 'Example Text'}
             self.extra_schemas_data[schema_name] = schema
         self.extra_schemas_populated = True
 
