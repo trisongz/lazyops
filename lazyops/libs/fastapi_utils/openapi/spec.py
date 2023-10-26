@@ -311,7 +311,8 @@ class OpenAPIRoleSpec(ABC):
                 schema['title'] = f'{self.extra_schema_prefix}{schema_name}'
             
             if self.extra_schema_example_callable:
-                schema['example'] = self.extra_schema_example_callable(schema = schema, schema_name = schema_name)
+                if schema_example := self.extra_schema_example_callable(schema = schema, schema_name = schema_name):
+                    schema['example'] = schema_example
             elif self.extra_schema_example_mapping and schema_name in self.extra_schema_example_mapping:
                 schema['example'] = self.extra_schema_example_mapping[schema_name]
 
