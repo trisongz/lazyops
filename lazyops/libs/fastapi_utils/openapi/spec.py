@@ -193,7 +193,7 @@ def get_server_domain(
         ):
             scheme = 'https' if request.url.port == 443 else 'http'
             # _server_domains[module_name] = f'{request.url.scheme}://{request.url.hostname}'
-                _server_domains[module_name] = f'{scheme}://{request.url.hostname}'
+            _server_domains[module_name] = f'{scheme}://{request.url.hostname}'
             if request.url.port and request.url.port not in {80, 443}:
                 _server_domains[module_name] += f':{request.url.port}'
             if verbose: logger.info(f"[|g|{module_name}|e|] Setting Server Domain: {_server_domains[module_name]} from {request.url}", colored = True)
