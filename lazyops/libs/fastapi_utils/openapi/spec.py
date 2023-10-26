@@ -242,6 +242,8 @@ class OpenAPIRoleSpec(ABC):
         extra_schema_prefix: Optional[str] = None,
         extra_schema_name_mapping: Optional[Dict[str, str]] = None,
         extra_schema_ref_template: Optional[str] = '#/components/schemas/{model}',
+        extra_schema_example_mapping: Optional[Dict[str, Dict[str, Any]]] = None,
+        extra_schema_example_callable: Optional[Callable] = None,
         **kwargs
     ):
         self.role = role or UserRole.ANON
@@ -260,6 +262,8 @@ class OpenAPIRoleSpec(ABC):
         self.extra_schemas_populated = False
         self.extra_schemas_data: Dict[str, Dict[str, Any]] = None
         self.extra_schema_ref_template = extra_schema_ref_template
+        self.extra_schema_example_mapping = extra_schema_example_mapping
+        self.extra_schema_example_callable = extra_schema_example_callable
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -305,6 +309,13 @@ class OpenAPIRoleSpec(ABC):
                 schema['title'] = self.extra_schema_name_mapping[schema_name]
             elif self.extra_schema_prefix:
                 schema['title'] = f'{self.extra_schema_prefix}{schema_name}'
+            
+            if self.extra_schema_example_callable:
+                schema['example'] = self.extra_schema_example_callable(schema = schema, schema_name = schema_name)
+            elif self.extra_schema_example_mapping and schema_name in self.extra_schema_example_mapping:
+                schema['example'] = self.extra_schema_example_mapping[schema_name]
+
+            # schema['example'] = {'text': 'Example Text'}
             self.extra_schemas_data[schema_name] = schema
         self.extra_schemas_populated = True
 
