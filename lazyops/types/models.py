@@ -80,22 +80,52 @@ class ProxySettings:
         self,
         settings_cls: Optional[Type[BaseSettings]] = None,
         settings_getter: Optional[Union[Callable, str]] = None,
+        debug_enabled: Optional[bool] = False,
     ):
+        """
+        Proxy settings object
+        """
+        # Intentionally underscore on the end to avoid conflicts with the settings
         assert settings_cls or settings_getter, "Either settings_cls or settings_getter must be provided"
-        self._settings_cls = settings_cls
-        self._settings_getter = settings_getter
-        if self._settings_getter and isinstance(self._settings_getter, str):
+        self.__settings_cls_ = settings_cls
+        self.__settings_getter_ = settings_getter
+        if self.__settings_getter_ and isinstance(self.__settings_getter_, str):
             from lazyops.utils.helpers import import_string
-            self._settings_getter = import_string(self._settings_getter)
-        self._settings = None
+            self.__settings_getter_ = import_string(self.__settings_getter_)
+        self.__settings_ = None
+        self.__debug_enabled_ = debug_enabled
+        self.__last_attrs_: Dict[str, int] = {}
+
+    @property
+    def _settings_(self):
+        """
+        Returns the settings object
+        """
+        if self.__settings_ is None:
+            if self.__settings_getter_:
+                self.__settings_ = self.__settings_getter_()
+            elif self.__settings_cls_:
+                self.__settings_ = self.__settings_cls_()
+        return self.__settings_
 
     def __getattr__(self, name):
-        if self._settings is None:
-            if self._settings_getter:
-                self._settings = self._settings_getter()
-            elif self._settings_cls:
-                self._settings = self._settings_cls()
-        return getattr(self._settings, name)
+        """
+        Forward all unknown attributes to the settings object
+        """
+        if not self.__debug_enabled_:
+            return getattr(self._settings_, name)
+        
+        # Try to debug the attribute
+        if name not in self.__last_attrs_:
+            self.__last_attrs_[name] = 0
+        self.__last_attrs_[name] += 1
+        if self.__last_attrs_[name] > 5:
+            raise AttributeError(f"Settings object has no attribute {name}")
+
+        if hasattr(self._settings_, name):
+            self.__last_attrs_[name] = 0
+            return getattr(self._settings_, name)
+        raise AttributeError(f"Settings object has no attribute {name}")
 
 
 class BaseModel(_BaseModel):

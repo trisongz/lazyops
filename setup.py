@@ -28,6 +28,7 @@ extras = {
         'kubernetes_asyncio',
         'kopf',
         'aiocache',
+        # 'kr8s',
     ],
     'fastapi': [
         'fastapi',
