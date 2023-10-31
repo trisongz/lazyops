@@ -177,7 +177,7 @@ class QueueManagerMetaClass(type):
         return cls.get_or_init_queue(queue_name = queue_name, kind = kind)
     
 
-    def __getitem__(cls, queue_name: str) -> Optional[TaskQueue]:
+    def __getitem__(cls, queue_name: str) -> Optional['TaskQueue']:
         """
         Returns the queue object
         """
@@ -191,12 +191,15 @@ class ProxyDict(LazyDict):
     These are non-global clients
     """
     initialize_objects: Optional[bool] = True
+    exclude_schema_attrs: Optional[bool] = True
     proxy_schema: Optional[Dict[str, str]] = None
 
     def __init__(self, **kwargs):
         if self.proxy_schema is None:
             raise NotImplementedError('Proxy Schema not set')
         self._dict = self.proxy_schema
+        if self.exclude_schema_attrs:
+            self.excluded_attrs = list(self.proxy_schema.keys())
         self.post_init(**kwargs)
     
     def post_init(self, **kwargs):
