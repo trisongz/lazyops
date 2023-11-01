@@ -123,6 +123,14 @@ class GlobalContextMeta(type):
         """
         return cls.state.is_leader_process or multiprocessing.parent_process() is None
     
+    @property
+    def is_primary_server_process(cls) -> bool:
+        """
+        Returns if this is the primary server process
+        """
+        return cls.state.is_primary_server_process or multiprocessing.parent_process() is None
+    
+
     def get_settings_func(cls, func: Union[Callable, str]) -> Callable:
         """
         Returns the settings func

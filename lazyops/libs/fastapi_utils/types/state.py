@@ -215,11 +215,19 @@ class AppState(BaseModel):
         return self.process_id == self.stx.get('primary_process_id', 0)
     
     @property
+    def is_primary_server_process(self) -> bool:
+        """
+        Returns whether this is the primary server process
+        """
+        return self.process_id == self.stx.get('primary_server_process_id', 0)
+
+    @property
     def is_leader_process(self) -> bool:
         """
         Returns whether this is the leader process
         """
         return self.process_id in self.stx.get('leader_process_ids', []) or self.is_primary_process
+
     
     @property
     def server_process_id_path(self) -> pathlib.Path:

@@ -17,28 +17,34 @@ import asyncio
 import threading
 
 from lazyops.utils.logs import logger
-from typing import List, Union, Set, Callable, Tuple
+from typing import List, Union, Set, Callable, Tuple, Optional
 
 _server_tasks: Set[asyncio.Task] = set()
 _server_task_index: List[Callable] = []
 
 
-def register_server_task(func: Callable):
+def register_server_task(func: Callable, name: Optional[str] = None):
     """
     Register a server task
     """
     global _server_task_index
     from lazyops.libs.fastapi_utils.processes import GlobalContext
     if GlobalContext.is_leader_process:
-        logger.info(f"Registered server task: {func.__name__}")
+        logger.info(f"Registered server task: {name or func.__name__}")
     _server_task_index.append(func)
     return func
 
 
-async def start_bg_tasks():
+async def start_bg_tasks(
+    primary_server_process_only: Optional[bool] = None,
+):
     """
     Start background tasks
     """
+    if primary_server_process_only:
+        from lazyops.libs.fastapi_utils.processes import GlobalContext
+        if not GlobalContext.is_primary_server_process:
+            return
     for task in _server_task_index:
         task = asyncio.create_task(task())
         _server_tasks.add(task)
