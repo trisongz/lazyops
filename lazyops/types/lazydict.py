@@ -56,7 +56,7 @@ class LazyDict(ABC):
         Get an attribute from the dictionary        
         """
         if name.startswith('__') and name.endswith('__') or name in self.excluded_attrs:
-            return super().__getattr__(name)
+            return getattr(self, name)
         return self.get_or_init(name, None)
 
     def __getitem__(self, name: str) -> RT:
