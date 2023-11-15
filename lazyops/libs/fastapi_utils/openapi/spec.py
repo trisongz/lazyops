@@ -123,7 +123,7 @@ def patch_openapi_schema(
                     sep_char = replace_sep_char,
                 )
 
-        if 'schemas' in openapi_schema['components']:
+        if 'schemas' in openapi_schema.get('components', {}):
             openapi_schema['components']['schemas'] = dict(sorted(openapi_schema['components']['schemas'].items()))
         _openapi_schemas[module_name] = openapi_schema
     
