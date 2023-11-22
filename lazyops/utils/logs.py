@@ -112,6 +112,43 @@ def _find_seps(msg: str) -> str:
     # return re.sub(r'\|(\w+),(\w+)\|', r'|\1||\2|', msg)
     # return re.sub(r'\|(\w+)\|', r'|\1||', msg)
 
+
+class NullLogger(logging.Logger):
+    """
+    A logger that does nothing
+    """
+
+    def info(self, *args, **kwargs):
+        """
+        Logs info
+        """
+        pass
+
+    def debug(self, *args, **kwargs):
+        """
+        Logs debug
+        """
+        pass
+
+    def warning(self, *args, **kwargs):
+        """
+        Logs warning
+        """
+        pass
+
+    def error(self, *args, **kwargs):
+
+        """
+        Logs error
+        """
+        pass
+
+    def critical(self, *args, **kwargs):
+        """
+        Logs critical
+        """
+        pass
+
 # Setup Default Logger
 class Logger(_Logger):
 
@@ -793,7 +830,7 @@ else:
 
 get_logger = CustomizeLogger.make_default_logger
 default_logger = CustomizeLogger.make_default_logger(level = logger_level)
-
+null_logger = NullLogger(name = 'null_logger')
 
 def change_logger_level(
     level: Union[str, int] = 'INFO',
