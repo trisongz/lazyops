@@ -2,7 +2,8 @@ import dill
 from pydantic import BaseModel, Field, root_validator
 from pydantic.types import ByteSize
 from typing import Union, Any, Dict, Optional
-
+from lazyops.configs.base import DefaultSettings
+from lazyops.types import lazyproperty
 from lazyops.libs.sqlcache.constants import DEFAULT_SETTINGS, OPTIMIZED_SETTINGS, DBNAME
 
 def get_eviction_policies(table_name: str):
@@ -38,9 +39,20 @@ def get_eviction_policies(table_name: str):
         },
     }
 
+
+class SqlCacheSettings(DefaultSettings):
+    """
+    Settings for the SqlCache.
+    """
+
+    class Config(DefaultSettings.Config):
+        env_prefix = 'SQLCACHE_'
+        case_sensitive = False
+    
+
 class SqlCacheConfig(BaseModel):
 
-    table_name: str = 'sqlCache'
+    table_name: str = 'sqlcache'
     db_name: str = DBNAME
     statistics: Union[int, bool] = False
     tag_index: Union[int, bool] = False
@@ -48,7 +60,7 @@ class SqlCacheConfig(BaseModel):
     size_limit: ByteSize = Field(default = OPTIMIZED_SETTINGS['standard']['size_limit'])
     cull_limit: int = 10
     sqlite_auto_vacuum: int = 1  # FULL
-    cache_size: int = 2**13  # 8,192 pages
+    cache_size: int = 2 ** 13  # 8,192 pages
     sqlite_journal_mode: str = 'wal'
     mmap_size: ByteSize = Field(default = OPTIMIZED_SETTINGS['standard']['mmap_size']) # 2**26  # 64mb
     sqlite_synchronous: int = 1  # NORMAL

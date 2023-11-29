@@ -1,5 +1,5 @@
 
-import lazyops.libs.sqlcache.base
+
 import os
 import io
 import zlib
@@ -17,6 +17,7 @@ import contextlib as cl
 from fileio.lib.types import File, FileLike
 from typing import Any, Iterable, AsyncIterable
 from lazyops.utils.pooler import ThreadPooler
+from . import base
 from lazyops.libs.sqlcache.constants import (
     UNKNOWN,
     MODE_NONE,

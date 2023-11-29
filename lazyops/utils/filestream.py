@@ -25,14 +25,14 @@ class FileLikeObject(IOBase):
         Yield up to size bytes from the iterator.
         """
         while size:
-            if self.offset == len(chunk):
-                try: chunk = next(self.iterator)
+            if self.offset == len(self.chunk):
+                try: self.chunk = next(self.iterator)
                 except StopIteration: break
                 else: self.offset = 0
-            to_yield = min(size, len(chunk) - self.offset)
+            to_yield = min(size, len(self.chunk) - self.offset)
             self.offset = self.offset + to_yield
             size -= to_yield
-            yield chunk[self.offset - to_yield : self.offset]
+            yield self.chunk[self.offset - to_yield : self.offset]
 
     def readable(self):
         """
@@ -86,14 +86,14 @@ class AsyncFileLikeObject(IOBase):
         Yield up to size bytes from the iterator.
         """
         while size:
-            if self.offset == len(chunk):
-                try: chunk = await anext(self.iterator)
+            if self.offset == len(self.chunk):
+                try: self.chunk = await anext(self.iterator)
                 except StopIteration: break
                 else: self.offset = 0
-            to_yield = min(size, len(chunk) - self.offset)
-            self.offset = self.offset + to_yield
+            to_yield = min(size, len(self.chunk) - self.offset)
+            self.offset += to_yield
             size -= to_yield
-            yield chunk[self.offset - to_yield : self.offset]
+            yield self.chunk[self.offset - to_yield : self.offset]
 
     def readable(self):
         """

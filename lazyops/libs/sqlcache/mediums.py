@@ -51,7 +51,7 @@ class Disk(BaseMedium):
         :param int pickle_protocol: pickle protocol for serialization
         :param dict config: dict to pass to update sql settings
         """
-        self._directory = File(directory) or File.get_tempdir(prefix = 'kops')
+        self._directory = File(directory) or File.get_tempdir(prefix = 'lazyops')
         self.min_file_size = min_file_size
         self.pickle_protocol = pickle_protocol
         self.config = config
@@ -88,7 +88,8 @@ class Disk(BaseMedium):
             filename, full_path = self.filename(key, value)
             self._write(full_path, io.StringIO(value), 'x', 'UTF-8')
             # size = op.getsize(full_path)
-            size = (full_path.info())['size']
+            size = full_path.size()
+            # size = (full_path.info())['size']
             return size, MODE_TEXT, filename, None
         elif read:
             reader = ft.partial(value.read, 2**22)
@@ -134,7 +135,8 @@ class Disk(BaseMedium):
         elif type_value is str:
             filename, full_path = self.filename(key, value)
             await self._awrite(full_path, io.StringIO(value), 'x', 'UTF-8')
-            size = (await full_path.async_info())['size']
+            size = await full_path.async_size()
+            # size = (await full_path.async_info())['size']
             # size = op.getsize(full_path)
             return size, MODE_TEXT, filename, None
         elif read:

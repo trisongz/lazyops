@@ -302,7 +302,7 @@ class ThreadPoolerMetaClass(type):
         Creates a threadpool task
         """
         task = cls.pool.submit(func, *args, **kwargs)
-        task.add_done_callback
+        # task.add_done_callback
         cls.add_task(task, task_callback)
         return task
 
