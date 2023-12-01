@@ -47,8 +47,8 @@ class TemporaryData(abc.ABC):
         Returns the context
         """
         with self.filelock:
+            data = self.data
             try:
-                data = self.data
                 yield data
             finally:
                 self.filepath.write_text(Json.dumps(data, indent = 2))

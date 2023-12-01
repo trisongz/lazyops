@@ -408,6 +408,17 @@ class GlobalContextMeta(type):
         cls.state.add_leader_process_id(p.pid, 'server')
         cls.server_processes.append(p)
         return p
+    
+    def add_server_process(cls, name: str, cmd: str, verbose: bool = True):
+        """
+        Adds the server process
+        """
+        if verbose: cls.logger.info(f"Adding Server Process: {cmd}", prefix = name)
+        context = multiprocessing.get_context('spawn')
+        p = context.Process(target = os.system, args = (cmd,))
+        p.start()
+        cls.server_processes.append(p)
+        return p
 
     def stop_server_processes(cls, verbose: bool = True, timeout: float = 5.0):
         """

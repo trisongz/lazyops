@@ -229,7 +229,7 @@ class ThreadPoolerMetaClass(type):
         """
         return is_coro_func(obj)
 
-    async def run_async(cls, func: Callable, *args, **kwargs):
+    async def run_async(cls, func: Callable[..., RT], *args, **kwargs) -> RT:
         """
         Runs a Sync Function as an Async Function
         """
@@ -237,7 +237,7 @@ class ThreadPoolerMetaClass(type):
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(cls.pool, blocking)
     
-    def run_sync(cls, func: Coroutine, *args, **kwargs):
+    def run_sync(cls, func: Coroutine, *args, **kwargs) -> RT:
         """
         Runs an Async Function as a Sync Function
         """
@@ -247,7 +247,7 @@ class ThreadPoolerMetaClass(type):
             return anyio.run(partial_f)
         return anyio.from_thread.run(partial_f)
 
-    async def asyncish(cls, func: Callable, *args, **kwargs):
+    async def asyncish(cls, func: Callable[..., RT], *args, **kwargs) -> RT:
         """
         Runs a Function as an Async Function if it is an Async Function
         otherwise wraps it around `run_async`
