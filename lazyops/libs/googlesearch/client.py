@@ -31,7 +31,7 @@ url_parameters = (
 )
 
 # RT = TypeVar('RT', str, Tuple[str, str])
-RT = Union[str, Tuple[str, str]]
+RT = Union[str, Tuple[str, str], Tuple[str, str, str]]
 
 class SearchParams(BaseModel):
     """
@@ -48,6 +48,7 @@ class SearchParams(BaseModel):
     # pause: Optional[float] = 2.0
     country: Optional[str] = ''
     include_title: Optional[bool] = False
+    include_description: Optional[bool] = False
     # extra_params: Optional[Dict[str,str]] = None
 
     @property
@@ -128,12 +129,16 @@ class SearchParams(BaseModel):
         hashes.add(h)
         return link
     
-    def extract_result(self, anchor: Tag, hashes: Set) -> Optional[RT]:
+    def extract_result(self, anchor: Tag, desc: Tag, hashes: Set) -> Optional[RT]:
         """
         Extracts the result
         """
         link = self.is_valid_link(anchor, hashes)
         if not link: return None
+        if self.include_title and self.include_description:
+            return (link, anchor.text, desc.text)
+        if self.include_description:
+            return (link, desc.text)
         return (link, anchor.text) if self.include_title else link
     
 
@@ -277,12 +282,12 @@ class GoogleSearchClient(abc.ABC):
     
     def extract_anchors(
         self,
-        html: Union[str, bytes],
+        html: Union[str, bytes, BeautifulSoup],
     ) -> List[Tag]:
         """
         Extracts the anchors
         """
-        soup = BeautifulSoup(html, 'html.parser')
+        soup = BeautifulSoup(html, 'html.parser') if isinstance(html, (bytes, str)) else html
         try:
             return soup.find(id='search').findAll('a')
             # Sometimes (depending on the User-agent) there is
@@ -292,7 +297,23 @@ class GoogleSearchClient(abc.ABC):
             gbar = soup.find(id='gbar')
             if gbar: gbar.clear()
             return soup.findAll('a')
-
+        
+    def extract_description(
+        self,
+        html: Union[str, bytes, BeautifulSoup],
+    ) -> List[Tag]:
+        """
+        Extracts the description
+        """
+        soup = BeautifulSoup(html, 'html.parser') if isinstance(html, (bytes, str)) else html
+        try:
+            return soup.find(id='search').findAll('span')
+        except AttributeError:
+            # Remove links of the top bar.
+            gbar = soup.find(id='gbar')
+            if gbar: gbar.clear()
+            return soup.findAll('span')
+    
     def validate_extra_params(
         self,
         extra_params: Dict[str, str],
@@ -321,6 +342,7 @@ class GoogleSearchClient(abc.ABC):
         pause: Optional[float] = 2.0, 
         country: Optional[str] = '', 
         include_title: Optional[bool] = False,
+        include_description: Optional[bool] = False,
         extra_params: Optional[Dict[str,str]] = None,
         user_agent: Optional[str] = None, 
         verify_ssl: Optional[bool] = True,
@@ -354,6 +376,7 @@ class GoogleSearchClient(abc.ABC):
             stop = stop,
             country = country,
             include_title = include_title,
+            include_description = include_description,
         )
 
         # Grab the cookie from the home page.
@@ -378,12 +401,15 @@ class GoogleSearchClient(abc.ABC):
 
             # Request the Google Search results page.
             html = self.get_page(url, user_agent)
+            soup = BeautifulSoup(html, 'html.parser')
 
             # Parse the response and get every anchored URL.
-            anchors = self.extract_anchors(html)
+            anchors = self.extract_anchors(soup)
+            desc_anchors = self.extract_description(soup)
+
             # Process every anchored URL.
-            for a in anchors:
-                result = sp.extract_result(a, hashes)
+            for (a, desc) in zip(anchors, desc_anchors):
+                result = sp.extract_result(a, desc, hashes)
                 if not result: continue
 
                 # Yield the result.
@@ -417,6 +443,7 @@ class GoogleSearchClient(abc.ABC):
         pause: Optional[float] = 2.0, 
         country: Optional[str] = '', 
         include_title: Optional[bool] = False,
+        include_description: Optional[bool] = False,
         extra_params: Optional[Dict[str,str]] = None,
         user_agent: Optional[str] = None, 
         verify_ssl: Optional[bool] = True,
@@ -450,6 +477,7 @@ class GoogleSearchClient(abc.ABC):
             stop = stop,
             country = country,
             include_title = include_title,
+            include_description = include_description,
         )
 
         # Grab the cookie from the home page.
@@ -474,13 +502,15 @@ class GoogleSearchClient(abc.ABC):
 
             # Request the Google Search results page.
             html = await self.aget_page(url, user_agent, **kwargs)
+            soup = BeautifulSoup(html, 'html.parser')
 
             # Parse the response and get every anchored URL.
-            anchors = self.extract_anchors(html)
+            anchors = self.extract_anchors(soup)
+            desc_anchors = self.extract_description(soup)
             # Process every anchored URL.
-            for a in anchors:
+            for (a, desc) in zip(anchors, desc_anchors):
                 
-                result = sp.extract_result(a, hashes)
+                result = sp.extract_result(a, desc, hashes)
                 if not result: continue
 
                 # Yield the result.
@@ -512,6 +542,7 @@ class GoogleSearchClient(abc.ABC):
         pause: Optional[float] = 2.0, 
         country: Optional[str] = '', 
         include_title: Optional[bool] = False,
+        include_description: Optional[bool] = False,
         extra_params: Optional[Dict[str,str]] = None,
         user_agent: Optional[str] = None, 
         verify_ssl: Optional[bool] = True,
@@ -532,6 +563,7 @@ class GoogleSearchClient(abc.ABC):
             pause = pause, 
             country = country, 
             include_title = include_title,
+            include_description = include_description,
             extra_params = extra_params,
             user_agent = user_agent, 
             verify_ssl = verify_ssl,
@@ -551,6 +583,7 @@ class GoogleSearchClient(abc.ABC):
         pause: Optional[float] = 2.0, 
         country: Optional[str] = '', 
         include_title: Optional[bool] = False,
+        include_description: Optional[bool] = False,
         extra_params: Optional[Dict[str,str]] = None,
         user_agent: Optional[str] = None, 
         verify_ssl: Optional[bool] = True,
@@ -571,6 +604,7 @@ class GoogleSearchClient(abc.ABC):
             pause = pause, 
             country = country, 
             include_title = include_title,
+            include_description = include_description,
             extra_params = extra_params,
             user_agent = user_agent, 
             verify_ssl = verify_ssl,
