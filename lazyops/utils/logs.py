@@ -673,7 +673,7 @@ class Logger(_Logger):
 
 # < 0.7.0
 try:
-    logger = Logger(
+    _logger = Logger(
         core=_Core(),
         exception=None,
         depth=0,
@@ -687,7 +687,7 @@ try:
     )
 # >= 0.7.0
 except Exception as e:
-    logger = Logger(
+    _logger = Logger(
         core=_Core(),
         exception=None,
         depth=0,
@@ -700,19 +700,19 @@ except Exception as e:
         extra={},
     )
 
-dev_level = logger.level(name='DEV', no=19, color="<blue>", icon="@")
+dev_level = _logger.level(name='DEV', no=19, color="<blue>", icon="@")
 
 if _defaults.LOGURU_AUTOINIT and sys.stderr:
-    logger.add(sys.stderr)
+    _logger.add(sys.stderr)
 
-_atexit.register(logger.remove)
+_atexit.register(_logger.remove)
 
 class InterceptHandler(logging.Handler):
     loglevel_mapping = LOGLEVEL_MAPPING
 
     def emit(self, record):
         try:
-            level = logger.level(record.levelname).name
+            level = _logger.level(record.levelname).name
         except ValueError:
             level = self.loglevel_mapping.get(record.levelno, 'DEBUG')
         # if "Unclosed client session" in record.message:
@@ -722,7 +722,7 @@ class InterceptHandler(logging.Handler):
         while frame.f_code.co_filename == logging.__file__:
             frame = frame.f_back
             depth += 1
-        log = logger.bind(request_id=None)
+        log = _logger.bind(request_id=None)
         log.opt(
             depth=depth,
             exception=record.exc_info
@@ -744,25 +744,25 @@ class CustomizeLogger:
     ):
         # todo adjust this later to use a ConfigModel
         if isinstance(level, str): level = level.upper()
-        logger.remove()
-        logger.add(
+        _logger.remove()
+        _logger.add(
             sys.stdout,
             enqueue = True,
             backtrace = True,
             colorize = True,
             level = level,
             format = format if format is not None else cls.logger_formatter,
-            filter = filter if filter is not None else logger._filter,
+            filter = filter if filter is not None else _logger._filter,
         )
 
-        logger.add_if_condition('dev', logger._is_dev_condition)
+        _logger.add_if_condition('dev', _logger._is_dev_condition)
 
         logging.basicConfig(
             handlers = handlers or [InterceptHandler()], 
             level = 0
         )
-        *options, extra = logger._options
-        new_logger = Logger(logger._core, *options, {**extra})
+        *options, extra = _logger._options
+        new_logger = Logger(_logger._core, *options, {**extra})
         if settings: new_logger.settings = settings
         return new_logger
 
@@ -829,7 +829,8 @@ else:
 
 
 get_logger = CustomizeLogger.make_default_logger
-default_logger = CustomizeLogger.make_default_logger(level = logger_level)
+logger = CustomizeLogger.make_default_logger(level = logger_level)
+default_logger = logger
 null_logger = NullLogger(name = 'null_logger')
 
 def change_logger_level(
@@ -846,14 +847,14 @@ def change_logger_level(
         verbose: bool = False
             Whether to print the change to the logger
     """
-    global default_logger, logger_level
+    global logger, logger_level
     if isinstance(level, str):
         level = level.upper()
     # Skip if the level is the same
     if level == logger_level: return
-    if verbose: default_logger.info(f"Changing logger level from {logger_level} -> {level}")
+    if verbose: logger.info(f"Changing logger level from {logger_level} -> {level}")
     logger_level = level
-    default_logger = get_logger(logger_level, **kwargs)
+    logger = get_logger(logger_level, **kwargs)
 
 
 def add_api_log_filters(

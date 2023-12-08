@@ -23,6 +23,7 @@ def resolve_backoff(
         resolve_missing('backoff', required = required)
         import backoff
         _backoff_available = True
+        globals()['backoff'] = backoff
 
 
 def require_backoff(
