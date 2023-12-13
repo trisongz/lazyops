@@ -207,6 +207,18 @@ class Timer(abc.ABC, dict):
         """
         return self.pformat(self.total)
     
+    def total_average(self, count: int) -> float:
+        """
+        Returns the average duration of the timer
+        """
+        return self.total / count
+    
+    def total_average_s(self, count: int) -> str:
+        """
+        Returns the average duration of the timer as a string
+        """
+        return self.pformat(self.total_average(count))
+    
     @property
     def elapsed(self) -> float:
         """
