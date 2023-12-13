@@ -153,6 +153,7 @@ class GoogleSearchClient(abc.ABC):
         default_lang: Optional[str] = 'en',
         timeout: Optional[int] = 10,
         max_connections: Optional[int] = 100,
+        raise_exceptions: Optional[bool] = True,
         **kwargs,
     ):
         """
@@ -163,6 +164,7 @@ class GoogleSearchClient(abc.ABC):
         self.user_agents = user_agents or load_user_agents()
         self.verify_ssl = verify_ssl
         self.lang = default_lang
+        self.raise_exceptions = raise_exceptions
         self.cookie_jar = load_cookie_jar()
         self.cookies = aiohttpx.Cookies(self.cookie_jar)
         self.api = aiohttpx.Client(
@@ -205,6 +207,7 @@ class GoogleSearchClient(abc.ABC):
         )
         request.headers['User-Agent'] = user_agent
         response = self.api.send(request)
+        if self.raise_exceptions: response.raise_for_status()
         self.cookies.extract_cookies(response)
         html = response.read()
         response.close()
@@ -242,6 +245,7 @@ class GoogleSearchClient(abc.ABC):
         )
         request.headers['User-Agent'] = user_agent
         response = await self.api.async_send(request)
+        if self.raise_exceptions: response.raise_for_status()
         self.cookies.extract_cookies(response)
         html = response.read()
         await response.aclose()
