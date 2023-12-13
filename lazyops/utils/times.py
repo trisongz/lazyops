@@ -234,6 +234,18 @@ class Timer(abc.ABC, dict):
         Does not add a checkpoint
         """
         return self.pformat(self.elapsed)
+    
+    def elapsed_average(self, count: int) -> float:
+        """
+        Returns the average duration of the timer
+        """
+        return self.elapsed / count
+    
+    def elapsed_average_s(self, count: int) -> str:
+        """
+        Returns the average duration of the timer as a string
+        """
+        return self.pformat(self.elapsed_average(count))
 
     @property
     def average(self) -> float:
