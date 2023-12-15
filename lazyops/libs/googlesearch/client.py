@@ -167,16 +167,10 @@ class GoogleSearchClient(abc.ABC):
         self.raise_exceptions = raise_exceptions
         self.cookie_jar = load_cookie_jar()
         self.cookies = aiohttpx.Cookies(self.cookie_jar)
-        self.api = aiohttpx.Client(
-            timeout = timeout,
-            cookies = self.cookies,
-            limits = aiohttpx.Limits(
-                max_connections = max_connections
-            ),
-            proxies = {
-                "all://": self.proxy
-            } if self.proxy else None,
-        )
+        self.timeout = timeout
+        self.max_connections = max_connections
+        self.api: aiohttpx.Client = None
+        self.init_api(**kwargs)
         self.post_init(**kwargs)
 
     def pre_init(self, **kwargs):
@@ -190,6 +184,20 @@ class GoogleSearchClient(abc.ABC):
         Post init
         """
         pass
+
+    def init_api(self, **kwargs):
+        """
+        Initializes the api
+        """
+        if self.api is None:
+            self.api = aiohttpx.Client(
+                timeout = self.timeout,
+                cookies = self.cookies,
+                limits = aiohttpx.Limits(max_connections = self.max_connections),
+                proxies = {"all://": self.proxy} if self.proxy else None,
+                follow_redirects = True,
+            )
+
     
     def _get_page(
         self,
