@@ -8,6 +8,7 @@ from typing import Any, Dict, Callable, Union, Optional, Type, TypeVar, List, Tu
 
 if TYPE_CHECKING:
     from lazyops.types import BaseModel
+    from aiokeydb import KeyDBSession
 
 
 # Lazy Importing
@@ -140,8 +141,6 @@ def lazy_function(
 
 MT = TypeVar("MT", bound="BaseModel")
 
-
-
 _extracted_base_model_kws: Dict[str, List[str]] = {}
 
 def extract_base_model_kws(
@@ -163,3 +162,40 @@ def extract_base_model_kws(
         key: kwargs.pop(key) for key in kwargs if key in _extracted_base_model_kws[base_model_name]
     }
     return kwargs, model_kwargs
+
+
+# Lazy KeyDB Sessions
+
+_keydb_sessions: Dict[str, 'KeyDBSession'] = {}
+_keydb_enabled: Optional[bool] = None
+
+def get_keydb_enabled() -> bool:
+    """
+    Gets whether or not keydb is enabled
+    """
+    if _keydb_enabled is None:
+        get_keydb_session(validate_active = True)
+    return _keydb_enabled
+
+def get_keydb_session(
+    name: Optional[str] = "default",
+    validate_active: Optional[bool] = None,
+    **kwargs
+) -> Optional["KeyDBSession"]:
+    """
+    Get the KeyDB Session
+    """
+    global _keydb_sessions, _keydb_enabled
+    if not _keydb_sessions.get(name):
+        from aiokeydb import KeyDBClient
+        _keydb_sessions[name] = KeyDBClient.get_session(name = name, verbose = False, **kwargs)
+    if validate_active and _keydb_enabled is None:
+        try:
+            _keydb_enabled = _keydb_sessions[name].ping()
+        except Exception as e:
+            from .logs import logger
+            logger.warning(f"KeyDB Session {name} is not active: {e}")
+            _keydb_enabled = False
+    if validate_active and not _keydb_enabled:
+        return None
+    return _keydb_sessions[name]
