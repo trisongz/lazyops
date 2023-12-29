@@ -261,7 +261,7 @@ class AppSettings(BaseAppSettings):
         Validates the app environment
         """
         if value is None:
-            return get_app_env()
+            return get_app_env(cls.__module__.split(".")[0])
         return AppEnv.from_env(value) if isinstance(value, str) else value
 
     def get_assets(
