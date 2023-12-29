@@ -1,6 +1,7 @@
 import io
 import pickle
 from typing import Union, Any
+from pydantic import BaseModel
 from pydantic.types import ByteSize
 
 class Constant(tuple):
@@ -26,6 +27,11 @@ MODE_PICKLE = 4
 KeyT = Union[str, int, float, bytes, None]
 ValueT = Union[str, int, float, bytes, None, io.BytesIO, Any]
 
+class SizeModel(BaseModel):
+    size: ByteSize
+
+
+
 DEFAULT_SETTINGS = {
     'statistics': 0,  # False
     'tag_index': 0,  # False
@@ -43,41 +49,41 @@ DEFAULT_SETTINGS = {
 
 OPTIMIZED_SETTINGS = {
     'fast': {
-        'min_file_size': ByteSize.validate('32KiB'),
-        'size_limit': ByteSize.validate('4GiB'),
-        'mmap_size': ByteSize.validate('512MiB'),
+        'min_file_size': SizeModel(size = '32KiB').size,
+        'size_limit': SizeModel(size = '4GiB').size,
+        'mmap_size': SizeModel(size = '512MiB').size,
         'eviction_policy': 'least-recently-stored',
         'cache_size': 8192,
         'compression_level': 0,
     },
     'standard': {
-        'min_file_size': ByteSize.validate('64KiB'),
-        'size_limit': ByteSize.validate('8GiB'),
-        'mmap_size': ByteSize.validate('1024MiB'),
+        'min_file_size': SizeModel(size = '64KiB').size,
+        'size_limit': SizeModel(size = '8GiB').size,
+        'mmap_size': SizeModel(size = '1024MiB').size,
         'eviction_policy': 'least-recently-stored',
         'cache_size': 8192,
         'compression_level': 5,
     },
     'optimized': {
-        'min_file_size': ByteSize.validate('128KiB'),
-        'size_limit': ByteSize.validate('16GiB'),
-        'mmap_size': ByteSize.validate('2048MiB'),
+        'min_file_size': SizeModel(size = '128KiB').size,
+        'size_limit': SizeModel(size = '16GiB').size,
+        'mmap_size': SizeModel(size = '2048MiB').size,
         'eviction_policy': 'least-recently-stored',
         'sqlite_cache_size': 8192,
         'compression_level': 2,
     },
     'cache': {
-        'min_file_size': ByteSize.validate('256KiB'),
-        'size_limit': ByteSize.validate('32GiB'),
-        'mmap_size': ByteSize.validate('4GiB'),
+        'min_file_size': SizeModel(size = '256KiB').size,
+        'size_limit': SizeModel(size = '32GiB').size,
+        'mmap_size': SizeModel(size = '4GiB').size,
         'eviction_policy': 'least-recently-used',
         'cache_size': 8192 * 2,
         'compression_level': 8,
     },
     'cache_large': {
-        'min_file_size': ByteSize.validate('512KiB'),
-        'size_limit': ByteSize.validate('64GiB'),
-        'mmap_size': ByteSize.validate('8GiB'),
+        'min_file_size': SizeModel(size = '512KiB').size,
+        'size_limit': SizeModel(size = '64GiB').size,
+        'mmap_size': SizeModel(size = '8GiB').size,
         'eviction_policy': 'least-recently-used',
         'cache_size': 8192 * 4,
         'compression_level': 10,

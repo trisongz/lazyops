@@ -6,14 +6,40 @@ Base Serializers
 
 import abc
 import zlib
+import hashlib
 from lazyops.types import BaseModel
 from lazyops.utils.logs import logger
 from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
 
 from typing import Any, Optional, Union, Dict, TypeVar
 
+try:
+    import xxhash
+    _xxhash_available = True
+except ImportError:
+    _xxhash_available = False
+
+
+
+
 SchemaType = TypeVar("SchemaType", bound=BaseModel)
 ObjectValue = Union[SchemaType, Dict, Any]
+
+def create_obj_hash(obj: ObjectValue) -> str:
+    """
+    Creates a hash for the object
+    """
+    if isinstance(obj, BaseModel) or hasattr(obj, "model_dump"):
+        if _xxhash_available:
+            return xxhash.xxh64(obj.model_dump_json()).hexdigest()
+        return hashlib.sha256(obj.model_dump_json().encode()).hexdigest()
+    if isinstance(obj, dict):
+        if _xxhash_available:
+            return xxhash.xxh64(str(obj).encode()).hexdigest()
+        return hashlib.sha256(str(obj).encode()).hexdigest()
+    if _xxhash_available:
+        return xxhash.xxh64(str(obj).encode()).hexdigest()
+    return hashlib.sha256(str(obj).encode()).hexdigest()
 
 class BaseSerializer(abc.ABC):
     """
@@ -44,6 +70,18 @@ class BaseSerializer(abc.ABC):
         Returns if compression is enabled
         """
         return self.compression_level is not None
+    
+    def fetch_object_classname(self, obj: ObjectValue) -> str:
+        """
+        Fetches the object classname
+        """
+        return f"{obj.__class__.__module__}.{obj.__class__.__name__}"
+    
+    def create_hash(self, obj: ObjectValue) -> str:
+        """
+        Creates a hash for the object
+        """
+        return create_obj_hash(obj)
     
     def compress_value(self, value: Union[str, bytes], **kwargs) -> Union[str, bytes]:
         """

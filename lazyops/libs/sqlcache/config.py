@@ -69,7 +69,7 @@ class SqlCacheConfig(BaseModel):
     compression_level: int = Field(default = OPTIMIZED_SETTINGS['standard']['compression_level'])
     dataset_mode: bool = False # if enabled, will start Index at 0 rather than 500 trill
 
-    @root_validator()
+    @root_validator(pre = True)
     def validate_config(cls, values: Dict) -> Dict:
         """
         Ensures that the configuration is valid.
@@ -78,7 +78,7 @@ class SqlCacheConfig(BaseModel):
             values['statistics'] = int(values['statistics'])
         if 'tag_index' in values and isinstance(values['tag_index'], bool):
             values['tag_index'] = int(values['tag_index'])
-        
+        return values
 
     @classmethod
     def from_optimized(cls, table_name: str, optim: Optional[str] = 'standard', config: Optional[Dict[str, Any]] = None) -> 'SqlCacheConfig':

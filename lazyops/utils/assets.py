@@ -273,7 +273,7 @@ def create_import_assets_wrapper(
     allowed_extensions: Optional[List[str]] = None,
     recursive: Optional[bool] = False,
     as_dict: Optional[bool] = False,
-) -> Callable:
+) -> Callable[..., Union[Dict[str, Any], List[Any]]]:
     """
     Create a wrapper around import_module_assets.
 
@@ -321,7 +321,7 @@ def create_get_assets_wrapper(
     allowed_extensions: Optional[List[str]] = None,
     recursive: Optional[bool] = False,
     as_dict: Optional[bool] = False,
-) -> Callable:
+) -> Callable[..., Union[pathlib.Path, Any, List[pathlib.Path], List[Any], Dict[str, pathlib.Path], Dict[str, Any]]]:
     """
     Create a wrapper around `get_module_assets`.
 

@@ -4,16 +4,9 @@ Local Persistence Types
 
 import os
 import json
-import copy
 import filelock
 import binascii
-import contextlib
-import collections.abc
-
-from io import BytesIO
 from pathlib import Path, PurePath
-from pydantic import BaseModel
-from abc import ABC, abstractmethod
 from typing import TypeVar, Generic, Any, Dict, Optional, Union, Iterable, List, Type, TYPE_CHECKING
 from lazyops.utils.helpers import  create_unique_id
 from .base import BaseStatefulBackend, SchemaType, logger
@@ -68,6 +61,8 @@ class LocalStatefulBackend(BaseStatefulBackend):
             else:
                 file_path = Path(os.getcwd()).joinpath(f"{self.name}.cache")
         self.file_path = File(file_path)
+        if self.file_path.is_dir():
+            self.file_path = self.file_path.joinpath(f"{self.name}.cache")
         self.file_path.parent.mkdir(parents = True, exist_ok = True)
         self.file_lock_path = self.file_path.with_suffix(".lock")
         self.file_hash_path = self.file_path.with_suffix(".hash")
@@ -75,10 +70,10 @@ class LocalStatefulBackend(BaseStatefulBackend):
         try:
             import simdjson
             self.parser = simdjson.Parser()
-            self.cache: simdjson.SimValue = None
+            self.cache: simdjson.SimValue = {}
         except ImportError:
             self.parser = None
-            self.cache: Dict[str, Any] = None
+            self.cache: Dict[str, Any] = {}
 
         if not self.file_path.exists():
             with self.file_lock:
@@ -89,6 +84,158 @@ class LocalStatefulBackend(BaseStatefulBackend):
             self.cache = self.get_data()
             self.file_hash = self.file_hash_path.read_text()
     
+    def encode_value(self, value: Union[Any, SchemaType], **kwargs) -> str:
+        """
+        Encodes a Value
+        """
+        result = super().encode_value(value, **kwargs)
+        return result.hex() if isinstance(result, bytes) else result
+    
+    def decode_value(self, value: str, **kwargs) -> Any:
+        """
+        Decodes a Value
+        """
+        if self.serializer.binary or self.serializer.compression_enabled:
+            value = binascii.unhexlify(value)
+        return super().decode_value(value, **kwargs)
+    
+    def _precheck(self, **kwargs):
+        """
+        Precheck
+        """
+        self.sync()
+
+    def get(self, key: str, default: Optional[Any] = None, **kwargs) -> Optional[Any]:
+        """
+        Gets a Value from the JSON
+        """
+        self.sync()
+        if value := self.cache.get(self.get_key(key)):
+            try:
+                return self.decode_value(value, **kwargs) or default
+            except Exception as e:
+                logger.info(f'Error Decoding Value: |r|({type(value)}) {e}|e| {value}', colored = True)
+                self.delete(key)
+                return default
+        return default
+    
+    def get_values(self, keys: Iterable[str]) -> List[Any]:
+        """
+        Gets a Value from the JSON
+        """
+        self.sync()
+        results = []
+        for key in keys:
+            if value := self.cache.get(self.get_key(key)):
+                try:
+                    results.append(self.decode_value(value))
+                except AttributeError:
+                    logger.warning(f'Unable to decode value for {key}')
+                    self.delete(key)
+                    results.append(None)
+            else:
+                results.append(None)
+        return results
+    
+
+    def set(self, key: str, value: Any, *args, **kwargs) -> None:
+        """
+        Sets a Value in the JSON
+        """
+        self.sync()
+        self.cache[self.get_key(key)] = self.encode_value(value)
+        self.write_data(self.cache)
+        
+
+    def set_batch(self, data: Dict[str, Any], *args, **kwargs) -> None:
+        """
+        Sets a Value in the JSON
+        """
+        self.sync()
+        for key, value in data.items():
+            self.cache[self.get_key(key)] = self.encode_value(value)
+        self.write_data(self.cache)
+
+    def delete(self, key: str, **kwargs) -> None:
+        """
+        Deletes a Value from the JSON
+        """
+        self.sync()
+        _ = self.cache.pop(self.get_key(key), None)
+        self.write_data(self.cache)
+    
+    def clear(self, *keys: str, **kwargs):
+        """
+        Clears the Cache
+        """
+        self.sync()
+        if keys:
+            for key in keys:
+                self.cache.pop(self.get_key(key), None)
+        else:
+            self.cache = {}
+        self.write_data(self.cache)
+
+
+    def get_all_keys(self, exclude_base_key: Optional[bool] = False) -> List[str]:
+        """
+        Returns all the Keys
+        """
+        self.sync()
+        keys = [
+            key
+            for key in self.cache.keys()
+            if key.startswith(self.base_key)
+        ] if self.base_key else list(self.cache.keys())
+        if exclude_base_key:
+            keys = [key.replace(f'{self.base_key}.', '') for key in keys]
+        return keys
+
+    def get_all_data(self, exclude_base_key: Optional[bool] = False) -> Dict[str, Any]:
+        """
+        Loads all the Data
+        """
+        self.sync()
+        all_keys = self.get_all_keys()
+        data = {
+            key: self.decode_value(value)
+            for key, value in self.cache.items() if key in all_keys
+        }
+        if exclude_base_key:
+            data = {key.replace(f'{self.base_key}.', ''): value for key, value in data.items()}
+        return data
+    
+    def get_all_values(self) -> Iterable[Any]:
+        """
+        Returns all the Values
+        """
+        self.sync()
+        all_keys = self.get_all_keys()
+        return [
+            self.decode_value(value)
+            for key, value in self.cache.items() if key in all_keys
+        ]    
+
+    def contains(self, key: str) -> bool:
+        """
+        Returns True if the Cache contains the Key
+        """
+        self.sync()
+        return key in self.get_all_keys()
+    
+
+    def iterate(self, **kwargs) -> Iterable[Any]:
+        """
+        Iterates over the Cache
+        """
+        self.sync()
+        return iter(self.get_all_keys())
+
+
+    """
+    Primary Utility Methods
+    """
+
     def should_sync(self) -> bool:
         """
         Returns True if the File should be Synced
@@ -133,79 +280,20 @@ class LocalStatefulBackend(BaseStatefulBackend):
                 return json.loads(await self.file_path.async_read_text())
             return self.parser.parse(await self.file_path.async_read_bytes(), recursive=True)
         
-    def encode_value(self, value: Union[Any, SchemaType], **kwargs) -> str:
+    def write_data(self, data: Dict):
         """
-        Encodes a Value
+        Writes the Data to the File
         """
-        result = super().encode_value(value, **kwargs)
-        return result.hex() if isinstance(result, bytes) else result
+        with self.file_lock:
+            self.file_path.write_text(json.dumps(data, indent = 4, ensure_ascii = False))
+            self.file_hash = create_unique_id()
+            self.file_hash_path.write_text(self.file_hash)
     
-    def decode_value(self, value: str, **kwargs) -> Any:
+    async def awrite_data(self, data: Dict):
         """
-        Decodes a Value
+        Writes the Data to the File
         """
-        if self.serializer.name == 'pickle' or self.serializer.compression_enabled:
-            value = binascii.unhexlify(value)
-        return super().decode_value(value, **kwargs)
-
-    def get(self, key: str, default: Optional[Any] = None, **kwargs) -> Optional[Any]:
-        """
-        Gets a Value from the JSON
-        """
-        self.sync()
-        if value := self.cache.get(self.get_key(key)):
-            try:
-                return self.decode_value(value, **kwargs) or default
-            except Exception as e:
-                logger.info(f'Error Decoding Value: |r|({type(value)}) {e}|e| {value}', colored = True)
-                self.delete(key)
-                return default
-        return default
-    
-    def get_values(self, keys: Iterable[str]) -> List[Any]:
-        """
-        Gets a Value from the JSON
-        """
-        self.sync()
-        results = []
-        for key in keys:
-            if value := self.cache.get(self.get_key(key)):
-                try:
-                    results.append(self.decode_value(value))
-                except AttributeError:
-                    logger.warning(f'Unable to decode value for {key}')
-                    self.delete(key)
-                    results.append(None)
-            else:
-                results.append(None)
-        return results
-    
-
-    def set(self, key: str, value: Any, **kwargs) -> None:
-        """
-        Sets a Value in the JSON
-        """
-        self.sync()
-        cache_data = copy.deepcopy(self.cache)
-        cache_data[self.get_key(key)] = self.encode_value(value)
-        self.write_data(cache_data)
-
-
-            
-            
-
-
-    
-
-        
-
-
-
-
-
-
-
-
-
-
-
+        with self.file_lock:
+            await self.file_path.async_write_text(json.dumps(data, indent = 4, ensure_ascii = False))
+            self.file_hash = create_unique_id()
+            await self.file_hash_path.async_write_text(self.file_hash)

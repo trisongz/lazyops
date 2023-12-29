@@ -397,7 +397,7 @@ class ThreadPoolerMetaClass(type):
         concurrency_limit = kwargs.pop('limit', concurrency_limit)
 
         results = []
-        async for result in _amap(func, iterable, *args, return_when = rt, **kwargs):
+        async for result in _amap(func, iterable, *args, return_when = rt, limit = concurrency_limit, **kwargs):
             results.append(result)
         return results
     
@@ -416,7 +416,7 @@ class ThreadPoolerMetaClass(type):
         from .ahelpers import async_map as _amap
         rt = kwargs.pop('return_when', 'ALL_COMPLETED' if return_ordered else 'FIRST_COMPLETED')
         concurrency_limit = kwargs.pop('limit', concurrency_limit)
-        async for result in _amap(func, iterable, *args, return_when = rt, **kwargs):
+        async for result in _amap(func, iterable, *args, return_when = rt, limit = concurrency_limit, **kwargs):
             yield result
 
 
