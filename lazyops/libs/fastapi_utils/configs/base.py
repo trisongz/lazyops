@@ -110,13 +110,13 @@ class AppEnv(str, Enum):
         return self.value.lower()
 
 
-def get_app_env(name: str) -> AppEnv:
+def get_app_env(name: Optional[str] = None) -> AppEnv:
     """
     Retrieves the app environment
     """
     for key in {
         "SERVER_ENV",
-        f"{name.upper()}_ENV",
+        f"{name.upper()}_ENV" if name is not None else "APP_SERVER_ENV",
         "APP_ENV",
         "ENVIRONMENT",
     }:
@@ -156,14 +156,15 @@ def get_app_ingress(
 def get_app_env_file(
     configs_path: Path,
     name: Optional[str] = None, 
-    required: Optional[bool] = False
+    required: Optional[bool] = False,
+    module_name: Optional[str] = None,
 ) -> Optional[Path]:
     """
     Retrieves the app environment file
 
     Only valid for local/dev environments
     """
-    app_env = get_app_env()
+    app_env = get_app_env(module_name)
     is_local_env = app_env in [
         AppEnv.LOCAL,
         AppEnv.DEVELOPMENT,
@@ -186,14 +187,15 @@ def get_app_default_file(
     configs_path: Path,
     name: Optional[str] = None, 
     required: Optional[bool] = False, 
-    suffix: Optional[str] = None
+    suffix: Optional[str] = None,
+    module_name: Optional[str] = None,
 ) -> Optional[Path]:
     """
     Retrieves the app environment file
 
     Only valid for local/dev environments
     """
-    app_env = get_app_env()
+    app_env = get_app_env(module_name)
     defaults_path = configs_path.joinpath('defaults')
     suffix = suffix or 'json'
     if name is not None:
@@ -209,19 +211,25 @@ def get_app_default_file(
 
 def create_get_app_env_file(
     configs_path: Path,
+    module_name: Optional[str] = None,
 ) -> Callable[[Optional[str], Optional[bool]], Optional[Path]]:
     """
     Creates a get_app_env_file wrapper
     """
-    return functools.partial(get_app_env_file, configs_path)
+    kwargs = {}
+    if module_name is not None: kwargs["module_name"] = module_name
+    return functools.partial(get_app_env_file, configs_path, **kwargs)
 
 def create_get_app_default_file(
     configs_path: Path,
+    module_name: Optional[str] = None,
 ) -> Callable[[Optional[str], Optional[bool], Optional[str]], Optional[Path]]:
     """
     Creates a get_app_default_file wrapper
     """
-    return functools.partial(get_app_default_file, configs_path)
+    kwargs = {}
+    if module_name is not None: kwargs["module_name"] = module_name
+    return functools.partial(get_app_default_file, configs_path, **kwargs)
 
 def create_get_app_ingress(
     module_name: str,
