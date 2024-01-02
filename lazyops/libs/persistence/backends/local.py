@@ -112,7 +112,8 @@ class LocalStatefulBackend(BaseStatefulBackend):
         self.sync()
         if value := self.cache.get(self.get_key(key)):
             try:
-                return self.decode_value(value, **kwargs) or default
+                result = self.decode_value(value, **kwargs)
+                return result if result is not None else default
             except Exception as e:
                 logger.info(f'Error Decoding Value: |r|({type(value)}) {e}|e| {value}', colored = True)
                 self.delete(key)

@@ -23,11 +23,12 @@ try:
 except ImportError:
     _ujson_available = False
 
-if _orjson_available:
-    default_json = orjson
 
-elif _simdjson_available:
+if _simdjson_available:
     default_json = simdjson
+
+elif _orjson_available:
+    default_json = orjson
 
 elif _ujson_available:
     default_json = ujson

@@ -27,3 +27,6 @@ lazyops/libs/stream_unzip/constants.py
 tests/test_shelve.db.db
 lazyops/libs/unzip_stream*
 lazyops/libs/jsonstate*
+tests/local.cache
+tests/local.hash
+tests/local.lock

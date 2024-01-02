@@ -4,6 +4,9 @@ import pathlib
 
 from pydantic import BaseModel
 from lazyops.libs.persistence import PersistentDict
+from lazyops.libs.persistence.main import _DEBUG_ENABLED
+
+_DEBUG_ENABLED = True
 
 class X(BaseModel):
     n: int
@@ -271,10 +274,18 @@ def test_json_advanced(backend: str = 'local', compression_level: int = None, is
         i_int = random.randint(0, 1000)
         y[f'x{i}'] = i_int
         d[f'x{i}'] = X(n = i_int)
-
+    
+    d.setdefault('xy', {})
+    d['xy'].update({
+        'x': 1,
+        'y': 2,
+    })
     
     print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test json advanced: ', y, '=', list(d.keys()))
     for k,v in d.items():
+        if k == 'xy':
+            print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test json advanced: {k} {v} {type(v)}')
+            continue
         assert y[k] == v.n if is_obj else v['n'], f'[{backend} - {compression_level} - {kwargs}] test json advanced: {k} {y[k]} {v} {type(v)}'
     d.clear()
     assert len(d) == 0
@@ -303,6 +314,13 @@ def test_msgpack_advanced(backend: str = 'local', compression_level: int = None,
         d[f'x{i}'] = X(n = i_int)
     
 
+    d.setdefault('xy', {})
+    d['xy'].update({
+        'x': 1,
+        'y': 2,
+    })
+    
+
     print(f'[{backend} - {d.base_key}] mutating: ', d['x5'].n, '=', d['x5'].n + 1)
     d['x5'].n += 1
     print(f'[{backend} - {d.base_key}] mutated: ', d['x5'].n)
@@ -317,6 +335,9 @@ def test_msgpack_advanced(backend: str = 'local', compression_level: int = None,
 
     print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test msgpack advanced: ', y, '=', list(d.keys()))
     for k,v in d.items():
+        if k == 'xy':
+            print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test msgpack advanced: {k} {v} {type(v)}')
+            continue
         assert y[k] == v.n, f'[{backend} - {compression_level} - {kwargs}] test msgpack advanced: {k} {y[k]} {v} {type(v)}'
     d.clear()
     assert len(d) == 0
@@ -342,6 +363,12 @@ def test_pickle_advanced(backend: str = 'local', compression_level: int = None, 
         y[f'x{i}'] = i_int
         d[f'x{i}'] = X(n = i_int)
     
+    d.setdefault('xy', {})
+    d['xy'].update({
+        'x': 1,
+        'y': 2,
+    })
+
     print(f'[{backend} - {d.base_key}] mutating: ', d['x5'].n, '=', d['x5'].n + 1)
     d['x5'].n += 1
     print(f'[{backend} - {d.base_key}] mutated: ', d['x5'].n)
@@ -357,6 +384,10 @@ def test_pickle_advanced(backend: str = 'local', compression_level: int = None, 
 
     print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test pickle advanced: ', y, '=', list(d.keys()))
     for k,v in d.items():
+        if k == 'xy':
+            print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test msgpack advanced: {k} {v} {type(v)}')
+            continue
+
         assert y[k] == v.n, f'[{backend} - {compression_level} - {kwargs}] test pickle advanced: {k} {y[k]} {v} {type(v)}'
     for key in d:
         print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test pickle advanced: {key} {d[key]} {type(d[key])}')

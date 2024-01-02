@@ -293,7 +293,7 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         if self.contains(key):
             return self.get(key)
         self.set(key, default)
-        return default        
+        return default
     
     async def asetdefault(self, key: str, default: Any = None):
         """
