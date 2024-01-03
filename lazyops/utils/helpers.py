@@ -429,3 +429,15 @@ def create_background_task(func: Union[Callable, Coroutine], *args, **kwargs):
     task.add_done_callback(_background_tasks.discard)
     return task
 
+
+async def adeferred_task(
+    func: Union[Callable, Coroutine],
+    *args,
+    wait_time: typing.Optional[float] = 10.0,
+    **kwargs,
+):
+    """
+    Runs a function as a background task
+    """
+    await asyncio.sleep(wait_time)
+    return create_background_task(func, *args, **kwargs)

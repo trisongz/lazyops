@@ -218,13 +218,11 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         self._precheck()
         value = self.get(key)
-        if value is not None:
-            if self.async_enabled:
-                ThreadPooler.create_background_task(self.adelete(key))
-            else:
-                self.delete(key)
-            return value
-        return default
+        if self.async_enabled:
+            ThreadPooler.create_background_task(self.adelete(key))
+        else:
+            self.delete(key)
+        return value if value is not None else default
     
     async def apop(self, key, default = None):
         """
@@ -232,10 +230,8 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         self._precheck()
         value = await self.aget(key)
-        if value is not None:
-            await self.adelete(key)
-            return value
-        return default
+        await self.adelete(key)
+        return value if value is not None else default
 
     def contains(self, key: str) -> bool:
         """
@@ -286,7 +282,7 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         return (await self.aget_all_data(True)).items()
     
-    def setdefault(self, key: str, default: Any = None):
+    def setdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False):
         """
         Sets a Default Value
         """
@@ -294,11 +290,16 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
             with contextlib.suppress(Exception):
                 value = self.get(key)
                 if value is not None:
+                    if update_values and isinstance(value, dict) and default and isinstance(default, dict):
+                        for k, v in default.items():
+                            if k not in value or value[k] is None:
+                                value[k] = v
+                        self.set(key, value)
                     return value
         self.set(key, default)
         return default
     
-    async def asetdefault(self, key: str, default: Any = None):
+    async def asetdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False):
         """
         Sets a Default Value
         """
@@ -306,6 +307,11 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
             with contextlib.suppress(Exception):
                 value = await self.aget(key)
                 if value is not None:
+                    if update_values and isinstance(value, dict) and default and isinstance(default, dict):
+                        for k, v in default.items():
+                            if k not in value or value[k] is None:
+                                value[k] = v
+                        await self.aset(key, value)
                     return value
         await self.aset(key, default)
         return default

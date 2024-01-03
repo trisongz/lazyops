@@ -4,7 +4,7 @@ Persistence Types
 - Handles persistence of data with Redis or JSON+Pickle
 """
 
-
+import contextlib
 import collections.abc
 from lazyops.utils.lazy import lazy_import, get_keydb_enabled
 from lazyops.utils.logs import logger, null_logger
@@ -281,17 +281,78 @@ class PersistentDict(collections.abc.MutableMapping):
         await self._asave_mutation_objects()
         return await self.base.aitems()
 
-    def setdefault(self, key: str, default: Any = None) -> Any:
+    @contextlib.contextmanager
+    def track_changes(self, key: str, func: str, *args, **kwargs):
         """
-        Sets a Default Value
+        Tracks Changes
         """
-        return self.base.setdefault(key, default)
+        try:
+            value = None
+            if key in self._mutation_tracker:
+                autologger.info(f'tracked {func} {key} (cached) {self._mutation_tracker[key]}')
+                if self.base.serializer.create_hash(self._mutation_tracker[key]) == self._mutation_hashes[key]:
+                    value = self._mutation_tracker[key]
+                else:
+                    autologger.info(f'tracked {func} {key} (changed). Saving')
+                    self.base.set(key, self._mutation_tracker[key])
+                    value = self._mutation_tracker.pop(key)
+                    self._mutation_hashes.pop(key)
+            
+            if value is None:
+                autologger.info(f'tracked {func} {key}')
+                value = getattr(self.base, func)(key, *args, **kwargs)
+            yield value
+        finally:
+            if key not in self._mutation_hashes:
+                self._mutation_hashes[key] = self.base.serializer.create_hash(value)
+                self._mutation_tracker[key] = value
+            if self.base.serializer.create_hash(value) != self._mutation_hashes[key]:
+                autologger.info(f'tracked {func} {key} (post-changed). Saving')
+                self._save_mutation_objects(key)
 
-    async def asetdefault(self, key: str, default: Any = None) -> Any:
+    
+    @contextlib.asynccontextmanager
+    async def atrack_changes(self, key: str, func: str, *args, **kwargs):
+        """
+        Tracks Changes
+        """
+        try:
+            value = None
+            if key in self._mutation_tracker:
+                autologger.info(f'tracked {func} {key} (cached): {self._mutation_tracker[key]}')
+                if self.base.serializer.create_hash(self._mutation_tracker[key]) == self._mutation_hashes[key]:
+                    value = self._mutation_tracker[key]
+                else:
+                    autologger.info(f'tracked {func} {key} (changed). Saving')
+                    await self.base.aset(key, self._mutation_tracker[key])
+                    value = self._mutation_tracker.pop(key)
+                    self._mutation_hashes.pop(key)
+            if value is None:
+                autologger.info(f'tracked {func} {key}')
+                value = await getattr(self.base, func)(key, *args, **kwargs)
+            yield value
+        finally:
+            if key not in self._mutation_hashes:
+                self._mutation_hashes[key] = self.base.serializer.create_hash(value)
+                self._mutation_tracker[key] = value
+            if self.base.serializer.create_hash(value) != self._mutation_hashes[key]:
+                autologger.info(f'tracked {func} {key} (post-changed). Saving')
+                await self._asave_mutation_objects(key)
+
+    def setdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False) -> Any:
         """
         Sets a Default Value
         """
-        return await self.base.asetdefault(key, default)
+        with self.track_changes(key, 'setdefault', default, update_values = update_values) as result:
+            return result
+    
+    async def asetdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False) -> Any:
+        """
+        Sets a Default Value
+        """
+        async with self.atrack_changes(key, 'asetdefault', default, update_values = update_values) as result:
+            return result
+        
     
     def update(self, data: Dict[str, Any]) -> None:
         """
@@ -380,20 +441,9 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         Gets an Item from the DB
         """
-        if key in self._mutation_tracker:
-            autologger.info(f'__getitem__ {key} (cached)')
-            if self.base.serializer.create_hash(self._mutation_tracker[key]) == self._mutation_hashes[key]:
-                return self._mutation_tracker[key]
-            self.base.__setitem__(key, self._mutation_tracker[key])
-            obj = self._mutation_tracker.pop(key)
-            self._mutation_hashes.pop(key)
-            return obj
+        with self.track_changes(key, '__getitem__') as result:
+            return result
 
-        autologger.info(f'__getitem__ {key}')
-        obj = self.base.__getitem__(key)
-        self._mutation_hashes[key] = self.base.serializer.create_hash(obj)
-        self._mutation_tracker[key] = obj
-        return obj
     
     def __setitem__(self, key: str, value: ObjectValue):
         """
