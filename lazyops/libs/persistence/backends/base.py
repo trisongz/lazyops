@@ -3,7 +3,7 @@ from __future__ import annotations
 """
 Base Persistence Backend
 """
-
+import contextlib
 import collections.abc
 from pathlib import Path
 from pydantic import BaseModel
@@ -291,7 +291,10 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         Sets a Default Value
         """
         if self.contains(key):
-            return self.get(key)
+            with contextlib.suppress(Exception):
+                value = self.get(key)
+                if value is not None:
+                    return value
         self.set(key, default)
         return default
     
@@ -300,7 +303,10 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         Sets a Default Value
         """
         if await self.acontains(key):
-            return await self.aget(key)
+            with contextlib.suppress(Exception):
+                value = await self.aget(key)
+                if value is not None:
+                    return value
         await self.aset(key, default)
         return default
     

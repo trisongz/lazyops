@@ -138,6 +138,43 @@ class BaseSerializer(abc.ABC):
         """
         return await ThreadPooler.run_async(self.decode, value, **kwargs)
     
+    def dumps(self, value: ObjectValue, **kwargs) -> Union[str, bytes]:
+        # sourcery skip: class-extract-method
+        """
+        Dumps the value
+        """
+        try:
+            return self.encode(value, **kwargs)
+        except Exception as e:
+            logger.trace(f'[{self.name}] Error in Encoding: {str(value)[:500]}', e)
+            if self.raise_errors: raise e
+            return None
+        
+    async def adumps(self, value: ObjectValue, **kwargs) -> Union[str, bytes]:
+        """
+        Dumps the value asynchronously
+        """
+        return await ThreadPooler.run_async(self.dumps, value, **kwargs)
+    
+    def loads(self, value: Union[str, bytes], **kwargs) -> ObjectValue:
+        """
+        Loads the value
+        """
+        try:
+            return self.decode(value, **kwargs)
+        except Exception as e:
+            logger.trace(f'[{self.name}] Error in Decoding: {str(value)[:500]}', e)
+            if self.raise_errors: raise e
+            return None
+        
+    async def aload(self, value: Union[str, bytes], **kwargs) -> ObjectValue:
+        """
+        Loads the value asynchronously
+        """
+        return await ThreadPooler.run_async(self.loads, value, **kwargs)
+    
+
+    
 
 class BinaryBaseSerializer(BaseSerializer):
 

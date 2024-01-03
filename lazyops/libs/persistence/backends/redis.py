@@ -70,7 +70,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
         try:
             return self.decode_value(value)
         except Exception as e:
-            logger.error(f'Error Getting Value: {e}')
+            logger.error(f'Error Getting Value for Key: {key} - {e}')
             self.delete(key)
             return default
 
@@ -85,7 +85,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
             try:
                 results.append(self.decode_value(value))
             except Exception as e:
-                logger.error(f'Error Getting Value: {e}')
+                logger.error(f'Error Getting Value for Key: {key} - {e}')
                 self.delete(key)
                 results.append(None)
         return results
@@ -150,7 +150,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
         try:
             return self.decode_value(value)
         except Exception as e:
-            logger.error(f'Error Getting Value: {e}')
+            logger.error(f'Error Getting Value for Key: {key} - {e}')
             await self.adelete(key)
             return default
 
@@ -164,7 +164,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
         for key, value in zip(keys, values):
             try: results.append(self.decode_value(value))
             except Exception as e:
-                logger.error(f'Error Getting Value: {e}')
+                logger.error(f'Error Getting Value for Key: {key} - {e}')
                 await self.adelete(key)
                 results.append(None)
         return results
