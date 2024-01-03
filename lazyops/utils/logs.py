@@ -388,7 +388,9 @@ class Logger(_Logger):
         -> "example <blue>msg</><reset>"
         """
         _message = ""
-        if prefix: _message += f'[{prefix}] '
+        if prefix: 
+            if colored and '|' not in prefix: prefix = f'|g|{prefix}|e|'
+            _message += f'[{prefix}] '
         _message += self._format_item(message, max_length = max_length, colored = colored)
         if args:
             for arg in args:
@@ -531,8 +533,15 @@ class Logger(_Logger):
         _msg = msg if isinstance(msg, str) else pprint.pformat(msg)
         _msg += f": {traceback.format_exc(chain = chain, limit = (depth if depth is not None else self.default_trace_depth))}"
         if error: _msg += f" - {error}"
-        _log = self.get_log_mode(level)
-        _log(_msg)
+        # _log = self.get_log_mode(level)
+        # _log(_msg)
+        try:
+            self._log(level, False, self._get_opts(colored = True), _msg, (), {})
+        except TypeError:
+        # level = self._get_level(level)
+            static_log_no = REVERSE_LOGLEVEL_MAPPING.get(level, 40)
+            self._log(level, static_log_no, False, self._get_opts(colored = True), _msg, (), {})
+
 
     
     def __call__(self, message: Any, *args, level: str = 'info', **kwargs):

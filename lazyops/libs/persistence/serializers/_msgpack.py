@@ -42,7 +42,7 @@ class MsgPackSerializer(BinaryBaseSerializer):
         """
         Default Serialization Hook
         """
-        if not isinstance(obj, BaseModel) and not hasattr(obj, 'model_dump'):
+        if not isinstance(obj, BaseModel) or not hasattr(obj, 'model_dump'):
             return obj
         
         if self.disable_object_serialization: 
