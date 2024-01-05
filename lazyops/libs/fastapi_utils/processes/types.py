@@ -475,7 +475,7 @@ class GlobalContextMeta(type):
         """
         import anyio
         for func in cls.on_close_funcs:
-            async with anyio.fail_after(timeout):
+            with anyio.fail_after(timeout):
                 try:
                     await func()
                     if verbose: cls.logger.info(f"Called function {func.__name__} on close")
