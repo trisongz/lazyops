@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 # Lazily handle stuff
-import functools
+import sys
+import copy
+import pathlib
 import inspect
-from typing import Any, Dict, Callable, Union, Optional, Type, TypeVar, List, Tuple, TYPE_CHECKING
-
+import functools
+import importlib.util
+from typing import Any, Dict, Callable, Union, Optional, Type, TypeVar, List, Tuple, cast, TYPE_CHECKING
+from types import ModuleType
 
 if TYPE_CHECKING:
     from lazyops.types import BaseModel
@@ -199,3 +203,101 @@ def get_keydb_session(
     if validate_active and not _keydb_enabled:
         return None
     return _keydb_sessions[name]
+
+
+"""
+Lazily Handle Classes and Imports
+"""
+
+def import_code(
+    code: str,
+    add_to_sys: Optional[bool] = True,
+    name: Optional[str] = None,
+    ref: Optional[str] = None,
+    module_name: Optional[str] = None,
+) -> ModuleType:
+    """
+    Import dynamically generated code as a module. code is the
+    object containing the code (a string, a file handle or an
+    actual compiled code object, same types as accepted by an
+    exec statement). The name is the name to give to the module,
+    and the final argument says wheter to add it to sys.modules
+    or not. If it is added, a subsequent import statement using
+    name will return this module. If it is not added to sys.modules
+    import will try to load it in the normal fashion. 
+    """
+    assert name or ref, 'Must provide either a name or a ref'
+    name = name or ref
+    module = ModuleType(name)
+    module.__module__ = module_name or 'lazyops.types.dynamic'
+    exec(code, module.__dict__)
+    if add_to_sys:
+        sys.modules[name] = module
+    return module
+
+
+DynamicT = TypeVar('DynamicT')
+_DynamicClasses: Dict[str, DynamicT] = {}
+
+
+def create_new_class(
+    code: str,
+    cls: DynamicT,
+    ref: Optional[str] = None,
+    module_name: Optional[str] = None,
+) -> DynamicT:
+    """
+    Create a new class
+    """
+    global _DynamicClasses
+    module_name = module_name or "lazyops.types.dynamic"
+    from .serialization import create_hash_key
+    code_hash = create_hash_key(kwargs = {'ref': ref, 'cls': cls, 'module_name': module_name, 'code': code})
+    if code_hash in _DynamicClasses:
+        return _DynamicClasses[code_hash]
+    run_code = import_code(code, add_to_sys = True, ref = ref or cls.__name__, module_name = module_name)
+    new_cls = copy.deepcopy(cls)
+    for prop_or_func in dir(run_code):
+        setattr(new_cls, prop_or_func, getattr(run_code, prop_or_func))
+    _DynamicClasses[code_hash] = new_cls
+    return new_cls
+
+
+def load_module_from_file(
+    file: Union[str, pathlib.Path], 
+    module_name: str,
+    add_to_sys: Optional[bool] = False,
+) -> ModuleType:
+    """
+    Loads a module from a file
+    """
+    if isinstance(file, str):
+        file = pathlib.Path(file)
+    spec = importlib.util.spec_from_file_location(module_name, file.as_posix())
+    module = importlib.util.module_from_spec(spec)
+    if add_to_sys: sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+def import_from_file(
+    file: Union[str, pathlib.Path],
+    cls_name: str,
+) -> ModuleType:
+    """
+    Import a file
+    """
+    return load_module_from_file(file = file, module_name = cls_name)
+
+def create_new_class_from_file(
+    file: Union[str, pathlib.Path],
+    cls_name: str,
+    cls: DynamicT,
+) -> DynamicT:
+    """
+    Import a file and create a new class
+    """
+
+    module_spec = load_module_from_file(file = file, module_name = cls_name)
+    cls_spec = getattr(module_spec, cls_name)
+    cls_spec = cast(cls, cls_spec)
+    return cls_spec

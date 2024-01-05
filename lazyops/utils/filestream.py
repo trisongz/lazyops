@@ -15,7 +15,7 @@ class FileLikeObject(IOBase):
         **kwargs,
     ):
         super().__init__()
-        self.base = base
+        self.base: Type[bytes] = base
         self.chunk = base()
         self.offset = 0
         self.iterator = iter(data)
@@ -76,7 +76,7 @@ class AsyncFileLikeObject(IOBase):
         **kwargs,
     ):
         super().__init__()
-        self.base = base
+        self.base: Type[bytes] = base
         self.chunk = base()
         self.offset = 0
         self.iterator = aiter(data)
