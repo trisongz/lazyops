@@ -67,7 +67,8 @@ class JsonSerializer(BaseSerializer):
             self.jsonlib = jsonlib
         self.jsonlib_name = self.jsonlib.__name__
     
-    def encode_value(self, value: Union[Any, SchemaType], **kwargs) -> str:
+
+    def encode_one(self, value: Union[Any, SchemaType], **kwargs) -> str:
         """
         Encode the value with the JSON Library
         """
@@ -81,15 +82,29 @@ class JsonSerializer(BaseSerializer):
                 if not self.disable_object_serialization:
                     value['__class__'] = obj_class_name
         except Exception as e:
-            logger.info(f'Error Encoding Value: |r|({type(value)}) {e}|e| {value}', colored = True)
+            logger.info(f'Error Encoding Value: |r|({type(value)}) {e}|e| {str(value)[:1000]}', colored = True)
         try:
             return self.jsonlib.dumps(value, **kwargs)
         except Exception as e:
-            logger.info(f'Error Encoding Value: |r|({type(value)}) {e}|e| {value}', colored = True, prefix = self.jsonlib_name)
+            logger.info(f'Error Encoding Value: |r|({type(value)}) {e}|e| {str(value)[:1000]}', colored = True, prefix = self.jsonlib_name)
             if self.raise_errors: raise e
         return None
+        
+    def encode_value(self, value: Union[Any, SchemaType], **kwargs) -> str:
+        """
+        Encode the value with the JSON Library
+        """
+        if isinstance(value, list):
+            values = [self.encode_one(v, **kwargs) for v in value]
+            value_dict = {
+                '__type__': 'list',
+                'values': values,
+            }
+            return self.jsonlib.dumps(value_dict, **kwargs)
+        return self.encode_one(value, **kwargs)
 
-    def decode_value(self, value: str, **kwargs) -> Union[SchemaType, Dict, Any]:
+
+    def decode_one(self, value: str, **kwargs) -> Union[SchemaType, Dict, Any]:
         """
         Decode the value with the JSON Library
         """
@@ -105,9 +120,19 @@ class JsonSerializer(BaseSerializer):
                 value = self.serialization_obj.model_validate(value)
             return value
         except Exception as e:
-            logger.info(f'Error Decoding Value: |r|({type(value)}) {e}|e| {value}', colored = True, prefix = self.jsonlib_name)
+            logger.info(f'Error Decoding Value: |r|({type(value)}) {e}|e| {str(value)[:1000]}', colored = True, prefix = self.jsonlib_name)
             if self.raise_errors: raise e
         return None
+
+    def decode_value(self, value: str, **kwargs) -> Union[SchemaType, Dict, Any]:
+        """
+        Decode the value with the JSON Library
+        """
+        value = self.decode_one(value, **kwargs)
+        if isinstance(value, dict) and '__type__' in value and value['__type__'] == 'list':
+            return [self.decode_one(v, **kwargs) for v in value['values']]
+        return value
+
         
     
     

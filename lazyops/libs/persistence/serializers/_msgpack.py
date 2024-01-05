@@ -3,11 +3,11 @@ from __future__ import annotations
 """
 MsgPack Serializer
 """
-import json
+
 from typing import Any, Dict, Optional, Union, Type
 from lazyops.utils.lazy import lazy_import
 from .base import BinaryBaseSerializer, BaseModel, SchemaType, ObjectValue, logger
-
+from ._json import default_json
 try:
     import msgpack
     _msgpack_available = True
@@ -19,6 +19,7 @@ class MsgPackSerializer(BinaryBaseSerializer):
     name: Optional[str] = "msgpack"
     encoding: Optional[str] = "utf-8"
     disable_object_serialization: Optional[bool] = False
+    jsonlib: Any = default_json
 
     def __init__(
         self, 
@@ -53,7 +54,7 @@ class MsgPackSerializer(BinaryBaseSerializer):
             self.serialization_schemas[obj_class_name] = obj.__class__
         data = obj.model_dump(**self.serialization_obj_kwargs)
         data['__class__'] = obj_class_name
-        return msgpack.ExtType(2, json.dumps(data).encode(self.encoding))
+        return msgpack.ExtType(2, self.jsonlib.dumps(data).encode(self.encoding))
     
     def default_deserialization_hook(self, code: int, data: Union[str, bytes]) -> ObjectValue:
         """
@@ -62,9 +63,9 @@ class MsgPackSerializer(BinaryBaseSerializer):
         if code != 2: return data
         if isinstance(data, bytes): data = data.decode(self.encoding)
         try:
-            data = json.loads(data)
+            data = self.jsonlib.loads(data)
         except Exception as e:
-            logger.info(f'Error Decoding Value: |r|({type(data)}) {e}|e| {data}', colored = True, prefix = "msgpack")
+            logger.info(f'Error Decoding Value: |r|({type(data)}) {e}|e| {str(data)[:500]}', colored = True, prefix = "msgpack")
             if self.raise_errors: raise e
             return data
         if not self.disable_object_serialization:
@@ -87,7 +88,7 @@ class MsgPackSerializer(BinaryBaseSerializer):
         try:
             return msgpack.packb(value, **kwargs)
         except Exception as e:
-            logger.info(f'Error Encoding Value: |r|({type(value)}) {e}|e| {value}', colored = True, prefix = "msgpack")
+            logger.info(f'Error Encoding Value: |r|({type(value)}) {e}|e| {str(value)[:500]}', colored = True, prefix = "msgpack")
             if self.raise_errors: raise e
         return None
 
@@ -100,6 +101,6 @@ class MsgPackSerializer(BinaryBaseSerializer):
             if 'ext_hook' not in kwargs: kwargs['ext_hook'] = self.default_deserialization_hook
             return msgpack.unpackb(value, **kwargs)
         except Exception as e:
-            logger.info(f'Error Decoding Value: |r|({type(value)}) {e}|e| {value}', colored = True, prefix = "msgpack")
+            logger.info(f'Error Decoding Value: |r|({type(value)}) {e}|e| {str(value)[:500]}', colored = True, prefix = "msgpack")
             if self.raise_errors: raise e
         return None

@@ -524,6 +524,7 @@ class Logger(_Logger):
         level: str = "ERROR",
         depth: Optional[int] = None,
         chain: Optional[bool] = True,
+        colored: Optional[bool] = False,
     ) -> None:
         """
         This method logs the traceback of an exception.
@@ -536,11 +537,11 @@ class Logger(_Logger):
         # _log = self.get_log_mode(level)
         # _log(_msg)
         try:
-            self._log(level, False, self._get_opts(colored = True), _msg, (), {})
+            self._log(level, False, self._get_opts(colored = colored), _msg, (), {})
         except TypeError:
         # level = self._get_level(level)
             static_log_no = REVERSE_LOGLEVEL_MAPPING.get(level, 40)
-            self._log(level, static_log_no, False, self._get_opts(colored = True), _msg, (), {})
+            self._log(level, static_log_no, False, self._get_opts(colored = colored), _msg, (), {})
 
 
     
