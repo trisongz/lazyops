@@ -280,6 +280,18 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         await self._asave_mutation_objects()
         return await self.base.aitems()
+    
+    def expire(self, key: str, timeout: int) -> None:
+        """
+        Expires a Key
+        """
+        self.base.expire(key, timeout)
+
+    async def aexpire(self, key: str, timeout: int) -> None:
+        """
+        Expires a Key
+        """
+        await self.base.aexpire(key, timeout)
 
     @contextlib.contextmanager
     def track_changes(self, key: str, func: str, *args, **kwargs):

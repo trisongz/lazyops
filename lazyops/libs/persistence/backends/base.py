@@ -282,6 +282,19 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         return (await self.aget_all_data(True)).items()
     
+    def expire(self, key: str, ex: Optional[int] = None, **kwargs) -> None:
+        """
+        Expires a Key
+        """
+        pass
+            
+    async def aexpire(self, key: str, ex: Optional[int] = None, **kwargs) -> None:
+        """
+        Expires a Key
+        """
+        pass
+
+    
     def setdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False):
         """
         Sets a Default Value

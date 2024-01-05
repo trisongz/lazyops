@@ -390,6 +390,25 @@ class RedisStatefulBackend(BaseStatefulBackend):
         """
         if self.hset_enabled: return await self.cache.async_hexists(self.base_key, key)
         return await self.cache.async_client.exists(self.get_key(key))
+    
+    def expire(self, key: str, ex: int) -> None:
+        """
+        Expires a Key
+        """
+        if self.hset_enabled: 
+            logger.warning(f'Cannot expire a key in a hset cache: {self.base_key}.{key}')
+            return
+        self.cache.client.expire(self.get_key(key), ex)
+
+    async def aexpire(self, key: str, ex: int) -> None:
+        """
+        Expires a Key
+        """
+        if self.hset_enabled: 
+            logger.warning(f'Cannot expire a key in a hset cache: {self.base_key}.{key}')
+            return
+            # await self.cache.async_expire(self.base_key, ex)
+        await self.cache.async_client.expire(self.get_key(key), ex)
 
 
     """
