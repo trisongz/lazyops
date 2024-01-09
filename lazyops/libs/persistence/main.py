@@ -254,12 +254,12 @@ class PersistentDict(collections.abc.MutableMapping):
         self._save_mutation_objects()
         return self.base.values()
     
-    def items(self) -> Dict[Any, Any]:
+    def items(self, iterable: Optional[bool] = True) -> Dict[Any, Any]:
         """
         Returns the Items
         """
         self._save_mutation_objects()
-        return self.base.items()
+        return self.base.items(iterable = iterable)
     
     async def akeys(self) -> Iterable[Any]:
         """
@@ -274,12 +274,12 @@ class PersistentDict(collections.abc.MutableMapping):
         await self._asave_mutation_objects()
         return await self.base.avalues()
     
-    async def aitems(self) -> Dict[Any, Any]:
+    async def aitems(self, iterable: Optional[bool] = True) -> Dict[Any, Any]:
         """
         Returns the Items
         """
         await self._asave_mutation_objects()
-        return await self.base.aitems()
+        return await self.base.aitems(iterable = iterable)
     
     def expire(self, key: str, timeout: int) -> None:
         """

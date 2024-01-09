@@ -257,11 +257,12 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         return iter(self.get_all_values())
     
-    def items(self) -> Iterable[ItemsView]:
+    def items(self, iterable: Optional[bool] = True) -> Union[Iterable[ItemsView], Dict[str, Any]]:
         """
         Returns the Items
         """
-        return self.get_all_data(True).items()
+        items = self.get_all_data(True)
+        return items.items() if iterable else items
         # return iter(self.get_all_data())
     
     async def akeys(self) -> Iterable[Any]:
@@ -276,11 +277,12 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         return iter(await self.aget_all_values())
     
-    async def aitems(self) -> Iterable[ItemsView]:
+    async def aitems(self, iterable: Optional[bool] = True) -> Union[Iterable[ItemsView], Dict[str, Any]]:
         """
         Returns the Items
         """
-        return (await self.aget_all_data(True)).items()
+        items = await self.aget_all_data(True)
+        return items.items() if iterable else items
     
     def expire(self, key: str, ex: Optional[int] = None, **kwargs) -> None:
         """
@@ -306,6 +308,7 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
                     if update_values and isinstance(value, dict) and default and isinstance(default, dict):
                         for k, v in default.items():
                             if k not in value or value[k] is None:
+                                
                                 value[k] = v
                         self.set(key, value)
                     return value
