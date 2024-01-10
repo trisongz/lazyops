@@ -295,7 +295,6 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         Expires a Key
         """
         pass
-
     
     def setdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False):
         """
@@ -428,3 +427,14 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         return f"<{self.__class__.__name__} num_keys={len(self)}, base_key={self.base_key}, serializer={self.serializer.name}>"
     
+    def migrate_compression(self, **kwargs):
+        """
+        Migrates the Compression
+        """
+        pass
+
+    async def amigrate_compression(self, **kwargs):
+        """
+        Migrates the Compression
+        """
+        pass

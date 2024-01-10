@@ -13,7 +13,7 @@ except ImportError:
 
 class Lz4Compression(BaseCompression):
     name: str = "lz4"
-    compression_level: Optional[int] = 3
+    compression_level: Optional[int] = 4
 
     def check_deps(self):
         """

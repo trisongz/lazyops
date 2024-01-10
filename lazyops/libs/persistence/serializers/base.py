@@ -49,6 +49,7 @@ class BaseSerializer(abc.ABC):
     encoding: Optional[str] = None
     binary: Optional[bool] = False
     compressor: Optional['CompressionT'] = None
+    previous_compressor: Optional['CompressionT'] = None
 
     def __init__(
         self,
@@ -66,14 +67,15 @@ class BaseSerializer(abc.ABC):
             from ..compression import get_compression
             compression_kwargs = kwargs.pop("compression_kwargs", None)
             decompression_kwargs = kwargs.pop("decompression_kwargs", None)
-            enable_deprecation_support = kwargs.pop("enable_deprecation_support", True)
+            deprecated_compression = kwargs.pop("deprecated_compression", None)
             self.compressor = get_compression(
                 compression, 
                 compression_level = compression_level, 
                 compression_kwargs = compression_kwargs, 
                 decompression_kwargs = decompression_kwargs,
-                enable_deprecation_support = enable_deprecation_support,
             )
+            if deprecated_compression is not None and deprecated_compression != compression:
+                self.previous_compressor = get_compression(deprecated_compression)
         if encoding is not None: self.encoding = encoding
         self.raise_errors = raise_errors
         self.enable_deprecation_support = enable_deprecation_support
@@ -114,6 +116,26 @@ class BaseSerializer(abc.ABC):
             return self.compressor.compress(value)
         return value
     
+    def deprecated_decompress_value(self, value: Union[str, bytes], **kwargs) -> Optional[Union[str, bytes]]:
+        """
+        Attempts to decompress the value using the deprecated compressor
+        """
+        e = None
+        attempt_msg = f"{self.name}"
+        if self.previous_compressor is not None:
+            try:
+                return self.previous_compressor.decompress(value)
+            except Exception as e:
+                attempt_msg += f"-> {self.previous_compressor.name}"
+        try:
+            return zlib.decompress(value)
+        except Exception as e:
+            attempt_msg += " -> ZLib"
+            logger.trace(f'[{attempt_msg}] Error in Decompression: {str(value)[:100]}', e)
+            if self.raise_errors: raise e
+            return None
+        
+    
     def decompress_value(self, value: Union[str, bytes], **kwargs) -> Union[str, bytes]:
         # sourcery skip: extract-duplicate-method
         """
@@ -121,20 +143,11 @@ class BaseSerializer(abc.ABC):
         """
         if not self.compression_enabled: return value
         try:
-            value = self.compressor.decompress(value)
+            value = self.compressor.decompress(value, **kwargs)
         except Exception as e:
-            if not self.enable_deprecation_support:
-                logger.trace(f'[{self.name}] Error in Decompression: {str(value)[:500]}', e)
-                if self.raise_errors: raise e
-                return None
-            try:
-                value = zlib.decompress(value)
-            except Exception as e:
-                logger.trace(f'[{self.name} -> ZLib] Error in Decompression: {str(value)[:500]}', e)
-                if self.raise_errors: raise e
-                return None
-
-        if not self.binary: value = value.decode(self.encoding)
+            if self.enable_deprecation_support or self.previous_compressor is not None:
+                value = self.deprecated_decompress_value(value, **kwargs)
+        if value is not None and not self.binary: value = value.decode(self.encoding)
         return value
 
     def encode_value(self, value: ObjectValue, **kwargs) -> Union[str, bytes]:
@@ -208,7 +221,6 @@ class BaseSerializer(abc.ABC):
         """
         return await ThreadPooler.run_async(self.loads, value, **kwargs)
     
-
     
 
 class BinaryBaseSerializer(BaseSerializer):

@@ -447,3 +447,91 @@ class RedisStatefulBackend(BaseStatefulBackend):
         if decode: return [key.decode() if isinstance(key, bytes) else key for key in keys]
         return keys
     
+
+    def migrate_compression(self, **kwargs) -> List[str]:
+        """
+        Migrates the Compression
+        """
+        if not self.hset_enabled and not self.base_key:
+            raise NotImplementedError('Cannot get all data from a Redis Cache without a base key')
+        failed_keys = []
+        null_is_error = self.serializer.raise_errors
+        if self.hset_enabled:
+            data = self.cache.hgetall(self.base_key)
+            results = {}
+            for key, value in data.items():
+                if isinstance(key, bytes): key = key.decode()
+                try: 
+                    val = self.decode_value(value)
+                    if val is not None: results[key] = val
+                    elif null_is_error: failed_keys.append(key)
+                except Exception as e:
+                    if not null_is_error:
+                        logger.warning(f'Unable to decode value for {key}: {e}')
+                    failed_keys.append(key)
+                    # self.delete(key)
+            if results: self.set_batch(results)
+            if failed_keys: logger.warning(f'Failed to migrate keys: {failed_keys}')
+            return failed_keys
+        
+        keys = self._fetch_set_keys(decode = True)
+        data_list = self.cache.client.mget(keys)
+        results: Dict[str, Any] = {}
+        for key, value in zip(keys, data_list):
+            if isinstance(key, bytes): key = key.decode()
+            try:
+                val = self.decode_value(value)
+                if val is not None: results[key] = val
+                elif null_is_error: failed_keys.append(key)
+            except Exception as e:
+                if not null_is_error:
+                    logger.warning(f'Unable to decode value for {key}: {e}')
+                failed_keys.append(key)
+        
+        if results: self.set_batch(results)
+        if failed_keys: logger.warning(f'Failed to migrate keys: {failed_keys}')
+        return failed_keys
+        
+
+    async def amigrate_compression(self, **kwargs) -> List[str]:
+        """
+        Migrates the Compression
+        """
+        if not self.hset_enabled and not self.base_key:
+            raise NotImplementedError('Cannot get all data from a Redis Cache without a base key')
+        failed_keys = []
+        null_is_error = self.serializer.raise_errors
+        if self.hset_enabled:
+            data = await self.cache.async_hgetall(self.base_key)
+            results = {}
+            for key, value in data.items():
+                if isinstance(key, bytes): key = key.decode()
+                try: 
+                    val = await self.adecode_value(value)
+                    if val is not None: results[key] = val
+                    elif null_is_error: failed_keys.append(key)
+                except Exception as e:
+                    if not null_is_error:
+                        logger.warning(f'Unable to decode value for {key}: {e}')
+                    failed_keys.append(key)
+            if results: await self.aset_batch(results)
+            if failed_keys: logger.warning(f'Failed to migrate keys: {failed_keys}')
+            return failed_keys
+        
+        keys = await self._afetch_set_keys(decode = True)
+        data_list = await self.cache.async_client.mget(keys)
+        results: Dict[str, Any] = {}
+        for key, value in zip(keys, data_list):
+            if isinstance(key, bytes): key = key.decode()
+            try:
+                val = await self.adecode_value(value)
+                if val is not None: results[key] = val
+                elif null_is_error: failed_keys.append(key)
+            except Exception as e:
+                if not null_is_error:
+                    logger.warning(f'Unable to decode value for {key}: {e}')
+                failed_keys.append(key)
+        
+        if results: await self.aset_batch(results)
+        if failed_keys: logger.warning(f'Failed to migrate keys: {failed_keys}')
+        return failed_keys

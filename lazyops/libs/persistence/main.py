@@ -506,3 +506,15 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         return bool(self.base.keys())
     
+
+    def migrate_compression(self, **kwargs):
+        """
+        Migrates the compression
+        """
+        return self.base.migrate_compression(**kwargs)
+
+    async def amigrate_compression(self, **kwargs):
+        """
+        Migrates the compression
+        """
+        return await self.base.amigrate_compression(**kwargs)
