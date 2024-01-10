@@ -23,6 +23,7 @@ class MsgPackSerializer(BinaryBaseSerializer):
 
     def __init__(
         self, 
+        compression: Optional[str] = None,
         compression_level: int | None = None, 
         encoding: str | None = None, 
         serialization_obj: Optional[Type[BaseModel]] = None,
@@ -32,7 +33,7 @@ class MsgPackSerializer(BinaryBaseSerializer):
     ):
         if not _msgpack_available:
             raise ImportError("MsgPack Serializer is not available. Please install msgpack")
-        super().__init__(compression_level, encoding, **kwargs)
+        super().__init__(compression, compression_level, encoding, **kwargs)
         self.serialization_obj = serialization_obj
         self.serialization_obj_kwargs = serialization_obj_kwargs or {}
         self.serialization_schemas: Dict[str, Type[BaseModel]] = {}
@@ -43,7 +44,8 @@ class MsgPackSerializer(BinaryBaseSerializer):
         """
         Default Serialization Hook
         """
-        if not isinstance(obj, BaseModel) or not hasattr(obj, 'model_dump'):
+        if not isinstance(obj, BaseModel) and not hasattr(obj, 'model_dump'):
+            logger.info(f'Invalid Object Type: |r|{type(obj)}|e| {obj}', colored = True, prefix = "msgpack")
             return obj
         
         if self.disable_object_serialization: 
@@ -52,7 +54,7 @@ class MsgPackSerializer(BinaryBaseSerializer):
         obj_class_name = self.fetch_object_classname(obj)
         if obj_class_name not in self.serialization_schemas:
             self.serialization_schemas[obj_class_name] = obj.__class__
-        data = obj.model_dump(**self.serialization_obj_kwargs)
+        data = obj.model_dump(mode = 'json', **self.serialization_obj_kwargs)
         data['__class__'] = obj_class_name
         return msgpack.ExtType(2, self.jsonlib.dumps(data).encode(self.encoding))
     

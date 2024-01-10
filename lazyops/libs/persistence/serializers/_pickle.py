@@ -30,11 +30,12 @@ class PickleSerializer(BinaryBaseSerializer):
     def __init__(
         self, 
         picklelib: Optional[Union[str, Any]] = None,
+        compression: Optional[str] = None,
         compression_level: int | None = None, 
         encoding: str | None = None, 
         **kwargs
     ):
-        super().__init__(compression_level, encoding, **kwargs)
+        super().__init__(compression, compression_level, encoding, **kwargs)
         if picklelib is not None:
             if isinstance(picklelib, str):
                 picklelib = lazy_import(picklelib)

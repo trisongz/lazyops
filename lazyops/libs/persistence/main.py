@@ -77,6 +77,13 @@ class PersistentDict(collections.abc.MutableMapping):
             return LocalStatefulBackend
         raise NotImplementedError(f'Backend Type {self.backend_type} is not implemented')
     
+    @property
+    def compression_level(self) -> Optional[int]:
+        """
+        Returns the Compression Level
+        """
+        return self.base.serializer.compression_level
+
     def get_child(self, key: str, **kwargs) -> 'PersistentDict':
         """
         Gets a Child Persistent Dictionary

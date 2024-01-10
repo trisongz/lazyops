@@ -10,8 +10,7 @@ import hashlib
 from lazyops.types import BaseModel
 from lazyops.utils.logs import logger
 from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
-
-from typing import Any, Optional, Union, Dict, TypeVar
+from typing import Any, Optional, Union, Dict, TypeVar, TYPE_CHECKING
 
 try:
     import xxhash
@@ -19,7 +18,8 @@ try:
 except ImportError:
     _xxhash_available = False
 
-
+if TYPE_CHECKING:
+    from ..compression import CompressionT
 
 
 SchemaType = TypeVar("SchemaType", bound=BaseModel)
@@ -48,20 +48,35 @@ class BaseSerializer(abc.ABC):
     name: Optional[str] = None
     encoding: Optional[str] = None
     binary: Optional[bool] = False
+    compressor: Optional['CompressionT'] = None
 
     def __init__(
         self,
+        compression: Optional[str] = None,
         compression_level: Optional[int] = None,
         encoding: Optional[str] = None,
         raise_errors: bool = False,
+        enable_deprecation_support: bool = True,
         **kwargs,
     ):
         """
         Initializes the serializer
         """
-        self.compression_level = compression_level
+        if compression is not None or compression_level is not None:
+            from ..compression import get_compression
+            compression_kwargs = kwargs.pop("compression_kwargs", None)
+            decompression_kwargs = kwargs.pop("decompression_kwargs", None)
+            enable_deprecation_support = kwargs.pop("enable_deprecation_support", True)
+            self.compressor = get_compression(
+                compression, 
+                compression_level = compression_level, 
+                compression_kwargs = compression_kwargs, 
+                decompression_kwargs = decompression_kwargs,
+                enable_deprecation_support = enable_deprecation_support,
+            )
         if encoding is not None: self.encoding = encoding
         self.raise_errors = raise_errors
+        self.enable_deprecation_support = enable_deprecation_support
         self._kwargs = kwargs
 
     @property
@@ -69,8 +84,15 @@ class BaseSerializer(abc.ABC):
         """
         Returns if compression is enabled
         """
-        return self.compression_level is not None
+        return self.compressor is not None
     
+    @property
+    def compression_level(self) -> Optional[int]:
+        """
+        Returns the compression level
+        """
+        return self.compressor.compression_level if self.compressor is not None else None
+
     def fetch_object_classname(self, obj: ObjectValue) -> str:
         """
         Fetches the object classname
@@ -89,17 +111,30 @@ class BaseSerializer(abc.ABC):
         """
         if self.compression_enabled:
             if isinstance(value, str): value = value.encode(self.encoding)
-            return zlib.compress(value, level=self.compression_level)
+            return self.compressor.compress(value)
         return value
     
     def decompress_value(self, value: Union[str, bytes], **kwargs) -> Union[str, bytes]:
+        # sourcery skip: extract-duplicate-method
         """
         Decompresses the value
         """
-        if self.compression_enabled:
-            value = zlib.decompress(value)
-            if not self.binary: value = value.decode(self.encoding)
-            return value
+        if not self.compression_enabled: return value
+        try:
+            value = self.compressor.decompress(value)
+        except Exception as e:
+            if not self.enable_deprecation_support:
+                logger.trace(f'[{self.name}] Error in Decompression: {str(value)[:500]}', e)
+                if self.raise_errors: raise e
+                return None
+            try:
+                value = zlib.decompress(value)
+            except Exception as e:
+                logger.trace(f'[{self.name} -> ZLib] Error in Decompression: {str(value)[:500]}', e)
+                if self.raise_errors: raise e
+                return None
+
+        if not self.binary: value = value.decode(self.encoding)
         return value
 
     def encode_value(self, value: ObjectValue, **kwargs) -> Union[str, bytes]:

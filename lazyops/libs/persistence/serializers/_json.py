@@ -47,6 +47,7 @@ class JsonSerializer(BaseSerializer):
     def __init__(
         self, 
         jsonlib: Optional[Union[str, Any]] = None,
+        compression: Optional[str] = None,
         compression_level: int | None = None, 
         encoding: str | None = None, 
         serialization_obj: Optional[Type[BaseModel]] = None,
@@ -54,7 +55,7 @@ class JsonSerializer(BaseSerializer):
         disable_object_serialization: Optional[bool] = None,
         **kwargs
     ):
-        super().__init__(compression_level, encoding, **kwargs)
+        super().__init__(compression, compression_level, encoding, **kwargs)
         self.serialization_obj = serialization_obj
         self.serialization_obj_kwargs = serialization_obj_kwargs or {}
         self.serialization_schemas: Dict[str, Type[BaseModel]] = {}

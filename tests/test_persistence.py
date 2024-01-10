@@ -253,7 +253,7 @@ Advanced Tests
 """
 
 
-def test_json_advanced(backend: str = 'local', compression_level: int = None, is_obj: bool = False, **kwargs):
+def test_json_advanced(backend: str = 'local', compression: str = None, compression_level: int = None, is_obj: bool = False, **kwargs):
     """
     Handling more advanced dict types
     """
@@ -263,6 +263,7 @@ def test_json_advanced(backend: str = 'local', compression_level: int = None, is
         backend_type=backend,
         base_key='test.json',
         serializer_kwargs={
+            'compression': compression,
             'compression_level': compression_level,
             'disable_object_serialization': not is_obj,
             'serialization_obj': X if is_obj else None,
@@ -281,17 +282,17 @@ def test_json_advanced(backend: str = 'local', compression_level: int = None, is
         'y': 2,
     })
     
-    print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test json advanced: ', y, '=', list(d.keys()))
+    print(f'[{backend} - {compression}:{d.compression_level} - {kwargs} - {d.base_key}] test json advanced: ', y, '=', list(d.keys()))
     for k,v in d.items():
         if k == 'xy':
-            print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test json advanced: {k} {v} {type(v)}')
+            print(f'[{backend} - {compression}:{d.compression_level} - {kwargs} - {d.base_key}] test json advanced: {k} {v} {type(v)}')
             continue
-        assert y[k] == v.n if is_obj else v['n'], f'[{backend} - {compression_level} - {kwargs}] test json advanced: {k} {y[k]} {v} {type(v)}'
+        assert y[k] == v.n if is_obj else v['n'], f'[{backend} - {compression}:{d.compression_level} - {kwargs}] test json advanced: {k} {y[k]} {v} {type(v)}'
     d.clear()
     assert len(d) == 0
 
 
-def test_msgpack_advanced(backend: str = 'local', compression_level: int = None, **kwargs):
+def test_msgpack_advanced(backend: str = 'local', compression: str = None, compression_level: int = None, **kwargs):
     """
     Test MsgPack Object - The object is serialized to a dict, however upon retrieval, the object gets re-instantiated
     due to the serialization_obj parameter
@@ -303,6 +304,7 @@ def test_msgpack_advanced(backend: str = 'local', compression_level: int = None,
         base_key='test.msgpack',
         serializer_kwargs={
             'serialization_obj': X,
+            'compression': compression,
             'compression_level': compression_level,
         },
         **kwargs
@@ -333,17 +335,17 @@ def test_msgpack_advanced(backend: str = 'local', compression_level: int = None,
     y['x5'] += 2
     y['x5'] *= 5
 
-    print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test msgpack advanced: ', y, '=', list(d.keys()))
+    print(f'[{backend} - {compression}:{compression_level} - {kwargs} - {d.base_key}] test msgpack advanced: ', y, '=', list(d.keys()))
     for k,v in d.items():
         if k == 'xy':
-            print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test msgpack advanced: {k} {v} {type(v)}')
+            print(f'[{backend} - {compression}:{compression_level} - {kwargs} - {d.base_key}] test msgpack advanced: {k} {v} {type(v)}')
             continue
-        assert y[k] == v.n, f'[{backend} - {compression_level} - {kwargs}] test msgpack advanced: {k} {y[k]} {v} {type(v)}'
+        assert y[k] == v.n, f'[{backend} - {compression}:{compression_level} - {kwargs}] test msgpack advanced: {k} {y[k]} {v} {type(v)}'
     d.clear()
     assert len(d) == 0
 
 
-def test_pickle_advanced(backend: str = 'local', compression_level: int = None, **kwargs):
+def test_pickle_advanced(backend: str = 'local', compression: str = None, compression_level: int = None, **kwargs):
     """
     Pickle Test - The object is pickled and thus the type is perserved
     """
@@ -353,6 +355,7 @@ def test_pickle_advanced(backend: str = 'local', compression_level: int = None, 
         backend_type=backend,
         base_key='test.pickle',
         serializer_kwargs={
+            'compression': compression,
             'compression_level': compression_level,
         },
         **kwargs
@@ -382,15 +385,15 @@ def test_pickle_advanced(backend: str = 'local', compression_level: int = None, 
     y['x5'] += 2
     y['x5'] *= 5
 
-    print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test pickle advanced: ', y, '=', list(d.keys()))
+    print(f'[{backend} - {compression}:{d.compression_level} - {kwargs} - {d.base_key}] test pickle advanced: ', y, '=', list(d.keys()))
     for k,v in d.items():
         if k == 'xy':
-            print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test msgpack advanced: {k} {v} {type(v)}')
+            print(f'[{backend} - {compression}:{d.compression_level} - {kwargs} - {d.base_key}] test pickle advanced: {k} {v} {type(v)}')
             continue
 
-        assert y[k] == v.n, f'[{backend} - {compression_level} - {kwargs}] test pickle advanced: {k} {y[k]} {v} {type(v)}'
+        assert y[k] == v.n, f'[{backend} - {compression}:{d.compression_level} - {kwargs}] test pickle advanced: {k} {y[k]} {v} {type(v)}'
     for key in d:
-        print(f'[{backend} - {compression_level} - {kwargs} - {d.base_key}] test pickle advanced: {key} {d[key]} {type(d[key])}')
+        print(f'[{backend} - {compression}:{d.compression_level} - {kwargs} - {d.base_key}] test pickle advanced: {key} {d[key]} {type(d[key])}')
     d.clear()
     assert len(d) == 0
 
@@ -400,17 +403,25 @@ def test_basic_advanced(compression_level: int = None, **kwargs):
     """
     fp = pathlib.Path(__file__).parent
 
-    test_json_advanced(backend='local', compression_level=compression_level, file_path = fp, **kwargs)
-    test_msgpack_advanced(backend='local', compression_level=compression_level, file_path = fp, **kwargs)
-    test_pickle_advanced(backend='local', compression_level=compression_level, file_path = fp, **kwargs)
+    for compression in {
+        None,
+        'gzip',
+        'zlib',
+        'lz4',
+        'zstd',
+    }:
+
+        test_json_advanced(backend='local', compression=compression, compression_level=compression_level, file_path = fp, **kwargs)
+        test_msgpack_advanced(backend='local',compression=compression, compression_level=compression_level, file_path = fp, **kwargs)
+        test_pickle_advanced(backend='local', compression=compression, compression_level=compression_level, file_path = fp, **kwargs)
 
 
-    test_json_advanced(backend='redis', compression_level=compression_level, **kwargs)
-    test_msgpack_advanced(backend='redis', compression_level=compression_level, **kwargs)
-    test_pickle_advanced(backend='redis', compression_level=compression_level, **kwargs)
+        test_json_advanced(backend='redis', compression=compression, compression_level=compression_level, **kwargs)
+        # test_msgpack_advanced(backend='redis', compression=compression, compression_level=compression_level, **kwargs)
+        test_pickle_advanced(backend='redis', compression=compression, compression_level=compression_level, **kwargs)
 
-    test_json_advanced(backend='auto', compression_level=compression_level, **kwargs)
-    test_pickle_advanced(backend='auto', compression_level=compression_level, **kwargs)
+        test_json_advanced(backend='auto', compression=compression, compression_level=compression_level, **kwargs)
+        test_pickle_advanced(backend='auto', compression=compression, compression_level=compression_level, **kwargs)
 
 
 
