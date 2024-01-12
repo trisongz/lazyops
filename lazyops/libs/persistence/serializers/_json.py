@@ -116,7 +116,7 @@ class JsonSerializer(BaseSerializer):
                 if obj_class_name not in self.serialization_schemas:
                     self.serialization_schemas[obj_class_name] = lazy_import(obj_class_name)
                 obj_class = self.serialization_schemas[obj_class_name]
-                value = obj_class.model_validate(value, **self.serialization_obj_kwargs)
+                value = obj_class.model_validate(value)
             elif self.serialization_obj is not None:
                 value = self.serialization_obj.model_validate(value)
             return value
