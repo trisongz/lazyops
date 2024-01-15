@@ -39,6 +39,13 @@ class RedisStatefulBackend(BaseStatefulBackend):
         """
         Initializes the backend
         """
+        _kdb_kwargs = {}
+        if kwargs:
+            for key in kwargs:
+                if key.startswith('redis_'):
+                    _kdb_kwargs[key.replace('redis_', '')] = kwargs.pop(key)
+                elif key.startswith('keydb_'):
+                    _kdb_kwargs[key.replace('keydb_', '')] = kwargs.pop(key)
         super().__init__(
             serializer=serializer,
             serializer_kwargs=serializer_kwargs,
@@ -51,7 +58,10 @@ class RedisStatefulBackend(BaseStatefulBackend):
         if expiration is not None: self.expiration = expiration
         self.hset_enabled = (not hset_disabled and self.base_key is not None)
         if keyjoin is not None: self.keyjoin = keyjoin
-        self.cache: 'KeyDBSession' = get_keydb_session(name = 'persistence', **kwargs)
+        self.cache: 'KeyDBSession' = get_keydb_session(
+            name = self.name, 
+            **_kdb_kwargs
+        )
 
     def get_key(self, key: str) -> str:
         """

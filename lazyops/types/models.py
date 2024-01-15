@@ -1,7 +1,7 @@
 import os
 import pathlib
 
-from typing import Any, Type, Tuple, Dict, List, Union, Optional, Callable, TYPE_CHECKING
+from typing import Any, Type, Tuple, Dict, List, Union, Optional, Callable, TypeVar, Generic, TYPE_CHECKING
 from lazyops.types.formatting import to_camel_case, to_snake_case, to_graphql_format
 from lazyops.types.classprops import classproperty, lazyproperty
 from lazyops.utils.serialization import Json
@@ -512,6 +512,82 @@ class NatsDB(BaseDBUrl):
     ):
         return super().parse(url = url, scheme = scheme, adapter = adapter, **config)
 
+
+ProxyObjT = TypeVar('ProxyObjT')
+
+
+class ProxyObject(Generic[ProxyObjT]):
+    def __init__(
+        self,
+        obj_cls: Optional[Type[ProxyObjT]] = None,
+        obj_getter: Optional[Union[Callable, str]] = None,
+        obj_args: Optional[List[Any]] = None,
+        obj_kwargs: Optional[Dict[str, Any]] = None,
+        debug_enabled: Optional[bool] = False,
+    ):
+        """
+        Proxy Object
+
+        args:
+            obj_cls: the class of the object
+            obj_getter: the function to get the object
+            debug_enabled: if True, will raise an error if the object is not found
+        """
+        # Intentionally underscore on the end to avoid conflicts with the settings
+        assert obj_cls or obj_getter, "Either `obj_cls` or `obj_getter` must be provided"
+        self.__obj_cls_ = obj_cls
+        self.__obj_getter_ = obj_getter
+        if self.__obj_getter_ and isinstance(self.__obj_getter_, str):
+            from lazyops.utils.helpers import lazy_import
+            self.__obj_getter_ = lazy_import(self.__obj_getter_)
+        self.__obj_ = None
+        self.__obj_args_ = obj_args or []
+        self.__obj_kwargs_ = obj_kwargs or {}
+        self.__debug_enabled_ = debug_enabled
+        self.__last_attrs_: Dict[str, int] = {}
+
+    @property
+    def _obj_(self) -> ProxyObjT:
+        """
+        Returns the object
+        """
+        if self.__obj_ is None:
+            if self.__obj_getter_:
+                self.__obj_ = self.__obj_getter_(*self.__obj_args_, **self.__obj_kwargs_)
+            elif self.__obj_cls_:
+                self.__obj_ = self.__obj_cls_(*self.__obj_args_, **self.__obj_kwargs_)
+        return self.__obj_
+        
+    def __getattr__(self, name):
+        """
+        Forward all unknown attributes to the proxy object
+        """
+        if not self.__debug_enabled_:
+            return getattr(self._obj_, name)
+        
+        # Try to debug the attribute
+        if name not in self.__last_attrs_:
+            self.__last_attrs_[name] = 0
+        self.__last_attrs_[name] += 1
+        if self.__last_attrs_[name] > 5:
+            raise AttributeError(f"Proxy object has no attribute {name}")
+
+        if hasattr(self._obj_, name):
+            self.__last_attrs_[name] = 0
+            return getattr(self._obj_, name)
+        raise AttributeError(f"Settings object has no attribute {name}")
+    
+    if TYPE_CHECKING:
+        def __new__(cls, *args, **kwargs) -> ProxyObjT:
+            ...
+
+    
+    # def __setattr__(self, name: str, value: Any) -> None:
+    #     """
+    #     Forward all unknown attributes to the proxy object
+    #     """
+    #     return setattr(self._obj_, name, value)
+        
 
 
 __all__ = [

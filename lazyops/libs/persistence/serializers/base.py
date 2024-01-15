@@ -215,7 +215,7 @@ class BaseSerializer(abc.ABC):
             if self.raise_errors: raise e
             return None
         
-    async def aload(self, value: Union[str, bytes], **kwargs) -> ObjectValue:
+    async def aloads(self, value: Union[str, bytes], **kwargs) -> ObjectValue:
         """
         Loads the value asynchronously
         """

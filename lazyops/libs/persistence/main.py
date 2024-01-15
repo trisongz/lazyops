@@ -55,6 +55,7 @@ class PersistentDict(collections.abc.MutableMapping):
         self._kwargs['serializer'] = serializer
         self._kwargs['serializer_kwargs'] = serializer_kwargs
         self.base = self.base_class(
+            name = self.name,
             base_key = self.base_key,
             async_enabled = async_enabled,
             settings = self.settings,

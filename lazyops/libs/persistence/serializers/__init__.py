@@ -14,9 +14,13 @@ def get_serializer(
     Returns a Serializer
     """
     serializer_type = serializer_type or "pickle"
-    if serializer_type == "json":
+    if serializer_type in {"json", "orjson", "ujson", "simdjson"}:
+        if serializer_type != "json" and "jsonlib" not in kwargs:
+            kwargs["jsonlib"] = serializer_type
         return JsonSerializer(**kwargs)
-    if serializer_type == "pickle":
+    if serializer_type in {"pickle", "dill", "cloudpickle"}:
+        if serializer_type != "pickle" and "picklelib" not in kwargs:
+            kwargs["picklelib"] = serializer_type
         return PickleSerializer(**kwargs)
     if serializer_type == "msgpack":
         return MsgPackSerializer(**kwargs)
