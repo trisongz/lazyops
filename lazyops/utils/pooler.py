@@ -405,7 +405,7 @@ class ThreadPool(abc.ABC):
             return_when = return_when, 
             concurrency_limit = concurrency_limit
         ):
-            results.append(result)
+            results.append(await result)
         return results
     
     async def aiterate(
@@ -431,7 +431,7 @@ class ThreadPool(abc.ABC):
             return_when = return_when, 
             concurrency_limit = concurrency_limit
         ):
-            yield result
+            yield await result
     
     sync_map = map
     sync_iterate = iterate
