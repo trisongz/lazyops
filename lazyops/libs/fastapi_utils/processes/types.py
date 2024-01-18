@@ -381,8 +381,9 @@ class GlobalContextMeta(type):
                     proc.terminate()
                 except Exception as e:
                     if verbose: cls.logger.info(f"|r|[{kind.capitalize():7s}]|e| Failed Kill: [ {curr_proc + 1}/{n_procs} ] {log_name:20s} (Error: |r|{e}|e|)", colored = True)
-                proc.kill()
-                proc.close()
+                with contextlib.suppress(Exception):
+                    proc.kill()
+                    proc.close()
             curr_proc += 1
 
     async def astop_worker_processes(cls, name: str, verbose: bool = True, timeout: float = 5.0, kind: Optional[str] = None):
@@ -444,8 +445,9 @@ class GlobalContextMeta(type):
                     proc.terminate()
                 except Exception as e:
                     if verbose: cls.logger.info(f"|r|[{kind:7s}]|e| Failed Kill: [ {curr_proc + 1}/{n_procs} ] {log_name:20s} (Error: |r|{e}|e|)", colored = True)
-                proc.kill()
-                proc.close()
+                with contextlib.suppress(Exception):
+                    proc.kill()
+                    proc.close()
             curr_proc += 1
         # if verbose: cls.logger.info(f"Stopped all {curr_proc} server processes")
     

@@ -772,7 +772,7 @@ class LoggerFormatter:
             status_color = QUEUE_STATUS_COLORS.get(status.lower(), FALLBACK_STATUS_COLOR)
             if '<' not in status_color: status_color = f'<{status_color}>'
             extra += f':{status_color}' + '{extra[status]}</>: '
-        extra += RESET_COLOR
+        # extra += RESET_COLOR
         # print(extra)
         return extra
 
@@ -786,10 +786,10 @@ class LoggerFormatter:
         Then you can access it with `record['extra'].get('foo')`.
         """        
         _extra = record.get('extra', {})
-        if _extra.get('worker_name') or _extra.get('queue_name'):
-            return cls.queue_logger_formatter(record)
-        
         extra = DEFAULT_CLASS_COLOR + '{name}</>:' + DEFAULT_FUNCTION_COLOR + '{function}</>: '
+        if _extra.get('worker_name') or _extra.get('queue_name'):
+            extra = cls.queue_logger_formatter(record)
+        
         if 'result=tensor([' not in str(record['message']):
             return "<level>{level: <8}</> <green>{time:YYYY-MM-DD HH:mm:ss.SSS}</>: " \
                        + extra + "<level>{message}</level>" + RESET_COLOR + "\n"
