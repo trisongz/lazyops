@@ -10,10 +10,11 @@ ProxyObjT = TypeVar('ProxyObjT')
 class ProxyObject(Generic[ProxyObjT]):
     def __init__(
         self,
-        obj_cls: Optional[Type[ProxyObjT]] = None,
+        obj_cls: Optional[Union[Type[ProxyObjT], str]] = None,
         obj_getter: Optional[Union[Callable, str]] = None,
         obj_args: Optional[List[Any]] = None,
         obj_kwargs: Optional[Dict[str, Any]] = None,
+        obj_initialize: Optional[bool] = True,
         threadsafe: Optional[bool] = False,
         debug_enabled: Optional[bool] = False,
     ):
@@ -36,6 +37,7 @@ class ProxyObject(Generic[ProxyObjT]):
         self.__obj_ = None
         self.__obj_args_ = obj_args or []
         self.__obj_kwargs_ = obj_kwargs or {}
+        self.__obj_initialize_ = obj_initialize
         self.__debug_enabled_ = debug_enabled
         self.__last_attrs_: Dict[str, int] = {}
 
@@ -63,10 +65,16 @@ class ProxyObject(Generic[ProxyObjT]):
                 if self.__obj_getter_:
                     self.__obj_ = self.__obj_getter_(*self.__obj_args_, **self.__obj_kwargs_)
                 elif self.__obj_cls_:
-                    self.__obj_ = self.__obj_cls_(*self.__obj_args_, **self.__obj_kwargs_)
+                    if isinstance(self.__obj_cls_, str):
+                        from lazyops.utils.helpers import lazy_import
+                        self.__obj_cls_ = lazy_import(self.__obj_cls_)
+                    if self.__obj_initialize_:
+                        self.__obj_ = self.__obj_cls_(*self.__obj_args_, **self.__obj_kwargs_)
+                    else:
+                        self.__obj_ = self.__obj_cls_
         return self.__obj_
         
-    def __getattr__(self, name):
+    def __getattr__(self, name) -> Any:
         """
         Forward all unknown attributes to the proxy object
         """

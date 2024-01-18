@@ -1,16 +1,20 @@
-from __future__ import absolute_import
+"""
+This is now empty to avoid importing all the submodules when you import lazyops.
+"""
 
-from lazyops.types.classprops import lazyproperty, classproperty, cached_classproperty
-from lazyops.types import (
-    BaseModel, 
-    BaseSettings, 
-    Field, 
-    validator
-)
+# from __future__ import absolute_import
 
-from lazyops.utils import logger
-from lazyops.utils.lazylib import LazyLib
-from lazyops.utils.imports import (
-    resolve_missing,
-    require_missing_wrapper,
-)
+# from lazyops.types.classprops import lazyproperty, classproperty, cached_classproperty
+# from lazyops.types import (
+#     BaseModel, 
+#     BaseSettings, 
+#     Field, 
+#     validator
+# )
+
+# from lazyops.utils import logger
+# from lazyops.utils.lazylib import LazyLib
+# from lazyops.utils.imports import (
+#     resolve_missing,
+#     require_missing_wrapper,
+# )

@@ -142,6 +142,26 @@ def lazy_function(
     return wrapper_func
 
 
+_valid_class_init_kwarg: Dict[str, List[str]] = {}
+
+def extract_obj_init_kwargs(obj: object) -> List[str]:
+    """
+    Extracts the kwargs that are valid for an object
+    """
+    global _valid_class_init_kwarg
+    obj_name = get_obj_class_name(obj)
+    if obj_name not in _valid_class_init_kwarg:
+        argspec = inspect.getfullargspec(obj.__init__)
+        _args = list(argspec.args)
+        _args.extend(iter(argspec.kwonlyargs))
+        # Check if subclass of Connection
+        if hasattr(obj, "__bases__"):
+            for base in obj.__bases__:
+                _args.extend(extract_obj_init_kwargs(base))
+        _valid_class_init_kwarg[obj_name] = list(set(_args))
+    return _valid_class_init_kwarg[obj_name]
+
+
 
 MT = TypeVar("MT", bound="BaseModel")
 

@@ -1,12 +1,9 @@
-from __future__ import annotations
-
 """
-Rework v3 of the logger
-
-- Now imported from `lazyops.libs.logging` 
+Seperated logging module for lazyops to prevent circular imports for 3rd party modules.
 """
 
-from lazyops.libs.logging import (
+
+from .main import (
     DEFAULT_STATUS_COLORS,
     QUEUE_STATUS_COLORS,
     STATUS_COLOR,
