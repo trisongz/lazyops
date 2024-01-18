@@ -9,7 +9,8 @@ import zlib
 import hashlib
 from lazyops.types import BaseModel
 from lazyops.utils.logs import logger
-from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
+# from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
+from lazyops.utils.pooler import ThreadPooler
 from typing import Any, Optional, Union, Dict, TypeVar, TYPE_CHECKING
 
 try:

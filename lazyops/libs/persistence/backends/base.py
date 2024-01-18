@@ -10,7 +10,8 @@ from pydantic import BaseModel
 from typing import TypeVar, Generic, Any, Dict, Optional, Union, Iterable, List, Type, ItemsView, TYPE_CHECKING
 from lazyops.utils.helpers import  create_unique_id
 from lazyops.utils.logs import logger
-from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
+# from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
+from lazyops.utils.pooler import ThreadPooler
 from ..serializers import get_serializer, SerializerT
 
 if TYPE_CHECKING:

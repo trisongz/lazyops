@@ -1,3 +1,9 @@
+from __future__ import annotations
+
+"""
+Rework v3 of the logger
+"""
+
 import re
 import os
 import sys
@@ -8,13 +14,12 @@ import warnings
 import pprint
 import atexit as _atexit
 import functools
+from enum import Enum
 
 from loguru import _defaults
 from loguru._logger import Core as _Core
 from loguru._logger import Logger as _Logger
-# from pydantic import BaseSettings
-
-from typing import Type, Union, Optional, Any, List, Dict, Tuple, Callable, TYPE_CHECKING
+from typing import Type, Union, Optional, Any, List, Dict, Tuple, Callable, Set, TYPE_CHECKING
 
 # Use this section to filter out warnings from other modules
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = os.getenv('TF_CPP_MIN_LOG_LEVEL', '3')
@@ -25,25 +30,54 @@ if TYPE_CHECKING:
     from lazyops.types.models import BaseSettings
 
 
-STATUS_COLOR = {
-    'enqueue': 'light-blue',
-    'finish': 'green',
-    'completed': 'green',
-    'complete': 'green',
-    'retry': 'yellow',
-    'error': 'red',
-    'abort': 'red',
-    'process': 'cyan',
-    'scheduled': 'yellow',
-    'startup': 'green',
-    'shutdown': 'red',
-    'sweep': 'yellow',
-    'dequeue': 'light-blue',
-    'stats': 'light-blue',
-    'reset': '\x1b[0m'
 
+DEFAULT_STATUS_COLORS = {
+    'debug': '<fg #D9ED92>',
+    'info': '<fg #34A0A4>',
+    'success': '<fg #52B69A>',
+    'warning': '<fg #F48C06>',
+    'error': '<fg #DC2F02>',
+    'critical': '<fg #9D0208>',
 }
-FALLBACK_STATUS_COLOR = 'magenta'
+    
+
+QUEUE_STATUS_COLORS = {
+    'new': '<fg #D9ED92>',
+    'deferred': '<fg #B5E48C>',
+    'queued': '<fg #99D98C>',
+    'active': '<fg #76C893>',
+    'complete': '<fg #52B69A>',
+
+    # Error Colors
+    'aborted': '<fg #FFBA08>',
+    'failed': '<fg #9D0208>',
+
+    # Other Colors
+    'enqueue': '<fg #168AAD>',
+    'finish': '<fg #52B69A>',
+    'completed': '<fg #52B69A>',
+    'error': '<fg #DC2F02>',
+    'abort': '<fg #DC2F02>',
+
+    'retry': '<fg #F48C06>',
+    'scheduled': '<fg #34A0A4>',
+    'startup': '<fg #168AAD>',
+    'shutdown': '<fg #6A040F>',
+    'process': '<fg #184E77>',
+    'sweep': '<fg #B5E48C>',
+    'stats': '<fg #B5E48C>',
+    'dequeue': '<fg #168AAD>',
+}
+
+STATUS_COLOR = QUEUE_STATUS_COLORS
+
+FALLBACK_STATUS_COLOR = '<fg #99D98C>'
+
+# DEFAULT_FUNCTION_COLOR = '<fg #457b9d>'
+DEFAULT_FUNCTION_COLOR = '<fg #219ebc>'
+DEFAULT_CLASS_COLOR = '<fg #a8dadc>'
+
+RESET_COLOR = '\x1b[0m'
 
 LOGLEVEL_MAPPING = {
     50: 'CRITICAL',
@@ -90,7 +124,7 @@ COLORED_MESSAGE_MAP = {
 }
 
 
-def _find_seps(msg: str) -> str:
+def find_and_format_seps(msg: str) -> str:
     """
     Find any |a,b,c| and format them |a||b||c|
 
@@ -102,59 +136,35 @@ def _find_seps(msg: str) -> str:
     # v2
     for sep_match in re.finditer('\|\w+,(\w+,*)+\|', msg):
         s = sep_match.group()
-        # print(s)
         if len(s) >= 10: continue
         msg = msg.replace(s, "||".join(s.split(",")))
-        # print(msg)
     return msg
-
-    # v1
-    # return re.sub(r'\|(\w+),(\w+)\|', r'|\1||\2|', msg)
-    # return re.sub(r'\|(\w+)\|', r'|\1||', msg)
 
 
 class NullLogger(logging.Logger):
     """
     A logger that does nothing
     """
+    def info(self, *args, **kwargs): pass
+    def debug(self, *args, **kwargs): pass
+    def warning(self, *args, **kwargs): pass
+    def error(self, *args, **kwargs): pass
+    def critical(self, *args, **kwargs): pass
+    def exception(self, *args, **kwargs): pass
+    def log(self, *args, **kwargs): pass
+    def trace(self, *args, **kwargs): pass
+    def success(self, *args, **kwargs): pass
 
-    def info(self, *args, **kwargs):
-        """
-        Logs info
-        """
-        pass
-
-    def debug(self, *args, **kwargs):
-        """
-        Logs debug
-        """
-        pass
-
-    def warning(self, *args, **kwargs):
-        """
-        Logs warning
-        """
-        pass
-
-    def error(self, *args, **kwargs):
-
-        """
-        Logs error
-        """
-        pass
-
-    def critical(self, *args, **kwargs):
-        """
-        Logs critical
-        """
-        pass
 
 # Setup Default Logger
 class Logger(_Logger):
 
+    name: str = None
     settings: Type['BaseSettings'] = None
     conditions: Dict[str, Tuple[Union[Callable, bool], str]] = {}
     default_trace_depth: Optional[int] = None
+    is_global: bool = False
+
     _colored_opts = None
 
 
@@ -173,6 +183,14 @@ class Logger(_Logger):
         Returns the options
         """
         return self.colored_opts if colored else self._options
+
+
+    def get_log_mode(self, level: str = "info"):
+        """
+        Returns the log mode based on the level
+        """
+        return self.dev if level.upper() in {'DEV'} else getattr(self, level.lower())
+    
 
     def add_if_condition(
         self, 
@@ -218,17 +236,33 @@ class Logger(_Logger):
                 return False, clevel
             elif isinstance(condition, Callable):
                 return condition(record or message), clevel
-        
         return True, (record.levelname if record else self._get_level(level or 'INFO'))
     
+    def _filter_module_name(self, name: str) -> bool:
+        """
+        Filter based on module name
+
+        - True if the module is not registered and is_global is False 
+        - False if the module is registered and is_global is False
+        """
+        _is_registered = is_registered_logger_module(name)
+        if self.is_global: 
+            return _is_registered is not False
+        return _is_registered is False
+
+
     def _filter(self, record: logging.LogRecord, name: Optional[str] = None) -> bool:
         """
         Filters out messages based on conditions
+
+        - True if the message should be filtered out
+        - False if the message should be logged
         """
-        if not self.conditions:
+        if self._filter_module_name(record['name']): 
             return True
         if name is not None:
             return self._filter_if(name, record)[0]
+        if not self.conditions: return False
         return not any(
             isinstance(value, bool)
             and value is False
@@ -249,12 +283,6 @@ class Logger(_Logger):
                 ):
                     return False
         return True
-
-    def get_log_mode(self, level: str = "info"):
-        """
-        Returns the log mode based on the level
-        """
-        return self.dev if level.upper() in {'DEV'} else getattr(self, level.lower())
     
     def opt(
         self,
@@ -276,31 +304,6 @@ class Logger(_Logger):
         return type(self)(self._core, exception, depth, record, lazy, colors, raw, capture, *args)
 
 
-    def display_crd(self, message: Any, *args, level: str = 'info', **kwargs):
-        """
-        Display CRD information in the log.
-
-        Parameters
-        ----------
-        message : Any
-            The message to display.
-        level : str
-            The log level to use.
-        """
-        __message = ""
-        if isinstance(message, list):
-            for m in message:
-                if isinstance(m, dict):
-                    __message += "".join(f'- <light-blue>{key}</>: {value}\n' for key, value in m.items())
-                else:
-                    __message += f'- <light-blue>{m}</>\n'
-        elif isinstance(message, dict):
-            __message = "".join(f'- <light-blue>{key}</>: {value}\n' for key, value in message.items())
-        else:
-            __message = str(message)
-        _log = self.get_log_mode(level)
-        _log(__message.strip(), *args, **kwargs)
-
 
     """
     Newly Added APIs
@@ -314,14 +317,14 @@ class Logger(_Logger):
         elif isinstance(level, int): level = LOGLEVEL_MAPPING.get(level, 'INFO')
         return level
 
-    
     def _format_item(
         self,
         msg: Any,
         max_length: Optional[int] = None,
         colored: Optional[bool] = False,
+        level: Optional[str] = None,
         _is_part: Optional[bool] = False,
-    ) -> str:  # sourcery skip: low-code-quality
+    ) -> str:  # sourcery skip: extract-duplicate-method, low-code-quality, split-or-ifs
         """
         Formats an item
         """
@@ -331,8 +334,15 @@ class Logger(_Logger):
         if isinstance(msg, (list, set)):
             _msg = str(msg) if _is_part else "".join(f'- {item}\n' for item in msg)
             return _msg[:max_length] if max_length else _msg
-        prefix = '|g|' if colored else ''
-        suffix = '|e|' if colored else ''
+        
+        prefix, suffix = '', ''
+        if colored:
+            prefix = '|g|'
+            if level:
+                level = level.lower()
+                prefix = DEFAULT_STATUS_COLORS.get(level, '|g|')
+            suffix = '|e|'
+
         if isinstance(msg, dict):
             _msg = "\n"
             for key, value in msg.items():
@@ -340,18 +350,17 @@ class Logger(_Logger):
                 if max_length and len(_value) > max_length:
                     _value = f'{_value[:max_length]}...'
                 _msg += f'- {prefix}{key}{suffix}: {_value}\n'
-            # _msg = "".join(f'- {prefix}{key}{suffix}: {self._format_item(value, max_length = max_length, colored = colored, _is_part = True)}\n' for key, value in msg.items())
-            # return _msg[:max_length] if max_length else _msg
             return _msg.rstrip()
+        
         if isinstance(msg, tuple):
-            _msg = "".join(f'- {prefix}{key}{suffix}: {self._format_item(value, max_length = max_length, colored = colored,  _is_part = True)}\n' for key, value in zip(msg[0], msg[1]))
+            _msg = "".join(f'- {prefix}{key}{suffix}: {self._format_item(value, max_length = max_length, colored = colored, level = level,  _is_part = True)}\n' for key, value in zip(msg[0], msg[1]))
             return _msg[:max_length] if max_length else _msg
 
         # Complex Types
-        if hasattr(msg, 'dict') and hasattr(msg, 'Config'):
+        if (hasattr(msg, 'dict') and hasattr(msg, 'Config')) or hasattr(msg, 'fields'):
             # Likely Pydantic Model
             _msg = f'{prefix}[{msg.__class__.__name__}]{suffix}'
-            fields = msg.__fields__.keys()
+            fields = msg.fields.keys() if hasattr(msg, 'fields') else msg.__fields__.keys()
             for field in fields:
                 field_str = f'{prefix}{field}{suffix}'
                 val_s = f'\n  {field_str}: {getattr(msg, field)!r}'
@@ -361,14 +370,17 @@ class Logger(_Logger):
             return _msg
             # return self._format_item(msg.dict(), max_length = max_length, colored = colored, _is_part = _is_part)
         
+        if hasattr(msg, 'model_dump'):
+            return self._format_item(msg.model_dump(mode = 'json'), max_length = max_length, colored = colored, level = level, _is_part = _is_part)
+
         if hasattr(msg, 'dict'):
-            return self._format_item(msg.dict(), max_length = max_length, colored = colored, _is_part = _is_part)
+            return self._format_item(msg.dict(), max_length = max_length, colored = colored, level = level, _is_part = _is_part)
 
         if hasattr(msg, 'json'):
-            return self._format_item(msg.json(), max_length = max_length, colored = colored, _is_part = _is_part)
+            return self._format_item(msg.json(), max_length = max_length, colored = colored, level = level, _is_part = _is_part)
 
         if hasattr(msg, '__dict__'):
-            return self._format_item(msg.__dict__, max_length = max_length, colored = colored, _is_part = _is_part)
+            return self._format_item(msg.__dict__, max_length = max_length, colored = colored, level = level, _is_part = _is_part)
         
         return str(msg)[:max_length] if max_length else str(msg)
 
@@ -379,6 +391,7 @@ class Logger(_Logger):
         *args,
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
+        level: Optional[str] = None,
         colored: Optional[bool] = False,
     ) -> str:
         """
@@ -389,23 +402,45 @@ class Logger(_Logger):
         """
         _message = ""
         if prefix: 
-            if colored and '|' not in prefix: prefix = f'|g|{prefix}|e|'
+            if colored and '|' not in prefix: 
+                base_color = '|g|'
+                if level:
+                    level = level.lower()
+                    base_color = DEFAULT_STATUS_COLORS.get(level, '|g|')
+                prefix = f'{base_color}{prefix}|e|'
             _message += f'[{prefix}] '
-        _message += self._format_item(message, max_length = max_length, colored = colored)
+        _message += self._format_item(message, max_length = max_length, colored = colored, level = level)
         if args:
             for arg in args:
                 _message += "\n"
-                _message += self._format_item(arg, max_length = max_length, colored = colored)
+                _message += self._format_item(arg, max_length = max_length, colored = colored, level = level)
         if colored:
             # Add escape characters to prevent errors
+            _message = _message.replace("<fg", ">|fg")
             _message = _message.replace("<", "\<")
-            _message = _find_seps(_message)
+            _message = find_and_format_seps(_message)
             # print(_message)
             for key, value in COLORED_MESSAGE_MAP.items():
                 _message = _message.replace(key, value)
-            _message += STATUS_COLOR['reset']
-
+            _message = _message.replace(">|fg", "<fg")
+            _message += RESET_COLOR
         return _message
+
+    
+    def log_if(
+        self, 
+        name: str, 
+        message: Any, 
+        *args, 
+        level: Optional[Union[str, int]] = None, 
+        **kwargs
+    ):  # noqa: N805
+        """
+        Log ``message.format(*args, **kwargs)`` with severity ``level`` if condition is met.
+        """
+        condition, clevel = self._filter_if(name, message = message, level = level)
+        if condition:
+            return self.log((level or clevel), message, *args, **kwargs)
 
     def log(
         self, 
@@ -421,7 +456,7 @@ class Logger(_Logger):
         Log ``message.format(*args, **kwargs)`` with severity ``level``.
         """
         level = self._get_level(level)
-        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
+        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored, level = level)
         try:
             self._log(level, False, self._get_opts(colored = colored), message, args, kwargs)
         except TypeError:
@@ -429,27 +464,6 @@ class Logger(_Logger):
             # level_id, static_level_no, from_decorator, options, message, args, kwargs
             static_log_no = REVERSE_LOGLEVEL_MAPPING.get(level, 20)
             self._log(level, static_log_no, False, self._get_opts(colored = colored), message, args, kwargs)
-
-        # self._logcompat(level, False, self._get_opts(colored = colored), message, args, kwargs)
-        # self._log(level, False, __self._options, __message, args, kwargs)
-        # return super().log(level, message, *args, **kwargs)
-    
-    def log_if(
-        self, 
-        name: str, 
-        message: Any, 
-        *args, 
-        level: Optional[Union[str, int]] = None, 
-        **kwargs
-    ):  # noqa: N805
-        """
-        Log ``message.format(*args, **kwargs)`` with severity ``level`` if condition is met.
-        """
-        condition, clevel = self._filter_if(name, message = message, level = level)
-        if condition:
-            # print(condition, clevel)
-            return self.log((level or clevel), message, *args, **kwargs)
-            # return super().log((level or clevel), message, *args, **kwargs)
 
     def info(
         self, 
@@ -463,10 +477,7 @@ class Logger(_Logger):
         """
         Log ``message.format(*args, **kwargs)`` with severity ``'INFO'``.
         """
-        message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored)
-        # self._log("INFO", False, self._options, message, args, kwargs)
-        # level, from_decorator, options, message, args, kwargs
-        # self._logcompat("INFO", True, self._get_opts(colored = colored), message, args, kwargs)
+        message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored, level = 'INFO')
         try:
             self._log("INFO", False, self._get_opts(colored = colored), message, args, kwargs)
         except TypeError:
@@ -483,8 +494,7 @@ class Logger(_Logger):
         **kwargs
     ):  # noqa: N805
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'SUCCESS'``."""
-        message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored)
-        # self._log("SUCCESS", False, self._options, message, args, kwargs)
+        message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored, level = 'SUCCESS')
         try:
             self._log("SUCCESS", False, self._get_opts(colored = colored), message, args, kwargs)
         except TypeError:
@@ -502,8 +512,7 @@ class Logger(_Logger):
         **kwargs
     ):  # noqa: N805
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'WARNING'``."""
-        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored)
-        # self._log("WARNING", False, self._options, message, args, kwargs)
+        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored, level = 'WARNING')
         try:
             self._log("WARNING", False, self._get_opts(colored = colored), message, args, kwargs)
         except TypeError:
@@ -511,38 +520,49 @@ class Logger(_Logger):
             self._log("WARNING", 30, False, self._get_opts(colored = colored), message, args, kwargs)
 
 
-    def dev(self, message: Any, *args, **kwargs):
-        r"""Log ``message.format(*args, **kwargs)`` with severity ``'DEV'``."""
-        # self._log('DEV', None, False, self._options, message, args, kwargs)
-        self._logcompat('DEV', None, False, self._get_opts(colored = True), message, args, kwargs)
-
-
     def trace(
         self, 
         msg: Union[str, Any], 
         error: Optional[Type[Exception]] = None, 
         level: str = "ERROR",
-        depth: Optional[int] = None,
+        limit: Optional[int] = None,
         chain: Optional[bool] = True,
         colored: Optional[bool] = False,
+        prefix: Optional[str] = None,
+        max_length: Optional[int] = None,
+        **kwargs,
     ) -> None:
         """
         This method logs the traceback of an exception.
 
         :param error: The exception to log.
         """
-        _msg = msg if isinstance(msg, str) else pprint.pformat(msg)
-        _msg += f": {traceback.format_exc(chain = chain, limit = (depth if depth is not None else self.default_trace_depth))}"
+        _depth = kwargs.pop('depth', None)
+        if _depth is not None: limit = _depth
+        _msg = msg if isinstance(msg, str) else self._format_message(msg, colored = colored, level = level, prefix = prefix, max_length = max_length)
+        # pprint.pformat(msg)
+        _msg += f"\n{traceback.format_exc(chain = chain, limit = limit)}"
         if error: _msg += f" - {error}"
-        # _log = self.get_log_mode(level)
-        # _log(_msg)
         try:
             self._log(level, False, self._get_opts(colored = colored), _msg, (), {})
         except TypeError:
-        # level = self._get_level(level)
             static_log_no = REVERSE_LOGLEVEL_MAPPING.get(level, 40)
             self._log(level, static_log_no, False, self._get_opts(colored = colored), _msg, (), {})
 
+    def exception(
+        self,
+        message: Any,
+        *args,
+        colored: Optional[bool] = False,
+        prefix: Optional[str] = None,
+        max_length: Optional[int] = None,
+        **kwargs
+    ):
+        """
+        Log ``message.format(*args, **kwargs)`` with severity ``'ERROR'``.
+        """
+        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored, level = 'ERROR')
+        super().exception(message, *args, **kwargs)
 
     
     def __call__(self, message: Any, *args, level: str = 'info', **kwargs):
@@ -569,24 +589,6 @@ class Logger(_Logger):
             # level_id, static_level_no, from_decorator, options, message, args, kwargs
             static_log_no = REVERSE_LOGLEVEL_MAPPING.get(level, 20)
             self._log(level, static_log_no, from_decorator, options, message, args, kwargs)
-
-
-    # def warning(__self, __message, *args, **kwargs):  # noqa: N805
-    #     r"""Log ``message.format(*args, **kwargs)`` with severity ``'WARNING'``."""
-    #     __self._log("WARNING", False, __self._options, __message, args, kwargs)
-
-    # def error(__self, __message, *args, **kwargs):  # noqa: N805
-    #     r"""Log ``message.format(*args, **kwargs)`` with severity ``'ERROR'``."""
-    #     __self._log("ERROR", False, __self._options, __message, args, kwargs)
-
-    # def critical(__self, __message, *args, **kwargs):  # noqa: N805
-    #     r"""Log ``message.format(*args, **kwargs)`` with severity ``'CRITICAL'``."""
-    #     __self._log("CRITICAL", False, __self._options, __message, args, kwargs)
-
-    # def exception(__self, __message, *args, **kwargs):  # noqa: N805
-    #     r"""Convenience method for logging an ``'ERROR'`` with exception information."""
-    #     options = (True,) + __self._options[1:]
-    #     __self._log("ERROR", False, options, __message, args, kwargs)
 
 
     """
@@ -628,7 +630,31 @@ class Logger(_Logger):
             import yaml
             _log('\n' + yaml.dump(objs, **kwargs))
 
-        
+    def display_crd(self, message: Any, *args, level: str = 'info', **kwargs):
+        """
+        Display CRD information in the log.
+
+        Parameters
+        ----------
+        message : Any
+            The message to display.
+        level : str
+            The log level to use.
+        """
+        __message = ""
+        if isinstance(message, list):
+            for m in message:
+                if isinstance(m, dict):
+                    __message += "".join(f'- <light-blue>{key}</>: {value}\n' for key, value in m.items())
+                else:
+                    __message += f'- <light-blue>{m}</>\n'
+        elif isinstance(message, dict):
+            __message = "".join(f'- <light-blue>{key}</>: {value}\n' for key, value in message.items())
+        else:
+            __message = str(message)
+        _log = self.get_log_mode(level)
+        _log(__message.strip(), *args, **kwargs)
+
 
     def mute_logger(self, modules: Optional[Union[str, List[str]]], level: str = 'WARNING'):
         """
@@ -679,50 +705,12 @@ class Logger(_Logger):
         for logger in loggers:
             logging.getLogger(logger).addFilter(_healthz_filter)
 
-
-
-# < 0.7.0
-try:
-    _logger = Logger(
-        core=_Core(),
-        exception=None,
-        depth=0,
-        record=False,
-        lazy=False,
-        colors=True,
-        raw=False,
-        capture=True,
-        patcher=None,
-        extra={},
-    )
-# >= 0.7.0
-except Exception as e:
-    _logger = Logger(
-        core=_Core(),
-        exception=None,
-        depth=0,
-        record=False,
-        lazy=False,
-        colors=False,
-        raw=False,
-        capture=True,
-        patchers=[],
-        extra={},
-    )
-
-dev_level = _logger.level(name='DEV', no=19, color="<blue>", icon="@")
-
-if _defaults.LOGURU_AUTOINIT and sys.stderr:
-    _logger.add(sys.stderr)
-
-_atexit.register(_logger.remove)
-
 class InterceptHandler(logging.Handler):
     loglevel_mapping = LOGLEVEL_MAPPING
 
     def emit(self, record):
         try:
-            level = _logger.level(record.levelname).name
+            level = logger.level(record.levelname).name
         except ValueError:
             level = self.loglevel_mapping.get(record.levelno, 'DEBUG')
         # if "Unclosed client session" in record.message:
@@ -732,104 +720,213 @@ class InterceptHandler(logging.Handler):
         while frame.f_code.co_filename == logging.__file__:
             frame = frame.f_back
             depth += 1
-        log = _logger.bind(request_id=None)
-        log.opt(
-            depth=depth,
-            exception=record.exc_info
-        ).log(level, record.getMessage())
+        log = logger.bind(request_id=None)
+        log.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
 
 
-class CustomizeLogger:
 
+class LoggerFormatter:
 
     @classmethod
-    def make_default_logger(
-        cls, 
-        level: Union[str, int] = "INFO",
-        settings: Optional[Type['BaseSettings']] = None,
-        format: Optional[Callable] = None,
-        filter: Optional[Callable] = None,
-        handlers: Optional[List[logging.Handler]] = None,
-        **kwargs,
-    ):
-        # todo adjust this later to use a ConfigModel
-        if isinstance(level, str): level = level.upper()
-        _logger.remove()
-        _logger.add(
-            sys.stdout,
-            enqueue = True,
-            backtrace = True,
-            colorize = True,
-            level = level,
-            format = format if format is not None else cls.logger_formatter,
-            filter = filter if filter is not None else _logger._filter,
-        )
-
-        _logger.add_if_condition('dev', _logger._is_dev_condition)
-
-        logging.basicConfig(
-            handlers = handlers or [InterceptHandler()], 
-            level = 0
-        )
-        *options, extra = _logger._options
-        new_logger = Logger(_logger._core, *options, {**extra})
-        if settings: new_logger.settings = settings
-        return new_logger
-
-
-    @classmethod
-    def worker_logger_formatter(cls, record: dict) -> str:
+    def queue_logger_formatter(cls, record: Dict[str, Union[Dict[str, Any], Any]]) -> str:
         """
-        Formats the log message for the worker.
+        Formats the log message for the queue.
         """
-        if record['extra'].get('job_id') and record['extra'].get('queue_name') and record['extra'].get('kind'):
-            status = record['extra'].get('status')
-            color = STATUS_COLOR.get(status, FALLBACK_STATUS_COLOR)
-            kind_color = STATUS_COLOR.get(record.get('extra', {}).get('kind'), FALLBACK_STATUS_COLOR)
-            if not record['extra'].get('worker_name'):
-                record['extra']['worker_name'] = ''
-            extra = f'<b><{kind_color}>' + '{extra[kind]}</></>:'
-            extra += '<b><magenta>{extra[worker_name]}</></>:<cyan>{extra[queue_name]}</>:'
-            extra += '<light-blue>{extra[job_id]}</>'
-            if status:
-                extra += f':<b><{color}>' + '{extra[status]}</></>'
-            extra += ': '
-
-        elif record['extra'].get('kind') and record['extra'].get('queue_name'):
-            if not record['extra'].get('worker_name'):
-                record['extra']['worker_name'] = ''
-            kind_color = STATUS_COLOR.get(record.get('extra', {}).get('kind'), FALLBACK_STATUS_COLOR)
-            extra = f'<b><{kind_color}>' + '{extra[kind]}</></>:'
-            extra += '<b><magenta>{extra[worker_name]}</></>:<cyan>{extra[queue_name]:<18}</> '
+        _extra: Dict[str, Union[Dict[str, Any], Any]] = record.get('extra', {})
+        if not record['extra'].get('worker_name'):
+            record['extra']['worker_name'] = ''
         
+        status = _extra.get('status')
+        kind: str = _extra.get('kind')
+        if status and isinstance(status, Enum): status = status.name
+        
+        kind_color = QUEUE_STATUS_COLORS.get(kind.lower(), FALLBACK_STATUS_COLOR)
+        if '<' not in kind_color: kind_color = f'<{kind_color}>'
+        extra = kind_color + '{extra[kind]}</>:'
+        extra += '<fg #83c5be>{extra[worker_name]}</>:<b><fg #006d77>{extra[queue_name]:<18}</></>:'
+        if _extra.get('job_id'):
+            extra += '<fg #005f73>{extra[job_id]}</>'
+        if status:
+            status_color = QUEUE_STATUS_COLORS.get(status.lower(), FALLBACK_STATUS_COLOR)
+            if '<' not in status_color: status_color = f'<{status_color}>'
+            extra += f':{status_color}' + '{extra[status]}</>: '
+        extra += RESET_COLOR
+        # print(extra)
         return extra
 
 
     @classmethod
-    def logger_formatter(cls, record: dict) -> str:
+    def default_formatter(cls, record: Dict[str, Union[Dict[str, Any], Any]]) -> str:
         """
         To add a custom format for a module, add another `elif` clause with code to determine `extra` and `level`.
 
         From that module and all submodules, call logger with `logger.bind(foo='bar').info(msg)`.
         Then you can access it with `record['extra'].get('foo')`.
         """        
-        extra = '<cyan>{name}</>:<cyan>{function}</>: '
-
-        if record.get('extra'):
-            if record['extra'].get('request_id'):
-                extra = '<cyan>{name}</>:<cyan>{function}</>:<green>request_id: {extra[request_id]}</> '
-
-
-            elif record['extra'].get('queue_name') and record['extra'].get('kind'):
-                extra = cls.worker_logger_formatter(record)
-
+        _extra = record.get('extra', {})
+        if _extra.get('worker_name') or _extra.get('queue_name'):
+            return cls.queue_logger_formatter(record)
+        
+        extra = DEFAULT_CLASS_COLOR + '{name}</>:' + DEFAULT_FUNCTION_COLOR + '{function}</>: '
         if 'result=tensor([' not in str(record['message']):
-            return "<level>{level: <8}</> <green>{time:YYYY-MM-DD HH:mm:ss.SSS}</>: "\
-                       + extra + "<level>{message}</level>\n"
+            return "<level>{level: <8}</> <green>{time:YYYY-MM-DD HH:mm:ss.SSS}</>: " \
+                       + extra + "<level>{message}</level>" + RESET_COLOR + "\n"
         
         msg = str(record['message'])[:100].replace('{', '(').replace('}', ')')
         return "<level>{level: <8}</> <green>{time:YYYY-MM-DD HH:mm:ss.SSS}</>: "\
-                   + extra + "<level>" + msg + f"</level>{STATUS_COLOR['reset']}\n"
+                   + extra + "<level>" + msg + f"</level>{RESET_COLOR}\n"
+
+
+
+_registered_logger_modules: Set[str] = set()
+
+def register_logger_module(module: str):
+    """
+    Registers a logger module
+    """
+    global _registered_logger_modules
+    module = module.split('.')[0]
+    _registered_logger_modules.add(module)
+    # print('Registered logger module: ', module)
+
+
+@functools.lru_cache(maxsize=1000)
+def is_registered_logger_module(name: str) -> bool:
+    """
+    Returns whether a logger module is registered
+    """
+    module_name = name.split('.')[0]
+    return module_name in _registered_logger_modules
+
+
+_logger_contexts: Dict[str, Logger] = {
+    # 'lazyops': _logger,
+}
+
+def create_global_logger(
+    name: Optional[str] = 'lazyops',
+    level: Union[str, int] = "INFO",
+    format: Optional[Callable] = None,
+    filter: Optional[Callable] = None,
+    handlers: Optional[List[logging.Handler]] = None,
+    settings: Optional['BaseSettings'] = None,
+    **kwargs,
+) -> Logger:
+    """
+    Creates the global logger
+    """
+    global _logger_contexts
+
+    # < 0.7.0
+    try:
+        _logger = Logger(
+            core=_Core(),
+            exception=None,
+            depth=0,
+            record=False,
+            lazy=False,
+            colors=True,
+            raw=False,
+            capture=True,
+            patcher=None,
+            extra={},
+        )
+    # >= 0.7.0
+    except Exception as e:
+        _logger = Logger(
+            core=_Core(),
+            exception=None,
+            depth=0,
+            record=False,
+            lazy=False,
+            colors=False,
+            raw=False,
+            capture=True,
+            patchers=[],
+            extra={},
+        )
+
+    _logger.name = 'lazyops'
+    _logger.is_global = True
+    dev_level = _logger.level(name='DEV', no=19, color="<blue>", icon="@")
+
+    if _defaults.LOGURU_AUTOINIT and sys.stderr: _logger.add(sys.stderr)
+    _atexit.register(_logger.remove)
+
+    _logger.remove()
+    _logger.add_if_condition('dev', _logger._is_dev_condition)
+    
+    logging.basicConfig(
+        handlers = handlers or [InterceptHandler()],  level = 0
+    )
+
+    _logger.add(
+        sys.stdout,
+        enqueue = True,
+        backtrace = True,
+        colorize = True,
+        level = level,
+        format = format if format is not None else LoggerFormatter.default_formatter,
+        filter = filter if filter is not None else _logger._filter,
+        **kwargs,
+    )
+    if settings: _logger.settings = settings
+    _logger_contexts[name] = _logger
+    return _logger
+
+
+def create_default_logger(
+    name: Optional[str] = None,
+    level: Union[str, int] = "INFO",
+    format: Optional[Callable] = None,
+    filter: Optional[Callable] = None,
+    handlers: Optional[List[logging.Handler]] = None,
+    settings: Optional['BaseSettings'] = None,
+    **kwargs,
+) -> Logger:
+    """
+    Creates a default logger
+    """
+    global _logger_contexts
+
+
+    if name:
+        if name.upper() in REVERSE_LOGLEVEL_MAPPING:
+            # If name is a level, then set level to name
+            level = name
+            name = None
+        else:
+            name = name.split('.')[0]
+            
+    if name is None: name = 'lazyops'
+    if name in _logger_contexts:
+        return _logger_contexts[name]
+    
+    if name == 'lazyops':
+        return create_global_logger(
+            name = name,
+            level = level,
+            format = format,
+            filter = filter,
+            handlers = handlers,
+            settings = settings,
+        )
+    
+    if isinstance(level, str): level = level.upper()
+    # print(f"[{name}] Creating logger with level: {level}")
+    _logger = _logger_contexts['lazyops']
+    
+    *options, extra = _logger._options
+    new_logger = Logger(_logger._core, *options, {**extra})
+    if name: 
+        _logger_contexts[name] = new_logger
+        new_logger.name = name
+        register_logger_module(name)
+
+    if settings: new_logger.settings = settings
+    # if _is_global_logger: new_logger.is_global = True
+    return new_logger
+
 
 
 if os.getenv('DEBUG_ENABLED') == 'True':
@@ -838,12 +935,16 @@ else:
     logger_level: str = os.getenv('LOGGER_LEVEL', 'INFO').upper()
 
 
-get_logger = CustomizeLogger.make_default_logger
-logger = CustomizeLogger.make_default_logger(level = logger_level)
+
+get_logger = create_default_logger
+logger = create_default_logger(__name__, level = logger_level)
+
 default_logger = logger
 null_logger = NullLogger(name = 'null_logger')
 
+
 def change_logger_level(
+    name: Optional[str] = None,
     level: Union[str, int] = 'INFO',
     verbose: bool = False,
     **kwargs,
@@ -862,10 +963,16 @@ def change_logger_level(
         level = level.upper()
     # Skip if the level is the same
     if level == logger_level: return
-    if verbose: logger.info(f"Changing logger level from {logger_level} -> {level}")
+    name = name or 'lazyops'
+    name = name.split('.')[0]
     logger_level = level
-    logger = get_logger(logger_level, **kwargs)
-
+    if name != 'lazyops':
+        __logger = get_logger(name, logger_level, **kwargs)
+    else:
+        __logger = logger
+    if verbose: __logger.info(f"[{name}] Changing logger level from {logger_level} -> {level}")
+    __logger._core.min_level = float(REVERSE_LOGLEVEL_MAPPING[logger_level.upper()])
+    
 
 def add_api_log_filters(
     modules: typing.Optional[typing.Union[typing.List[str], str]] = ['gunicorn', 'uvicorn'],

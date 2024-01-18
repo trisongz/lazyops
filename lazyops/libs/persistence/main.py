@@ -8,7 +8,8 @@ import contextlib
 import collections.abc
 from lazyops.utils.lazy import lazy_import, get_keydb_enabled
 from lazyops.utils.logs import logger, null_logger
-from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
+# from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
+from lazyops.utils.pooler import ThreadPooler
 
 from typing import Any, Dict, Optional, Union, Iterable, List, Type, TYPE_CHECKING
 from .backends import LocalStatefulBackend, RedisStatefulBackend, StatefulBackendT

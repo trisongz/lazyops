@@ -7,7 +7,8 @@ Base Compression Classes
 import abc
 
 from lazyops.utils.logs import logger
-from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
+# from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
+from lazyops.utils.pooler import ThreadPooler
 from typing import Any, Optional, Union, Dict, TypeVar
 
 
