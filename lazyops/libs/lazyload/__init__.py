@@ -5,4 +5,5 @@ Support Lazy Loading of Modules
 """
 
 from .main import LazyLoad, lazy_load, load
+from .wrappers import lazy_function_wrapper
 from typing import TYPE_CHECKING

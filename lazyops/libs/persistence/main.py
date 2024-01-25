@@ -3,7 +3,8 @@ Persistence Types
 
 - Handles persistence of data with Redis or JSON+Pickle
 """
-
+import atexit
+import asyncio
 import contextlib
 import collections.abc
 from lazyops.utils.lazy import lazy_import, get_keydb_enabled
@@ -20,6 +21,20 @@ if TYPE_CHECKING:
 
 _DEBUG_ENABLED = False
 autologger = logger if _DEBUG_ENABLED else null_logger
+
+
+RegisteredBackends = {
+    'local': LocalStatefulBackend,
+    'redis': RedisStatefulBackend,
+}
+
+def is_in_async_loop() -> bool:
+    """
+    Returns True if the function is called in an async loop
+    """
+    with contextlib.suppress(Exception):
+        return asyncio.get_event_loop().is_running()
+    return False
 
 class PersistentDict(collections.abc.MutableMapping):
     """
@@ -64,16 +79,28 @@ class PersistentDict(collections.abc.MutableMapping):
         )
         self._mutation_tracker: Dict[str, ObjectValue] = {}
         self._mutation_hashes: Dict[str, str] = {}
+        atexit.register(self.flush)
     
+    @classmethod
+    def register_backend(cls, name: str, backend: Union[str, Type[StatefulBackendT]]):
+        """
+        Registers a Backend
+        """
+        global RegisteredBackends
+        RegisteredBackends[name] = backend
+
     def get_backend_class(self, **kwargs) -> Type[StatefulBackendT]:
         """
         Returns the Backend Class
         """
-        if self.backend_type == 'local':
-            return LocalStatefulBackend
-        elif self.backend_type == 'redis':
-            return RedisStatefulBackend
-        elif self.backend_type == 'auto':
+        if self.backend_type in RegisteredBackends:
+            bt = RegisteredBackends[self.backend_type]
+            return lazy_import(bt) if isinstance(bt, str) else bt
+        # if self.backend_type == 'local':
+        #     return LocalStatefulBackend
+        # elif self.backend_type == 'redis':
+        #     return RedisStatefulBackend
+        if self.backend_type == 'auto':
             if get_keydb_enabled():
                 return RedisStatefulBackend
             return LocalStatefulBackend
@@ -122,7 +149,7 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         Saves a Value to the DB
         """
-        if self.base.async_enabled:
+        if self.base.async_enabled and is_in_async_loop():
             ThreadPooler.create_background_task(self.base.aset(key, value, **kwargs))
         else:
             self.base.set(key, value, **kwargs)
@@ -140,7 +167,7 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         Deletes a Value from the DB
         """
-        if self.base.async_enabled:
+        if self.base.async_enabled and is_in_async_loop():
             ThreadPooler.create_background_task(self.base.adelete(key, **kwargs))
         else:
             self.base.delete(key, **kwargs)
@@ -155,7 +182,7 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         Clears the Cache
         """
-        if self.base.async_enabled:
+        if self.base.async_enabled and is_in_async_loop():
             ThreadPooler.create_background_task(self.base.clear(*keys, **kwargs))
         else:
             self.base.clear(*keys, **kwargs)
@@ -223,6 +250,12 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         return self.base.get_all_keys()
     
+    def get_keys(self, pattern: str, exclude_base_key: Optional[bool] = None) -> List[str]:
+        """
+        Returns all the Keys
+        """
+        return self.base.get_keys(pattern, exclude_base_key = exclude_base_key)
+    
     def get_all_values(self) -> Iterable[Any]:
         """
         Returns all the Values
@@ -242,6 +275,12 @@ class PersistentDict(collections.abc.MutableMapping):
         Returns all the Keys
         """
         return await self.base.aget_all_keys()
+
+    async def aget_keys(self, pattern: str, exclude_base_key: Optional[bool] = None) -> List[str]:
+        """
+        Returns all the Keys
+        """
+        return await self.base.aget_keys(pattern, exclude_base_key = exclude_base_key)
     
     async def aget_all_values(self) -> Iterable[Any]:
         """
@@ -311,7 +350,7 @@ class PersistentDict(collections.abc.MutableMapping):
             value = None
             if key in self._mutation_tracker:
                 autologger.info(f'tracked {func} {key} (cached) {self._mutation_tracker[key]}')
-                if self.base.serializer.create_hash(self._mutation_tracker[key]) == self._mutation_hashes[key]:
+                if self.base.create_hash(self._mutation_tracker[key]) == self._mutation_hashes[key]:
                     value = self._mutation_tracker[key]
                 else:
                     autologger.info(f'tracked {func} {key} (changed). Saving')
@@ -325,9 +364,9 @@ class PersistentDict(collections.abc.MutableMapping):
             yield value
         finally:
             if key not in self._mutation_hashes:
-                self._mutation_hashes[key] = self.base.serializer.create_hash(value)
+                self._mutation_hashes[key] = self.base.create_hash(value)
                 self._mutation_tracker[key] = value
-            if self.base.serializer.create_hash(value) != self._mutation_hashes[key]:
+            if self.base.create_hash(value) != self._mutation_hashes[key]:
                 autologger.info(f'tracked {func} {key} (post-changed). Saving')
                 self._save_mutation_objects(key)
 
@@ -341,7 +380,7 @@ class PersistentDict(collections.abc.MutableMapping):
             value = None
             if key in self._mutation_tracker:
                 autologger.info(f'tracked {func} {key} (cached): {self._mutation_tracker[key]}')
-                if self.base.serializer.create_hash(self._mutation_tracker[key]) == self._mutation_hashes[key]:
+                if self.base.create_hash(self._mutation_tracker[key]) == self._mutation_hashes[key]:
                     value = self._mutation_tracker[key]
                 else:
                     autologger.info(f'tracked {func} {key} (changed). Saving')
@@ -354,9 +393,9 @@ class PersistentDict(collections.abc.MutableMapping):
             yield value
         finally:
             if key not in self._mutation_hashes:
-                self._mutation_hashes[key] = self.base.serializer.create_hash(value)
+                self._mutation_hashes[key] = self.base.create_hash(value)
                 self._mutation_tracker[key] = value
-            if self.base.serializer.create_hash(value) != self._mutation_hashes[key]:
+            if self.base.create_hash(value) != self._mutation_hashes[key]:
                 autologger.info(f'tracked {func} {key} (post-changed). Saving')
                 await self._asave_mutation_objects(key)
 
@@ -520,3 +559,19 @@ class PersistentDict(collections.abc.MutableMapping):
         Migrates the compression
         """
         return await self.base.amigrate_compression(**kwargs)
+    
+    def flush(self, *keys: str):
+        """
+        Finalize any in-memory objects
+        """
+        if self.base.async_enabled and is_in_async_loop():
+            ThreadPooler.create_background_task(self._asave_mutation_objects(*keys))
+        else:
+            self._save_mutation_objects(*keys)
+
+    async def aflush(self, *keys: str):
+        """
+        Finalize any in-memory objects
+        """
+        await self._asave_mutation_objects(*keys)
+        

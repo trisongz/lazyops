@@ -13,9 +13,11 @@ from lazyops.utils.logs import logger
 # from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
 from lazyops.utils.pooler import ThreadPooler
 from ..serializers import get_serializer, SerializerT
+from ..serializers.base import create_obj_hash
 
 if TYPE_CHECKING:
     from lazyops.types.models import BaseSettings
+    from ..serializers.base import ObjectValue
 
 SchemaType = TypeVar("SchemaType", bound=BaseModel)
 
@@ -80,6 +82,14 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         Decodes a Value
         """
         return await self.serializer.adecode(value, **kwargs)
+    
+    def create_hash(self, obj: 'ObjectValue') -> str:
+        """
+        Creates a Hash
+        """
+        return self.serializer.create_hash(obj) if self.serializer is not None else \
+            create_obj_hash(obj)
+
     
     def _precheck(self, **kwargs):
         """
@@ -251,6 +261,12 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         Returns the Keys
         """
         return iter(self.get_all_keys(True))
+
+    def get_keys(self, pattern: str, exclude_base_key: Optional[bool] = None) -> List[str]:
+        """
+        Returns the Keys
+        """
+        raise NotImplementedError
     
     def values(self) -> Iterable[Any]:
         """
@@ -271,6 +287,12 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         Returns the Keys
         """
         return iter(await self.aget_all_keys(True))
+    
+    async def aget_keys(self, pattern: str, exclude_base_key: Optional[bool] = None) -> List[str]:
+        """
+        Returns the Keys
+        """
+        raise NotImplementedError
     
     async def avalues(self) -> Iterable[Any]:
         """

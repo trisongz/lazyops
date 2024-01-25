@@ -19,11 +19,13 @@ if TYPE_CHECKING:
 _imported_strings: Dict[str, Any] = {}
 
 
-def import_string(dotted_path: str) -> Any:
+def import_string(dotted_path: str, is_module: Optional[bool] = None, allow_module: Optional[bool] = False) -> Any:
     """
     Taken from pydantic.utils.
     """
     from importlib import import_module
+    if is_module:
+        return import_module(dotted_path)
     try:
         module_path, class_name = dotted_path.strip(' ').rsplit('.', 1)
     except ValueError as e:
@@ -33,18 +35,21 @@ def import_string(dotted_path: str) -> Any:
     try:
         return getattr(module, class_name)
     except AttributeError as e:
+        if allow_module: return module
         raise ImportError(f'Module "{module_path}" does not define a "{class_name}" attribute') from e
 
 
 def lazy_import(
-    dotted_path: str
+    dotted_path: str,
+    is_module: Optional[bool] = None,
+    allow_module: Optional[bool] = False,
 ) -> Any:
     """
     Lazily imports a string with caching to avoid repeated imports
     """
     global _imported_strings
     if dotted_path not in _imported_strings:
-        _imported_strings[dotted_path] = import_string(dotted_path)
+        _imported_strings[dotted_path] = import_string(dotted_path, is_module = is_module, allow_module = allow_module)
     return _imported_strings[dotted_path]
 
 

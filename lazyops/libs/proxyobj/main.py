@@ -15,7 +15,7 @@ class ProxyObject(Generic[ProxyObjT]):
         obj_args: Optional[List[Any]] = None,
         obj_kwargs: Optional[Dict[str, Any]] = None,
         obj_initialize: Optional[bool] = True,
-        threadsafe: Optional[bool] = False,
+        threadsafe: Optional[bool] = True,
         debug_enabled: Optional[bool] = False,
     ):
         """
@@ -27,6 +27,7 @@ class ProxyObject(Generic[ProxyObjT]):
             debug_enabled: if True, will raise an error if the object is not found
         """
         # Intentionally underscore on the end to avoid conflicts with the settings
+        # Evaluate better approach with https://github.com/seperman/dotobject/blob/master/dot/borrowed_lazy.py
         assert obj_cls or obj_getter, "Either `obj_cls` or `obj_getter` must be provided"
         self.__obj_cls_ = obj_cls
         self.__obj_getter_ = obj_getter

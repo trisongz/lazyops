@@ -441,3 +441,28 @@ async def adeferred_task(
     """
     await asyncio.sleep(wait_time)
     return create_background_task(func, *args, **kwargs)
+
+
+
+def build_dict_from_str(
+    data: str,
+    **kwargs
+) -> Union[List[Any], Dict[str, Any]]:
+    """
+    Helper to build a dictionary from a string
+    """
+    import json
+    if (data.startswith('[') and data.endswith(']')) or (data.startswith('{') and data.endswith('}')):
+        return json.loads(data)
+    return build_dict_from_list(data.split(','), **kwargs)
+
+
+def build_dict_from_list(
+    data: List[str],
+    seperator: str = '=',
+) -> Dict[str, Any]:
+    """
+    Builds a dictionary from a list of strings
+    """
+    import json
+    return json.loads(str(dict([item.split(seperator) for item in data])))

@@ -14,6 +14,7 @@ import inspect
 import asyncio
 import functools
 import subprocess
+import contextvars
 import anyio.from_thread
 from concurrent import futures
 from anyio._core._eventloop import threadlocals
@@ -160,6 +161,22 @@ class ThreadPool(abc.ABC):
         @functools.wraps(func)
         async def inner(*args, **kwargs):
             return await self.arun(func, *args, **kwargs)
+        return inner
+    
+    def ensure_coro_function(self, func: Callable[..., RT]) -> Callable[..., Awaitable[RT]]:
+        """
+        Ensure that the function is a coroutine
+        - Adds contextvars
+        """
+        if asyncio.iscoroutinefunction(func): return func
+        @functools.wraps(func)
+        async def inner(*args, **kwargs):
+            loop = asyncio.get_running_loop()
+            ctx = contextvars.copy_context()
+            return await loop.run_in_executor(
+                executor = self.pool, 
+                func = lambda: ctx.run(func, *args, **kwargs)
+            )
         return inner
     
     @property
