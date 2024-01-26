@@ -399,18 +399,18 @@ class PersistentDict(collections.abc.MutableMapping):
                 autologger.info(f'tracked {func} {key} (post-changed). Saving')
                 await self._asave_mutation_objects(key)
 
-    def setdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False) -> Any:
+    def setdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False, enforce_type: Optional[bool] = False) -> Any:
         """
         Sets a Default Value
         """
-        with self.track_changes(key, 'setdefault', default, update_values = update_values) as result:
+        with self.track_changes(key, 'setdefault', default, update_values = update_values, enforce_type = enforce_type) as result:
             return result
     
-    async def asetdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False) -> Any:
+    async def asetdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False, enforce_type: Optional[bool] = False) -> Any:
         """
         Sets a Default Value
         """
-        async with self.atrack_changes(key, 'asetdefault', default, update_values = update_values) as result:
+        async with self.atrack_changes(key, 'asetdefault', default, update_values = update_values, enforce_type = enforce_type) as result:
             return result
         
     

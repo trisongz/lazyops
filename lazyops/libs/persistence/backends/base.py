@@ -319,7 +319,7 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         pass
     
-    def setdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False):
+    def setdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False, enforce_type: Optional[bool] = False, **kwargs):
         """
         Sets a Default Value
         """
@@ -327,6 +327,8 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
             with contextlib.suppress(Exception):
                 value = self.get(key)
                 if value is not None:
+                    if enforce_type and not isinstance(value, type(default)):
+                        value = type(default)(value)
                     if update_values and isinstance(value, dict) and default and isinstance(default, dict):
                         for k, v in default.items():
                             if k not in value or value[k] is None:
@@ -337,7 +339,7 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         self.set(key, default)
         return default
     
-    async def asetdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False):
+    async def asetdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False, enforce_type: Optional[bool] = False, **kwargs):
         """
         Sets a Default Value
         """
@@ -345,6 +347,8 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
             with contextlib.suppress(Exception):
                 value = await self.aget(key)
                 if value is not None:
+                    if enforce_type and not isinstance(value, type(default)):
+                        value = type(default)(value)
                     if update_values and isinstance(value, dict) and default and isinstance(default, dict):
                         for k, v in default.items():
                             if k not in value or value[k] is None:

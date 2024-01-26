@@ -749,6 +749,19 @@ class InterceptHandler(logging.Handler):
 
 class LoggerFormatter:
 
+    max_extra_lengths: Dict[str, int] = {}
+
+    @classmethod
+    def get_extra_length(cls, key: str, value: str) -> int:
+        """
+        Returns the max length of an extra key
+        """
+        if key not in cls.max_extra_lengths:
+            cls.max_extra_lengths[key] = len(key)
+        if len(value) > cls.max_extra_lengths[key]:
+            cls.max_extra_lengths[key] = len(value)
+        return cls.max_extra_lengths[key]
+
     @classmethod
     def queue_logger_formatter(cls, record: Dict[str, Union[Dict[str, Any], Any]]) -> str:
         """
@@ -765,7 +778,13 @@ class LoggerFormatter:
         kind_color = QUEUE_STATUS_COLORS.get(kind.lower(), FALLBACK_STATUS_COLOR)
         if '<' not in kind_color: kind_color = f'<{kind_color}>'
         extra = kind_color + '{extra[kind]}</>:'
-        extra += '<fg #83c5be>{extra[worker_name]}</>:<b><fg #006d77>{extra[queue_name]:<18}</></>:'
+        if _extra.get('queue_name'):
+            queue_name_length = cls.get_extra_length('queue_name', _extra['queue_name'])
+            extra += '<b><fg #006d77>{extra[queue_name]:<' + str(queue_name_length) + '}</></>:'
+        if _extra.get('worker_name'):
+            worker_name_length = cls.get_extra_length('worker_name', _extra['worker_name'])
+            extra += '<fg #83c5be>{extra[worker_name]:<' + str(worker_name_length) + '}</>:'
+        # extra += '<fg #83c5be>{extra[worker_name]}</>:<b><fg #006d77>{extra[queue_name]:<18}</></>:'
         if _extra.get('job_id'):
             extra += '<fg #005f73>{extra[job_id]}</>'
         if status:
