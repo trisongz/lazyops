@@ -3,8 +3,8 @@ from __future__ import annotations
 from io import IOBase
 from lazyops.types import BaseModel, Field
 from lazyops.utils import logger
-from typing import Optional, Dict, Any, List, Union, Sequence, TYPE_CHECKING
-from .types import SlackContext
+from typing import Optional, Dict, Any, List, Union, Sequence, Callable, TYPE_CHECKING
+from .types import SlackContext, SlackPayload
 from .configs import SlackSettings
 
 if TYPE_CHECKING:
@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
     from slack_sdk.models.attachments import Attachment
     from slack_sdk.models.blocks import Block
+
+    from fastapi import APIRouter, FastAPI
 
 
 class SlackClient:
@@ -399,6 +401,52 @@ class SlackClient:
         """
         if self.disabled: return
         return SlackProxy(name = name_or_id, uid = self.lookup(name_or_id) or name_or_id, client = self)
+
+    def create_slash_command_endpoint(
+        self,
+        router: Union['APIRouter', 'FastAPI'],
+        path: str,
+        function: Callable,
+        function_name: Optional[str] = None,
+    ):
+        
+        function_name = function_name or function.__qualname__
+        from fastapi.requests import Request
+
+        async def slash_command(
+            data: Request,
+        ):
+            payload = await data.form()
+            return await function(SlackPayload(**payload))
+        
+        router.add_api_route(
+            path = path,
+            endpoint = slash_command,
+            name = function_name,
+            methods = ['POST'],
+            include_in_schema=False,
+        )
+        return router
+
+
+    # def create_interactive_endpoint(
+    #     self,
+    #     router: 'APIRouter',
+    #     path: str,
+    # ):
+    #     """
+    #     Create an interactive endpoint
+    #     """
+    #     from slack_sdk.web import WebClient
+    #     from slack_bolt import App
+    #     from slack_bolt.adapter.fastapi import SlackRequestHandler
+    #     app = App(client = WebClient(token = self.token))
+    #     handler = SlackRequestHandler(app = app)
+    #     router.add_api_route(
+    #         path = path,
+    #         endpoint = handler,
+    #         methods = ['POST'],
+    #     )
 
 
 class SlackProxy(BaseModel):

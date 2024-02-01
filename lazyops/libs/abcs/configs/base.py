@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 The Base Configuration Schema
 """
@@ -187,3 +189,16 @@ class AppSettings(BaseAppSettings):
         Returns whether the environment is development
         """
         return self.app_env in [AppEnv.DEVELOPMENT, AppEnv.LOCAL, AppEnv.CICD]
+    
+    @property
+    def global_ctx(self) -> Type[GlobalContext]:
+        """
+        Returns the global context
+        """
+        return GlobalContext
+    
+    def register_on_close(self, func: Callable, *args, **kwargs):
+        """
+        Registers a function to be called on close
+        """
+        GlobalContext.register_on_close(func, *args, **kwargs)
