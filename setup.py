@@ -36,6 +36,10 @@ extras = {
         'filelock',
         'pydantic-settings',
         'python-multipart',
+    ],
+    'builder': [
+        'pyyaml',
+        'typer',
     ]
 }
 args = {
@@ -44,7 +48,9 @@ args = {
     'include_package_data': True,
     'long_description': root.joinpath('README.md').read_text(encoding='utf-8'),
     'entry_points': {
-        "console_scripts": []
+        "console_scripts": [
+            'lazyops-build = lazyops.libs.abc.builder:main',
+        ]
     },
     'extras_require': extras,
 }

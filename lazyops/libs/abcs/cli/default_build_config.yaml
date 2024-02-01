@@ -1,0 +1,31 @@
+app_name: null
+builds:
+  server:
+    kind: services
+    names:
+    - server
+    - app
+    custom_install: []
+    custom_commands: []
+  service:
+    kind: services
+    names:
+    - service
+    - worker
+    - tasks
+    custom_install: []
+    custom_commands: []
+custom_installers:
+  keydb: 
+    - echo "deb https://download.keydb.dev/open-source-dist $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/keydb.list
+    - wget -O /etc/apt/trusted.gpg.d/keydb.gpg https://download.keydb.dev/open-source-dist/keyring.gpg
+    - apt-get update && apt-get -yq install keydb-tools
+  redis:
+    - apt-get update && apt-get -yq install redis-server
+  postgres:
+    - apt-get update && apt-get -yq install postgresql
+  playright:
+    - pip install playwright && playwright install chromium && playwright install-deps
+custom_commands: {}
+enabled_build_services: null
+

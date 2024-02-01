@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import time
 import uuid
 import typing
@@ -11,9 +13,9 @@ import contextlib
 import async_lru
 import signal
 
-
+from pathlib import Path
 from frozendict import frozendict
-from typing import Dict, Callable, List, Any, Union, Coroutine, TypeVar, TYPE_CHECKING
+from typing import Dict, Callable, List, Any, Union, Coroutine, TypeVar, Optional, TYPE_CHECKING
 from lazyops.utils.logs import default_logger
 
 from lazyops.utils.serialization import (
@@ -35,6 +37,8 @@ from lazyops.utils.lazy import (
 
 if TYPE_CHECKING:
     from lazyops.types import BaseModel
+    
+
 
 
 def timer(t: typing.Optional[float] = None, msg: typing.Optional[str] = None, logger = default_logger):
@@ -404,7 +408,7 @@ async def run_as_coro(
     try:
         return await ThreadPooler.asyncish(func, *args, **kwargs)
     except Exception as e:
-        default_logger.trace(f'Error running as coro', error = e)
+        default_logger.trace('Error running as coro', error = e)
         raise e
 
 
@@ -466,3 +470,51 @@ def build_dict_from_list(
     """
     import json
     return json.loads(str(dict([item.split(seperator) for item in data])))
+
+@contextlib.contextmanager
+def patch_env(
+    env_file: Optional[Union[str, 'Path']] = None,
+    reset_on_exit: Optional[bool] = True,
+    **env_vars: Dict[str, Any],
+):
+    """
+    Context manager to patch the current environment variables
+
+    Args:
+        env_file: Path to the environment file. Supported formats: .env, .json, .yaml
+        reset_on_exit: If True, resets the environment variables on exit
+        **env_vars: Environment variables to set
+    
+    Yields:
+        None
+    """
+    import os
+    current_env = dict(os.environ)
+    try:
+        if env_file:
+            env_file = Path(env_file)
+            if not env_file.exists():
+                raise FileNotFoundError(f'Environment file not found: {env_file}')
+            if env_file.suffix == '.env':
+                from dotenv import load_dotenv
+                load_dotenv(env_file, override=True)
+            elif env_file.suffix == '.json':
+                import json
+                with open(env_file, 'r') as f:
+                    env_vars.update(json.load(f))
+            elif env_file.suffix == '.yaml':
+                import yaml
+                with open(env_file, 'r') as f:
+                    env_vars.update(yaml.safe_load(f))
+
+        for k, v in env_vars.items():
+            os.environ[k] = str(v)
+        yield
+    finally:
+        if reset_on_exit:
+            os.environ.clear()
+            os.environ.update(current_env)
+
+    
+
+    
