@@ -249,7 +249,7 @@ class ProxyObjectV3(Generic[ProxyObjT]):
         obj_kwargs: Optional[Dict[str, Any]] = None,
         obj_initialize: Optional[bool] = True,
         threadsafe: Optional[bool] = True,
-        debug_enabled: Optional[bool] = False,
+        # debug_enabled: Optional[bool] = False,
     ) -> ProxyObjT:
         """
         args:
@@ -269,7 +269,7 @@ class ProxyObjectV3(Generic[ProxyObjT]):
         self.__dict__['__obj_args_'] = obj_args or []
         self.__dict__['__obj_kwargs_'] = obj_kwargs or {}
         self.__dict__['__obj_initialize_'] = obj_initialize
-        self.__dict__['__debug_enabled_'] = debug_enabled
+        # self.__dict__['__debug_enabled_'] = debug_enabled
         self.__dict__['__last_attrs_'] = {}
 
     
