@@ -21,6 +21,7 @@ _parser_types: Dict[str, Type] = {
     'bool': bool,
     'list': list,
     'dict': dict,
+    'List': List,
     # 'tuple': tuple,
     # 'None': None,
 }
@@ -39,13 +40,17 @@ def parse_one(
     for pt in _parser_types.values():
         if field_type == Optional[pt]:
             field_type = pt
+
             break
 
     if field.is_required():
         args.add(name)
     else:
         args.add(f'--{name}')
-        if len(name) > 3:
+        if field.json_schema_extra and field.json_schema_extra.get('alt'):
+            args.add(f'-{field.json_schema_extra["alt"]}')
+        
+        elif len(name) > 3:
             if '_' in name:
                 parts = name.split('_')
                 short_name = ''.join([p[0] for p in parts])
@@ -55,11 +60,10 @@ def parse_one(
 
     if field_type == bool:
         kwargs['action'] = 'store_true' if field.default is False else 'store_false'
-    elif field_type == list:
-        kwargs['nargs'] = '+'
+    elif field_type in {list[str], list[int], list[float], List[str], List[int], List[float]}:
+        kwargs['action'] = 'append'
     else:
         kwargs['type'] = field_type
-
     if field.default is not None:
         kwargs['default'] = field.default
     elif field.default_factory is not None:
