@@ -59,7 +59,7 @@ def parse_one(
 
 
     if field_type == bool:
-        kwargs['action'] = 'store_true' if field.default is False else 'store_false'
+        kwargs['action'] = 'store_true' if field.default is False or field.default is None else 'store_false'
     elif field_type in {list[str], list[int], list[float], List[str], List[int], List[float]}:
         kwargs['action'] = 'append'
     else:
@@ -86,7 +86,14 @@ def create_argparser_from_model(
     global _parsed_parser_objects
     model_key = f'{model.__module__}.{model.__name__}'
     if model_key not in _parsed_parser_objects:
-        parser = argparse.ArgumentParser(description=model.__doc__, exit_on_error = exit_on_error, **argparser_kwargs)
+        doc = model.__doc__ or ''
+        usage = argparser_kwargs.pop('usage', None)
+        if 'Usage' in doc and not usage:
+            parts = doc.split('Usage:', 1)
+            doc, usage = parts[0].strip(), parts[-1].strip()
+            
+
+        parser = argparse.ArgumentParser(description = doc, usage = usage, exit_on_error = exit_on_error, **argparser_kwargs)
         for name, field in model.model_fields.items():
             if field.json_schema_extra and field.json_schema_extra.get('hidden', False):
                 continue
