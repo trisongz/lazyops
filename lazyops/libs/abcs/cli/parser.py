@@ -76,7 +76,9 @@ def parse_one(
 
 
 def create_argparser_from_model(
-    model: Type['BaseModel']
+    model: Type['BaseModel'],
+    exit_on_error: Optional[bool] = False,
+    **argparser_kwargs,
 ) -> argparse.ArgumentParser:
     """
     Create an Argument Parser from a Pydantic Model
@@ -84,7 +86,7 @@ def create_argparser_from_model(
     global _parsed_parser_objects
     model_key = f'{model.__module__}.{model.__name__}'
     if model_key not in _parsed_parser_objects:
-        parser = argparse.ArgumentParser(description=model.__doc__)
+        parser = argparse.ArgumentParser(description=model.__doc__, exit_on_error = exit_on_error, **argparser_kwargs)
         for name, field in model.model_fields.items():
             if field.json_schema_extra and field.json_schema_extra.get('hidden', False):
                 continue
