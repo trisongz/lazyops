@@ -71,14 +71,3 @@ def parse_envvars_from_text(
 
     return text, values
 
-
-dummy_text = """
-{
-    "proxy_endpoints": {
-        "cluster": "env/CLUSTER_ENDPOINT"
-    }
-}
-""".strip()
-
-os.environ['CLUSTER_ENDPOINT'] = 'http://localhost:8000'
-print(parse_envvars_from_text(dummy_text))

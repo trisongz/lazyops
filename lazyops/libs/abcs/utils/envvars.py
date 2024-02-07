@@ -64,7 +64,11 @@ def parse_envvars_from_text(
         envvar = match.replace(envvar_prefix, '')
         # print(match, envvar)
         _default = values.get(envvar)
-        _type = type(_default) if _default is not None else str
+        if isinstance(_default, type):
+            _type = _default
+            _default = None
+        else:
+            _type = type(_default) if _default is not None else str
         val = parse_from_envvar(envvar, default=_default, _type=_type)
         # if val is not None:
         values[envvar] = val
