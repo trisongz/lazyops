@@ -12,7 +12,22 @@ if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
 
 
-_parsed_parser_objects: Dict[str, argparse.ArgumentParser] = {}
+class ArgParser(argparse.ArgumentParser):
+
+
+    def error(self, message):
+        """error(message: string)
+
+        Prints a usage message incorporating the message to stderr and
+        exits.
+
+        If you override this in a subclass, it should not return -- it
+        should either exit or raise an exception.
+        """
+        args = {'prog': self.prog, 'message': message}
+        raise ValueError('%(prog)s: error: %(message)s\n' % args)
+
+_parsed_parser_objects: Dict[str, ArgParser] = {}
 
 _parser_types: Dict[str, Type] = {
     'str': str,
@@ -79,7 +94,7 @@ def create_argparser_from_model(
     model: Type['BaseModel'],
     exit_on_error: Optional[bool] = False,
     **argparser_kwargs,
-) -> argparse.ArgumentParser:
+) -> ArgParser:
     """
     Create an Argument Parser from a Pydantic Model
     """
@@ -93,7 +108,7 @@ def create_argparser_from_model(
             doc, usage = parts[0].strip(), parts[-1].strip()
             
 
-        parser = argparse.ArgumentParser(description = doc, usage = usage, exit_on_error = exit_on_error, **argparser_kwargs)
+        parser = ArgParser(description = doc, usage = usage, exit_on_error = exit_on_error, **argparser_kwargs)
         for name, field in model.model_fields.items():
             if field.json_schema_extra and field.json_schema_extra.get('hidden', False):
                 continue
