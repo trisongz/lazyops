@@ -26,10 +26,12 @@ print(x.hi())
 >> hi
 """
 
-from typing import Type, TypeVar, Optional, Union, Any, overload, Callable, List, Dict, TYPE_CHECKING
+from typing import Type, TypeVar, Optional, Union, Any, Callable, List, Dict, TYPE_CHECKING
 from .main import ProxyObject
 
 OT = TypeVar('OT')
+
+
 
 def proxied(
     obj_cls: Optional[Type[OT]] = None,
@@ -38,7 +40,7 @@ def proxied(
     obj_kwargs: Optional[Dict[str, Any]] = None,
     obj_initialize: Optional[bool] = True,
     threadsafe: Optional[bool] = True,
-) -> Type[OT]:
+) -> Union[Callable[..., OT], OT]:
     """
     Lazily initialize an object as a proxy object
 
@@ -94,7 +96,7 @@ def proxied(
             threadsafe = threadsafe,
         )
     
-    def wrapper(obj_cls: Type[OT]) -> Type[OT]:
+    def wrapper(obj_cls: Type[OT]) -> OT:
         return ProxyObject(
             obj_cls = obj_cls,
             obj_getter = obj_getter,
