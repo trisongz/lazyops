@@ -8,7 +8,7 @@ import pathlib
 import filelock
 import contextlib
 from lazyops.utils.serialization import Json
-from typing import Optional, Dict, Any, Set, List, Union, TYPE_CHECKING
+from typing import Optional, Dict, Any, Set, List, Union, Generator, TYPE_CHECKING
 
 
 
@@ -20,38 +20,78 @@ class TemporaryData(abc.ABC):
         self, 
         filepath: Optional[pathlib.Path] = None,
         is_multithreaded: Optional[bool] = False,
+        timeout: Optional[int] = 10,
     ):
         if not filepath: filepath = pathlib.Path(tempfile.mktemp())
         self.filepath = filepath
         self.filelock_path = filepath.with_suffix('.lock')
-        self.filelock = filelock.FileLock(lock_file = self.filelock_path.as_posix(), thread_local = False)
+        self.timeout = timeout
         self.is_multithreaded = is_multithreaded
-        with self.filelock:
-            if not self.filepath.exists():
-                self.filepath.write_text('{}')
-        if self.is_multithreaded and not self.get('process_id'):
-            self['process_id'] = os.getpid()
-        atexit.register(self.cleanup_on_exit)
+        self._filelock: Optional[filelock.SoftFileLock] = None
+
+    @property
+    def filelock(self) -> filelock.SoftFileLock:
+        """
+        Returns the filelock
+        """
+        if self._filelock is None:
+            try:
+                self._filelock = filelock.SoftFileLock(
+                    self.filelock_path.as_posix(), 
+                    timeout = self.timeout,
+                    thread_local = False
+                )
+                with self._filelock.acquire():
+                    if not self.filepath.exists():
+                        self.filepath.write_text('{}')
+                    data = Json.loads(self.filepath.read_text())
+                    if self.is_multithreaded and not data.get('process_id'):
+                        data['process_id'] = os.getpid()
+                        self.filepath.write_text(Json.dumps(data, indent = 2))
+                atexit.register(self.cleanup_on_exit)
+            except Exception as e:
+                from lazyops.libs.logging import logger
+                logger.trace(f'Error creating filelock for {self.filepath}', e)
+                raise e
+        return self._filelock
+    
+    def _load_data(self) -> Dict[str, Any]:
+        """
+        Loads the data
+        """
+        # if not self.filepath.exists():
+        #     self.filepath.write_text('{}')
+        return Json.loads(self.filepath.read_text())
 
     @property
     def data(self) -> Dict[str, Any]:
         """
         Returns the data
         """
-        with self.filelock:
-            return Json.loads(self.filepath.read_text())
+        try:
+            with self.filelock.acquire():
+                return self._load_data()
+        except filelock.Timeout as e:
+            from lazyops.libs.logging import logger
+            logger.trace(f'Filelock timeout for {self.filepath}')
+            raise e
         
     @contextlib.contextmanager
-    def ctx(self) -> Dict[str, Union[List[Any], Dict[str, Any], Any]]:
+    def ctx(self) -> Generator[Dict[str, Union[List[Any], Dict[str, Any], Any]], None, None]:
         """
         Returns the context
         """
-        with self.filelock:
-            data = self.data
-            try:
-                yield data
-            finally:
-                self.filepath.write_text(Json.dumps(data, indent = 2))
+        try:
+            with self.filelock.acquire():
+                data = self._load_data()
+                try:
+                    yield data
+                finally:
+                    self.filepath.write_text(Json.dumps(data, indent = 2))
+        except filelock.Timeout as e:
+            from lazyops.libs.logging import logger
+            logger.trace(f'Filelock timeout for {self.filepath}')
+            raise e
     
     def get(self, key: str, default: Optional[Any] = None) -> Any:
         """

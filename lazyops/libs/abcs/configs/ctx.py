@@ -268,9 +268,18 @@ class ApplicationContextManagerClass(abc.ABC):
         Creates the context manager
         """
         self.ctxs: Dict[str, ApplicationContext] = {}
-        from ..state import GlobalContext
-        self.global_ctx: 'GlobalContextClass' = GlobalContext
+        self._global_ctx: Optional['GlobalContextClass'] = None
     
+    @property
+    def global_ctx(self) -> 'GlobalContextClass':
+        """
+        Returns the global context
+        """
+        if self._global_ctx is None:
+            from ..state import GlobalContext
+            self._global_ctx = GlobalContext
+        return self._global_ctx
+
     def init_ctx(self, module_name: str, *args, **kwargs) -> ApplicationContext:
         """
         Initializes the app context

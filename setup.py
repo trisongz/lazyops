@@ -33,7 +33,7 @@ extras = {
     'fastapi': [
         'fastapi',
         'uvicorn',
-        'filelock',
+        'filelock==3.12.4',
         'pydantic-settings',
         'python-multipart',
     ],
