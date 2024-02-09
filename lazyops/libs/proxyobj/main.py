@@ -3,7 +3,7 @@ import threading
 import contextlib
 import operator
 import copyreg
-from typing import Any, Type, Tuple, Dict, List, Union, Optional, Callable, TypeVar, Generic, TYPE_CHECKING
+from typing import Any, Type, Tuple, Dict, List, Union, Optional, Callable, TypeVar, Iterable, Generic, TYPE_CHECKING
 
 
 ProxyObjT = TypeVar('ProxyObjT')
@@ -241,12 +241,16 @@ class ProxyObjectV3(Generic[ProxyObjT]):
     
     _wrapped = None
 
+    if TYPE_CHECKING:
+        def __new__(cls: Type[ProxyObjT], *args, **kwargs) -> ProxyObjT:
+            ...
+
     def __init__(
         self,
         obj_cls: Optional[Union[Type[ProxyObjT], str]] = None,
-        obj_getter: Optional[Union[Callable, str]] = None,
-        obj_args: Optional[List[Any]] = None,
-        obj_kwargs: Optional[Dict[str, Any]] = None,
+        obj_getter: Optional[Union[Callable[..., ProxyObjT], str]] = None,
+        obj_args: Optional[Union[str, Callable[..., Iterable[Any]], Iterable[Any]]] = None,
+        obj_kwargs: Optional[Union[str, Callable[..., Dict[str, Any]], Dict[str, Any]]] = None,
         obj_initialize: Optional[bool] = True,
         threadsafe: Optional[bool] = True,
         # debug_enabled: Optional[bool] = False,
@@ -261,9 +265,16 @@ class ProxyObjectV3(Generic[ProxyObjT]):
         assert obj_cls or obj_getter, "Either `obj_cls` or `obj_getter` must be provided"
         self._wrapped = empty
         self.__dict__['__obj_cls_'] = obj_cls
-        if obj_getter and isinstance(obj_getter, str):
-            from lazyops.utils.helpers import lazy_import
-            obj_getter = lazy_import(obj_getter)
+        # Defer until called.
+        # if obj_getter and isinstance(obj_getter, str):
+        #     from lazyops.utils.helpers import lazy_import
+        #     obj_getter = lazy_import(obj_getter)
+        # if obj_args and isinstance(obj_args, str):
+        #     from lazyops.utils.helpers import lazy_import
+        #     obj_args = lazy_import(obj_args)
+        # if obj_kwargs and isinstance(obj_kwargs, str):
+        #     from lazyops.utils.helpers import lazy_import
+        #     obj_kwargs = lazy_import(obj_kwargs)
         self.__dict__['__obj_getter_'] = obj_getter
         self.__dict__['__threadlock_'] = None if threadsafe else threading.Lock()
         self.__dict__['__obj_args_'] = obj_args or []
@@ -313,18 +324,42 @@ class ProxyObjectV3(Generic[ProxyObjT]):
             self._setup()
         return self._wrapped(*args, **kwargs)
 
+    def _setup_init(self):
+        """
+        Setup and initialize the proxy object arguments
+        """
+        from lazyops.utils.helpers import lazy_import
+        if self.__dict__['__obj_args_'] is not None and not isinstance(self.__dict__['__obj_args_'], (list, tuple)):
+            if isinstance(self.__dict__['__obj_args_'], str):
+                self.__dict__['__obj_args_'] = lazy_import(self.__dict__['__obj_args_'])
+            if callable(self.__dict__['__obj_args_']):
+                self.__dict__['__obj_args_'] = self.__dict__['__obj_args_']()
+        
+        if self.__dict__['__obj_kwargs_'] is not None and not isinstance(self.__dict__['__obj_kwargs_'], dict):
+            if isinstance(self.__dict__['__obj_kwargs_'], str):
+                self.__dict__['__obj_kwargs_'] = lazy_import(self.__dict__['__obj_kwargs_'])
+            if callable(self.__dict__['__obj_kwargs_']):
+                self.__dict__['__obj_kwargs_'] = self.__dict__['__obj_kwargs_']()
+        
+        if self.__dict__['__obj_getter_'] is not None and isinstance(self.__dict__['__obj_getter_'], str):
+            self.__dict__['__obj_getter_'] = lazy_import(self.__dict__['__obj_getter_'])
+
+        elif self.__dict__['__obj_cls_'] is not None and isinstance(self.__dict__['__obj_cls_'], str):
+            self.__dict__['__obj_cls_'] = lazy_import(self.__dict__['__obj_cls_'])
+
+
     def _setup(self):
         """
         Initializes the Proxy Object
         """
         # if self.__dict__['__obj_'] is not None: return
+        
         with self._objlock_():
-            if self.__dict__['__obj_getter_']:
+            self._setup_init()    
+            if self.__dict__['__obj_getter_'] is not None:
                 self.__dict__['_wrapped'] = self.__dict__['__obj_getter_'](*self.__dict__['__obj_args_'], **self.__dict__['__obj_kwargs_'])
+            
             elif self.__dict__['__obj_cls_']:
-                if isinstance(self.__dict__['__obj_cls_'], str):
-                    from lazyops.utils.helpers import lazy_import
-                    self.__dict__['__obj_cls_'] = lazy_import(self.__dict__['__obj_cls_'])
                 if self.__dict__['__obj_initialize_']:
                     self.__dict__['_wrapped'] = self.__dict__['__obj_cls_'](*self.__dict__['__obj_args_'], **self.__dict__['__obj_kwargs_'])
                 else:
