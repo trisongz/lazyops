@@ -2,6 +2,7 @@
 Configuration Types
 """
 
+import os
 from enum import Enum
 from typing import Any
 
@@ -52,3 +53,34 @@ class AppEnv(str, Enum):
         Returns the name in lower
         """
         return self.value.lower()
+
+
+    
+
+
+def get_app_env(
+    module_name: str,
+) -> AppEnv:
+    """
+    Retrieves the app environment
+    """
+    module_name = module_name.replace(".", "_").upper()
+    for key in {
+        "SERVER_ENV",
+        f"{module_name}_ENV",
+        "APP_ENV",
+        "ENVIRONMENT",
+    }:
+        if env_value := os.getenv(key):
+            return AppEnv.from_env(env_value)
+
+    from lazyops.utils.system import is_in_kubernetes, get_host_name
+    if is_in_kubernetes():
+        # Name should be
+        # scout-<service>-<index>
+        # or 
+        # scout-<service>-<env>-<index>
+        parts = get_host_name().split("-")
+        return AppEnv.from_env(parts[2]) if len(parts) > 3 else AppEnv.PRODUCTION
+    
+    return AppEnv.LOCAL

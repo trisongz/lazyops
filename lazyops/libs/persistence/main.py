@@ -112,16 +112,29 @@ class PersistentDict(collections.abc.MutableMapping):
         Returns the Compression Level
         """
         return self.base.serializer.compression_level
+    
+    def get_child_kwargs(self, **kwargs) -> Dict[str, Any]:
+        """
+        Returns the Child Kwargs
+        """
+        base_kwargs = self._kwargs.copy()
+        if kwargs: base_kwargs.update(kwargs)
+        if 'settings' not in base_kwargs:
+            base_kwargs['settings'] = self.settings
+        if 'name' not in base_kwargs:
+            base_kwargs['name'] = self.name
+        if 'backend_type' not in base_kwargs and 'backend' not in base_kwargs:
+            base_kwargs['backend'] = self.base_class
+        if 'async_enabled' not in base_kwargs:
+            base_kwargs['async_enabled'] = self.base.async_enabled
+        return base_kwargs
 
     def get_child(self, key: str, **kwargs) -> 'PersistentDict':
         """
         Gets a Child Persistent Dictionary
         """
-        base_key = f'{self.base_key}.{key}' if self.base_key else key
-        if 'async_enabled' not in kwargs:
-            kwargs['async_enabled'] = self.base.async_enabled
-        base_kwargs = self._kwargs.copy()
-        base_kwargs.update(kwargs)
+        base_key = f'{self.base_key}:{key}' if self.base_key else key
+        base_kwargs = self.get_child_kwargs(**kwargs)
         return self.__class__(base_key = base_key, **base_kwargs)
 
 
@@ -329,17 +342,20 @@ class PersistentDict(collections.abc.MutableMapping):
         await self._asave_mutation_objects()
         return await self.base.aitems(iterable = iterable)
     
-    def expire(self, key: str, timeout: int) -> None:
+    def expire(self, key: str, timeout: Optional[int] = None, expiration: Optional[int] = None, **kwargs) -> None:
         """
         Expires a Key
         """
-        self.base.expire(key, timeout)
+        # Add a check to see if expiration or timeout is set
+        ex = expiration if expiration is not None else timeout
+        self.base.expire(key, ex)
 
-    async def aexpire(self, key: str, timeout: int) -> None:
+    async def aexpire(self, key: str, timeout: Optional[int] = None, expiration: Optional[int] = None, **kwargs) -> None:
         """
         Expires a Key
         """
-        await self.base.aexpire(key, timeout)
+        ex = expiration if expiration is not None else timeout
+        await self.base.aexpire(key, ex)
 
     @contextlib.contextmanager
     def track_changes(self, key: str, func: str, *args, **kwargs):

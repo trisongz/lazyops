@@ -330,10 +330,12 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
                     if enforce_type and not isinstance(value, type(default)):
                         value = type(default)(value)
                     if update_values and isinstance(value, dict) and default and isinstance(default, dict):
-                        for k, v in default.items():
-                            if k not in value or value[k] is None:
-                                
-                                value[k] = v
+                        from lazyops.libs.abcs.utils.helpers import update_dict
+                        value = update_dict(value, default, exclude_none = True)
+                        # for k, v in default.items():
+                        #     if k not in value or value[k] is None:
+                        #         
+                        #         value[k] = v
                         self.set(key, value)
                     return value
         self.set(key, default)
@@ -350,9 +352,11 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
                     if enforce_type and not isinstance(value, type(default)):
                         value = type(default)(value)
                     if update_values and isinstance(value, dict) and default and isinstance(default, dict):
-                        for k, v in default.items():
-                            if k not in value or value[k] is None:
-                                value[k] = v
+                        from lazyops.libs.abcs.utils.helpers import update_dict
+                        value = update_dict(value, default, exclude_none = True)
+                        # for k, v in default.items():
+                        #     if k not in value or value[k] is None:
+                        #         value[k] = v
                         await self.aset(key, value)
                     return value
         await self.aset(key, default)
