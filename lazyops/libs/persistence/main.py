@@ -79,6 +79,7 @@ class PersistentDict(collections.abc.MutableMapping):
         )
         self._mutation_tracker: Dict[str, ObjectValue] = {}
         self._mutation_hashes: Dict[str, str] = {}
+        # logger.info(f'Initialized PersistentDict {self.name}/{self.base_key}/{self.base_class}')
         atexit.register(self.flush)
     
     @classmethod
@@ -590,4 +591,57 @@ class PersistentDict(collections.abc.MutableMapping):
         Finalize any in-memory objects
         """
         await self._asave_mutation_objects(*keys)
-        
+    
+
+    def get_all_data_raw(self, exclude_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
+        """
+        Loads all the Data
+        """
+        return self.base.get_all_data_raw(exclude_base_key = exclude_base_key, **kwargs)
+    
+    async def aget_all_data_raw(self, exclude_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
+        """
+        Loads all the Data
+        """
+        return await self.base.aget_all_data_raw(exclude_base_key = exclude_base_key, **kwargs)
+    
+    
+    def load_data_raw(self, data: Dict[str, Any], includes_base_key: Optional[bool] = False, **kwargs):
+        """
+        Loads the Data
+        """
+        self.base.load_data_raw(data, includes_base_key = includes_base_key, **kwargs)
+
+    async def aload_data_raw(self, data: Dict[str, Any], includes_base_key: Optional[bool] = False, **kwargs):
+        """
+        Loads the Data
+        """
+        await self.base.aload_data_raw(data, includes_base_key = includes_base_key, **kwargs)
+
+
+    def dump_data_raw(self, include_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
+        """
+        Dumps the Data
+        """
+        return self.base.dump_data_raw(include_base_key = include_base_key, **kwargs)
+    
+    async def adump_data_raw(self, include_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
+        """
+        Dumps the Data
+        """
+        return await self.base.adump_data_raw(include_base_key = include_base_key, **kwargs)
+    
+    def replicate_from(self, source: Any, **kwargs):
+        """
+        Replicates the Data
+        """
+        self.base.replicate_from(source, **kwargs)
+
+    async def areplicate_from(self, source: Any, **kwargs):
+        """
+        Replicates the Data
+        """
+        await self.base.areplicate_from(source, **kwargs)
+
+    
+

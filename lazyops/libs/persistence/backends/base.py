@@ -469,3 +469,52 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         Migrates the Compression
         """
         pass
+
+    def get_all_data_raw(self, exclude_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
+        """
+        Loads all the Data
+        """
+        raise NotImplementedError
+    
+    async def aget_all_data_raw(self, exclude_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
+        """
+        Loads all the Data
+        """
+        return await ThreadPooler.run_async(self.get_all_data_raw, exclude_base_key = exclude_base_key, **kwargs)
+    
+    def load_data_raw(self, data: Dict[str, Any], includes_base_key: Optional[bool] = False, **kwargs):
+        """
+        Loads the Data
+        """
+        raise NotImplementedError
+    
+    async def aload_data_raw(self, data: Dict[str, Any], includes_base_key: Optional[bool] = False, **kwargs):
+        """
+        Loads the Data
+        """
+        return await ThreadPooler.run_async(self.load_data_raw, data, includes_base_key = includes_base_key, **kwargs)
+    
+    def dump_data_raw(self, include_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
+        """
+        Dumps the Data
+        """
+        raise NotImplementedError
+    
+    async def adump_data_raw(self, include_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
+        """
+        Dumps the Data
+        """
+        return await ThreadPooler.run_async(self.dump_data_raw, include_base_key = include_base_key, **kwargs)
+    
+    
+    def replicate_from(self, source: Any, **kwargs):
+        """
+        Replicates the Cache from a Source
+        """
+        raise NotImplementedError
+    
+    async def areplicate_from(self, source: Any, **kwargs):
+        """
+        Replicates the Cache from a Source
+        """
+        return await ThreadPooler.run_async(self.replicate_from, source, **kwargs)
