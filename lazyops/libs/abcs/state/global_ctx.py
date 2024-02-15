@@ -4,11 +4,11 @@ import os
 import abc
 import signal
 import contextlib
-import multiprocessing
+import multiprocessing 
 
-from typing import Optional, List, TypeVar, Callable, Dict, Any, Union, TYPE_CHECKING
+from typing import Optional, List, TypeVar, Callable, Dict, Any, overload, Type, Union, TYPE_CHECKING
 from lazyops.utils.lazy import lazy_import
-from lazyops.libs.proxyobj import ProxyObject
+from lazyops.libs.proxyobj import ProxyObject, proxied
 from lazyops.imports._psutil import _psutil_available
 
 if _psutil_available:
@@ -16,59 +16,67 @@ if _psutil_available:
 
 if TYPE_CHECKING:
     from lazyops.utils.logs import Logger
+    from ..configs.base import AppSettings
     from lazyops.types.models import BaseSettings
     from lazyops.libs.fastapi_utils.types.state import AppState
 
-    with contextlib.suppress(ImportError):
-        from kvdb import TaskWorker, TaskQueue
+    from kvdb import TaskFunction, CronJob, TaskWorker, TaskQueue
+
+    # with contextlib.suppress(ImportError):
+    #     from kvdb import TaskWorker, TaskQueue
         # from aiokeydb.types.task_queue import TaskQueue
         # from aiokeydb.types.worker import Worker
 
 
-SettingsT = TypeVar('SettingsT', bound='BaseSettings')
+# SettingsT = TypeVar('SettingsT', bound='AppSettings')
 
 
-class GlobalContextClass(abc.ABC):
+# class GlobalContextClass(abc.ABC):
+
+@proxied
+class GlobalContext(abc.ABC):
     """
     Global Context for FastAPI 
     """
 
-    queues: Dict[str, Dict[str, 'TaskQueue']] = {}
+
+    workers: Dict[str, Dict[str, Union[multiprocessing.Process, 'TaskWorker']]] = {}
+    # queues: Dict[str, Dict[str, 'TaskQueue']] = {}
     server_processes: List['multiprocessing.Process'] = []
-    worker_processes: Dict[str, Dict[str, List['multiprocessing.Process']]] = {}
+    # worker_processes: Dict[str, Dict[str, List['multiprocessing.Process']]] = {}
 
     on_close_funcs: List[Callable] = []
 
     settings_func: Optional[Union[Callable, str]] = None # type: ignore
     settings_config_func: Optional[Union[Callable, str]] = None # type: ignore
-    get_worker_func: Optional[Union[Callable, str]] = None # type: ignore
-    get_num_worker_func: Optional[Union[Callable, str]] = None # type: ignore
-    get_worker_names_func: Optional[Union[Callable, str]] = None
+    get_worker_func: Optional[Union[Callable, str, List[str]]] = None # type: ignore
+    # get_num_worker_func: Optional[Union[Callable, str]] = None # type: ignore
+    # get_worker_names_func: Optional[Union[Callable, str]] = None
     
     
     def __init__(self, **kwargs):
         """
         Creates the global context
         """
-        self._settings: Optional[SettingsT] = None
+        self._settings: Optional['AppSettings'] = None
         self._state: Optional['AppState'] = None
         self._logger: Optional['Logger'] = None
 
     def configure(
         self,
-        queue_types: Optional[List[str]] = None,
+        # queue_types: Optional[List[str]] = None,
         settings_func: Optional[Union[Callable, str]] = None, # type: ignore
         settings_config_func: Optional[Union[Callable, str]] = None, # type: ignore
-        get_worker_func: Optional[Union[Callable, str]] = None, # type: ignore
-        get_num_worker_func: Optional[Union[Callable, str]] = None, # type: ignore
-        get_worker_names_func: Optional[Union[Callable, str]] = None,
+        get_worker_func: Optional[Union[Callable, str, List[str]]] = None, # type: ignore
+        # get_num_worker_func: Optional[Union[Callable, str]] = None, # type: ignore
+        # get_worker_names_func: Optional[Union[Callable, str]] = None,
     ):
         """
         Configures the global context
         """
-        if queue_types is not None:
-            for kind in queue_types:
-                self.add_queue_type(kind)
+        # if queue_types is not None:
+        #     for kind in queue_types:
+        #         self.add_queue_type(kind)
         
         if settings_func is not None:
             if isinstance(settings_func, str):
@@ -81,15 +89,15 @@ class GlobalContextClass(abc.ABC):
         if get_worker_func is not None:
             self.get_worker_func = get_worker_func
         
-        if get_num_worker_func is not None:
-            self.get_num_worker_func = get_num_worker_func
+        # if get_num_worker_func is not None:
+        #     self.get_num_worker_func = get_num_worker_func
         
-        if get_worker_names_func is not None:
-            self.get_worker_names_func = get_worker_names_func
+        # if get_worker_names_func is not None:
+        #     self.get_worker_names_func = get_worker_names_func
             
 
     @property
-    def settings(self) -> SettingsT:
+    def settings(self) -> 'AppSettings':
         """
         Returns the settings
         """
@@ -164,234 +172,112 @@ class GlobalContextClass(abc.ABC):
                 procs.extend(child.pid for child in parent.children(recursive=True))
                 if first: break
             return procs
-        if kind is None: kind = 'default'
-        if kind not in self.worker_processes:
-            self.logger.warning(f"No worker processes found for {kind}")
-            return []
-        if name not in self.worker_processes[kind]:
-            self.logger.warning(f"No worker processes found for {kind}.{name}")
-            return []
+        
         procs = []
-        for proc in self.worker_processes[kind][name]:
-            if proc._closed: continue
-            parent = psutil.Process(proc.pid)
-            procs.extend(child.pid for child in parent.children(recursive=True))
-            if first: break
+        if name == 'worker':
+            for worker_name, values in self.workers.items():
+                process = values.get('process')
+                if process is None or process._closed: continue
+                parent = psutil.Process(process.pid)
+                procs.extend(child.pid for child in parent.children(recursive=True))
+                if first: break
         return procs
     
-    def add_queue_type(self, kind: str):
-        """
-        Add a queue type
-        """
-        if kind not in self.queues:
-            setattr(self, kind, {})
-            self.queues[kind] = getattr(self, kind)
-    
-    def set_queue(self, name: str, queue: 'TaskQueue', kind: Optional[str] = None):
-        """
-        Set a queue
-        """
-        if kind is None: kind = 'default'
-        if kind not in self.queues:
-            self.add_queue_type(kind)
-        self.queues[kind][name] = queue
-    
-    def add_worker_processes(self, name: str, procs: List['multiprocessing.Process'], kind: Optional[str] = None):
-        """
-        Adds worker processes
-        """
-        if kind is None: kind = 'default'
-        if self.worker_processes.get(kind) is None: self.worker_processes[kind] = {}
-        if self.worker_processes[kind].get(name) is None: self.worker_processes[kind][name] = []
-        self.worker_processes[kind][name].extend(procs)
+    @overload
+    def start_task_workers(
+        self,
+        num_workers: Optional[int] = 1,
+        start_index: Optional[int] = None,
 
-    def has_worker_processes(self, name: str, kind: Optional[str] = None) -> bool:
-        """
-        Checks if there are processes
-        """
-        if kind is None: kind = 'default'
-        if kind not in self.worker_processes: self.worker_processes[kind] = {}
-        if name not in self.worker_processes[kind]:
-            self.worker_processes[kind][name] = []        
-        return len(self.worker_processes[kind][name]) > 0
-    
-    def start_worker_processes(
-        self, 
-        name: str, 
-        kind: Optional[str] = None,
-        config: Optional[Dict[str, Any]] = None, 
-        num_workers: Optional[int] = 1, 
-        verbose: Optional[bool] = True, 
-        base_index: Optional[Union[int, str]] = 'auto',
+        worker_name: Optional[str] = 'global',
+        worker_name_sep: Optional[str] = '-',
 
-        spawn_worker_func: Optional[Union[Callable, str]] = None,
-        num_worker_func: Optional[Union[Callable, str]] = None,
-        get_worker_func: Optional[Union[Callable, str]] = None,
-        settings_config_func: Optional[Union[Callable, str]] = None,
-
-        **kwargs
-    ):  # sourcery skip: low-code-quality
-        """
-        Starts the worker processes
-        """
-        procs = []
-        if kind is None: kind = 'default'
-        if verbose: self.logger.info(f"[{kind.capitalize()}] Spawning Worker: {name} ({num_workers})")
-        context = multiprocessing.get_context('spawn')
-        if base_index == 'auto':
-            from .utils import get_base_worker_index
-            base_index = get_base_worker_index()
-        if num_worker_func is None: num_worker_func = self.get_settings_func(self.get_num_worker_func)
-        if get_worker_func is None: get_worker_func = self.get_settings_func(self.get_worker_func)
-        if settings_config_func is None: 
-            settings_config_func = self.get_settings_func(self.settings_config_func)
-        if spawn_worker_func is None: 
-            from .workers import spawn_new_worker
-            spawn_worker_func = spawn_new_worker
+        worker_imports: Optional[Union[str, List[str]]] = None,
+        worker_cls: Optional[str] = None,
+        worker_class: Optional[Type['TaskWorker']] = None,
+        worker_config: Optional[Dict[str, Any]] = None,
+        worker_queues: Optional[Union[str, List[str]]] = 'all',
         
-        if num_worker_func:
-            num_workers = num_worker_func(name = name, num_workers = num_workers, kind = kind)
-        if not kwargs: kwargs = {}
-        
-        kwargs['kind'] = kind
-        kwargs['config'] = config
-        kwargs['verbose'] = verbose
+        worker_functions: Optional[List['TaskFunction']] = None,
+        worker_cron_jobs: Optional[List['CronJob']] = None,
+        worker_startup: Optional[Union[List[Callable], Callable,]] = None,
+        worker_shutdown: Optional[Union[List[Callable], Callable,]] = None,
+        worker_before_process: Optional[Callable] = None,
+        worker_after_process: Optional[Callable] = None,
+        worker_attributes: Optional[Dict[str, Any]] = None,
 
-        kwargs['settings_config_func'] = settings_config_func
-        kwargs['get_worker_func'] = get_worker_func
+        queue_names: Optional[Union[str, List[str]]] = None,
+        queue_config: Optional[Dict[str, Any]] = None,
+        queue_class: Optional[Type['TaskQueue']] = None,
+
+        max_concurrency: Optional[int] = None,
+        max_broadcast_concurrency: Optional[int] = None,
+
+        debug_enabled: Optional[bool] = False,
+        disable_env_name: Optional[bool] = False,
+        method: Optional[str] = 'mp',
+        use_new_event_loop: Optional[bool] = None,
+        disable_worker_start: Optional[bool] = False,
+        terminate_timeout: Optional[float] = 5.0,
+        **kwargs,
+    ):
+        ...
+
+
+    def start_task_workers(
+        self,
+        worker_name: Optional[str] = None,
+        worker_imports: Optional[Union[str, List[str]]] = None,
+        num_workers: Optional[int] = 1,
+        worker_queues: Optional[Union[str, List[str]]] = 'all',
+        debug_enabled: Optional[bool] = None,
+        verbose: Optional[bool] = True,
+        **kwargs,
+    ):
+        """
+        Starts the task workers
+        """
         
-        for n in range(num_workers):
-            is_primary_worker = n == 0
-            worker_index = (base_index * num_workers) + n
-            kwargs['is_primary_worker'] = is_primary_worker
-            kwargs['index'] = worker_index
-            p = context.Process(target = spawn_worker_func, args = (name,), kwargs = kwargs)
-            p.start()
-            if verbose: 
-                log_name = f'{name}-{worker_index}'
-                self.logger.info(f"- |g|[{kind.capitalize()}]|e| Started: [ {n + 1}/{num_workers} ] `|g|{log_name:20s}|e|` (Process ID: {p.pid})", colored = True)
-            procs.append(p)
-        self.add_worker_processes(kind = kind, name = name, procs = procs)
-        return procs
-    
-    def start_all_workers(
+        if worker_name is None:
+            worker_name = self.settings.module_name
+        if worker_imports is None:
+            worker_imports = self.get_worker_func
+            if not isinstance(worker_imports, list):
+                worker_imports = [worker_imports]
+        if debug_enabled is None:
+            debug_enabled = self.settings.debug_enabled or self.settings.is_development_env
+        
+        from kvdb import tasks
+        workers = tasks.start_task_workers(
+            worker_name = worker_name,
+            worker_imports = worker_imports,
+            num_workers = num_workers,
+            worker_queues = worker_queues,
+            debug_enabled = debug_enabled,
+            **kwargs,
+        )
+        if verbose:
+            self.logger.info(f"Started workers: {workers}")
+        self.workers.update(workers)
+
+    def stop_task_workers(
         self,
         worker_names: Optional[List[str]] = None,
-        kind: Optional[str] = None,
-        config: Optional[Dict[str, Any]] = None,
-        num_workers: Optional[int] = 1,
-        base_index: Optional[Union[int, str]] = 'auto',
-
-
-        enabled_workers: Optional[List[str]] = None,
-        disabled_workers: Optional[List[str]] = None,
-        verbose: Optional[bool] = True,
-
-        spawn_worker_func: Optional[Union[Callable, str]] = None,
-        num_worker_func: Optional[Union[Callable, str]] = None,
-        get_worker_func: Optional[Union[Callable, str]] = None,
-        settings_config_func: Optional[Union[Callable, str]] = None,
-        get_worker_names_func: Optional[Union[Callable, str]] = None,
-        **kwargs
-    ):  # sourcery skip: low-code-quality
+        timeout: Optional[float] = 5.0,
+        verbose: bool = True,
+        **kwargs,
+    ):
         """
-        Starts all the workers
+        Stops the task workers
         """
-        procs = []
-        if kind is None: kind = 'default'
-        if not worker_names:
-            if get_worker_names_func is None:
-                get_worker_names_func = self.get_settings_func(self.get_worker_names_func)
-            worker_names = get_worker_names_func(
-                kind = kind,
-                enabled_workers = enabled_workers,
-                disabled_workers = disabled_workers,
-            )
-        if verbose: self.logger.info(f"[|g|{kind.capitalize()}|e|] Starting {len(worker_names)} Workers: {worker_names}", colored = True)
-        context = multiprocessing.get_context('spawn')
-        if base_index == 'auto': base_index = get_base_worker_index()
-        if num_worker_func is None: num_worker_func = self.get_settings_func(self.get_num_worker_func)
-        if get_worker_func is None: get_worker_func = self.get_settings_func(self.get_worker_func)
-        if settings_config_func is None: 
-            settings_config_func = self.get_settings_func(self.settings_config_func)
-        if spawn_worker_func is None: 
-            from .workers import spawn_new_worker
-            spawn_worker_func = spawn_new_worker
-        
-        if not kwargs: kwargs = {}
-        
-        kwargs['kind'] = kind
-        kwargs['config'] = config
-        kwargs['verbose'] = verbose
+        if worker_names is None:
+            worker_names = list(self.workers.keys())
+        from kvdb.tasks.spawn import exit_task_workers
+        exit_task_workers(worker_names = worker_names, timeout = timeout)
+        for worker_name in worker_names:
+            if verbose: self.logger.info(f"Stopped worker: {worker_name}")
+            _ = self.workers.pop(worker_name, None)
 
-        kwargs['settings_config_func'] = settings_config_func
-        kwargs['get_worker_func'] = get_worker_func
-        
-        for name in worker_names:
-            if num_worker_func: num_workers = num_worker_func(name = name, num_workers = num_workers, kind = kind)
-            
-            for n in range(num_workers):
-                is_primary_worker = n == 0
-                worker_index = (base_index * num_workers) + n
-                kwargs['is_primary_worker'] = is_primary_worker
-                kwargs['index'] = worker_index
-                p = context.Process(target = spawn_new_worker, args = (name,), kwargs = kwargs)
-                p.start()
-                if verbose: 
-                    log_name = f'`|g|{name}-{worker_index}|e|`'
-                    self.logger.info(f"- [|g|{kind.capitalize():7s}|e|] Started: [ {n + 1}/{num_workers} ] {log_name:20s} (Process ID: {p.pid})", colored = True)
-                if is_primary_worker:
-                    self.state.add_leader_process_id(p.pid, kind)
-                
-                procs.append(p)
-            self.add_worker_processes(kind = kind, name = name, procs = procs)
-        return procs
-
-    def stop_worker_processes(self,  name: str, verbose: bool = True, timeout: float = 5.0, kind: Optional[str] = None):
-        # sourcery skip: low-code-quality
-        """
-        Stops the worker processes
-        """
-        if kind is None: kind = 'default'
-        if self.worker_processes.get(kind) is None or self.worker_processes[kind].get(name) is None: 
-            if verbose: self.logger.warning(f"[{kind.capitalize()}] No worker processes found for {name}")
-            return
-        curr_proc, n_procs = 0, len(self.worker_processes[kind][name])
-
-        while self.worker_processes[kind][name]:
-            proc = self.worker_processes[kind][name].pop()
-            if proc._closed: continue
-            log_name = f'`|g|{name}-{curr_proc}|e|`'
-            if verbose: 
-                self.logger.info(f"- [|y|{kind.capitalize():7s}|e|] Stopping: [ {curr_proc + 1}/{n_procs} ] {log_name:20s} (Process ID: {proc.pid})", colored = True)
-            proc.join(timeout)
-            proc.terminate()
-            try:
-                proc.close()
-            except Exception as e:
-                if verbose: self.logger.info(f"|y|[{kind.capitalize():7s}]|e| Failed Stop: [ {curr_proc + 1}/{n_procs} ] {log_name:20s} (Error: |r|{e}|e|)", colored = True)
-                try:
-                    signal.pthread_kill(proc.ident, signal.SIGKILL)
-                    proc.join(timeout)
-                    proc.terminate()
-                except Exception as e:
-                    if verbose: self.logger.info(f"|r|[{kind.capitalize():7s}]|e| Failed Kill: [ {curr_proc + 1}/{n_procs} ] {log_name:20s} (Error: |r|{e}|e|)", colored = True)
-                with contextlib.suppress(Exception):
-                    proc.kill()
-                    proc.close()
-            curr_proc += 1
-
-    async def astop_worker_processes(self, name: str, verbose: bool = True, timeout: float = 5.0, kind: Optional[str] = None):
-        """
-        Stops the worker processes
-        """
-        if kind is None: kind = 'default'
-        if self.worker_processes.get(kind) is None or self.worker_processes[kind].get(name) is None: 
-            if verbose: self.logger.warning(f"[{kind.capitalize()}] No worker processes found for {name}")
-            return
-        from .workers import terminate_worker
-        await terminate_worker(name = name, kind = kind)
-        self.stop_worker_processes(name = name, verbose = verbose, timeout = timeout, kind = kind)
     
     def start_server_process(self, cmd: str, verbose: bool = True):
         """
@@ -450,9 +336,10 @@ class GlobalContextClass(abc.ABC):
         """
         Terminates all processes
         """
-        for kind, names in self.worker_processes.items():
-            for name in names:
-                self.stop_worker_processes(name = name, verbose = verbose, timeout = timeout, kind = kind)
+        # for kind, names in self.worker_processes.items():
+        #     for name in names:
+        #         self.stop_worker_processes(name = name, verbose = verbose, timeout = timeout, kind = kind)
+        self.stop_task_workers(timeout = timeout, verbose = verbose)
         self.stop_server_processes(verbose = verbose, timeout = timeout)
         # self.logger.info("Terminated all processes")
 
@@ -498,4 +385,4 @@ class GlobalContextClass(abc.ABC):
 
 
 
-GlobalContext: GlobalContextClass = ProxyObject(GlobalContextClass)
+# GlobalContext: GlobalContextClass = ProxyObject(GlobalContextClass)

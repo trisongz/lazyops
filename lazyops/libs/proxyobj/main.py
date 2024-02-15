@@ -84,7 +84,7 @@ class ProxyObjectV1(Generic[ProxyObjT]):
         """
         return self._obj_(*args, **kwargs)
 
-    def __getattr__(self, name) -> Any:
+    def __getattr__(self, name):
         """
         Forward all unknown attributes to the proxy object
         """

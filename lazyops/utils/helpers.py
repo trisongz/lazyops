@@ -37,6 +37,7 @@ from lazyops.utils.lazy import (
 
 if TYPE_CHECKING:
     from lazyops.types import BaseModel
+    from pydantic.fields import FieldInfo
     
 
 
@@ -300,6 +301,7 @@ def timed_cache(
     secs: typing.Optional[int] = 60 * 60, 
     maxsize: int = 1024,
     invalidate_cache_key: typing.Optional[str] = '_invalidate_cache',
+    **kwargs,
 ):
     """
     Wrapper for creating a expiring cached function
@@ -308,6 +310,7 @@ def timed_cache(
         maxsize: maxsize of the cache
         invalidate_cache_key: key to invalidate the cache
     """
+    if 'ttl' in kwargs: secs = kwargs.pop('ttl')
     if secs is None: secs = 60
     def wrapper_cache(func):
         if is_coro_func(func):
@@ -470,6 +473,44 @@ def build_dict_from_list(
     """
     import json
     return json.loads(str(dict([item.split(seperator) for item in data])))
+
+
+
+def build_dict_from_query(
+    query: str,
+    **kwargs,
+) -> Dict[str, Union[int, float, str, datetime.datetime, Any]]:
+    """
+    Builds a dictionary from a query
+    """
+    # Try to base decode it
+    if not query.startswith('{') and not query.startswith('['):
+        import base64
+        query = base64.b64decode(query).decode('utf-8')
+    data = build_dict_from_str(query, **kwargs)
+    for k,v in data.items():
+        if 'date' in k:
+            with contextlib.suppress(Exception):
+                from lazyops.utils.dates import parse_datetime
+                v = parse_datetime(v)
+        data[k] = v
+    return data
+
+def is_pydantic_field_of_type(
+    field: 'FieldInfo',
+    t: typing.Any,
+) -> bool:
+    """
+    Inspects the type of a pydantic field to determine
+    whether it is of a certain type
+    """
+    pass
+
+    # if hasattr(field, 'type_'):
+    #     return field.type_.__name__
+    # return field.type__.__name__
+
+
 
 @contextlib.contextmanager
 def patch_env(

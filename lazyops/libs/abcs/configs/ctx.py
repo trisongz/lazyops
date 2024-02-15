@@ -9,19 +9,24 @@ import contextlib
 import multiprocessing
 from pathlib import Path
 from .types import AppEnv
-from lazyops.libs.proxyobj import ProxyObject
-from typing import Optional, Dict, Any, List, Union, Type, Callable, TypeVar, TYPE_CHECKING
+from lazyops.libs.proxyobj import proxied
+from typing import Optional, Dict, Any, List, Union, Type, Callable, TypeVar, Literal, overload, TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import jinja2
+    from pydantic import BaseModel
+    from kvdb import KVDBSession, PersistentDict
+    from kvdb.tasks.base import BaseTaskWorker, TaskWorkerT
     from lazyops.utils.logs import Logger
     from lazyops.libs.fastapi_utils.types.persistence import TemporaryData
     from lazyops.libs.fastapi_utils.types.state import AppState
-    from ..state import GlobalContext, GlobalContextClass
     from .base import AppSettings
-    # from lazyops.libs.fastapi_utils import GlobalContext
+    from ..clients import ClientTypes
+    from ..sql.database.types import ObjectCRUD
 
 
-AppSettingsT = TypeVar('AppSettingsT', bound='AppSettings')
+    AppSettingsT = TypeVar('AppSettingsT', bound = AppSettings)
+    ComponentSchemaT = TypeVar('ComponentSchemaT', BaseModel, ObjectCRUD)
 
 class ApplicationContext(abc.ABC):
     """
@@ -64,10 +69,34 @@ class ApplicationContext(abc.ABC):
 
         self._app_env: Optional[AppEnv] = None
         self._temp_data: Optional['TemporaryData'] = None
-        self._settings: Optional['AppSettingsT'] = None
+        self._settings: Optional['AppSettings'] = None
         self._state: Optional['AppState'] = None
         self._logger: Optional['Logger'] = None
         self.on_close_funcs: List[Callable] = []
+
+        self._kdb_sessions: Dict[str, 'KVDBSession'] = {}
+        self._persistent_dicts: Dict[str, 'PersistentDict'] = {}
+        self._persistent_dict_aliases: Dict[str, str] = {}
+
+        # Client Registration and Hooks
+        self._global_clients: Dict[str, str] = {}
+        self._local_clients: Dict[str, str] = {}
+
+        # Component Registration
+        self._component_schema_registry: Dict[str, Union[Dict, str, Type]] = {}
+        self._component_client_registry: Dict[str, Union[Dict, str, Any]] = {}
+
+        self.include_kind_in_client_name: Optional[bool] = True
+        self.include_kind_in_component_name: Optional[bool] = True
+        
+        self.client_kwarg_function: Optional[Union[Callable[..., Dict[str, Any]], str]] = None
+        self.client_hook_function: Optional[Union[Callable, str]] = None
+
+        self.component_client_hook_function: Optional[Union[Callable, str]] = None
+
+        # Jinja2 Contexts
+        self.j2_ctxs: Dict[str, 'jinja2.Environment'] = {}
+        self.j2_actxs: Dict[str, 'jinja2.Environment'] = {}
 
 
     @property
@@ -89,7 +118,7 @@ class ApplicationContext(abc.ABC):
         return self._temp_data
     
     @property
-    def settings(self) -> AppSettingsT:
+    def settings(self) -> 'AppSettings':
         """
         Returns the settings
         """
@@ -136,7 +165,7 @@ class ApplicationContext(abc.ABC):
         return self.state.is_primary_server_process or multiprocessing.parent_process() is None
     
 
-    def register_settings(self, settings: AppSettingsT) -> None:
+    def register_settings(self, settings: 'AppSettingsT') -> None:
         """
         Registers the settings
         """
@@ -184,7 +213,7 @@ class ApplicationContext(abc.ABC):
         """
         if self.app_env.is_local:
             app_host = app_host or "localhost"
-            app_port = app_port or 8085
+            app_port = app_port or 8080
             return f"http://{app_host}:{app_port}"
         if self.app_env == AppEnv.DEVELOPMENT:
             return f"https://{self.ingress_base}-develop.{self.ingress_domain}"
@@ -253,10 +282,330 @@ class ApplicationContext(abc.ABC):
         if env_path.exists(): return env_path
         default_path = defaults_path.joinpath(f'default.{suffix}')
         return default_path if default_path.exists() else None
+    
+    """
+    Migrate from lazy utils
+    """
+
+    def get_kdb_session(
+        self,
+        name: Optional[str] = None,
+        serializer: Optional[str] = 'json',
+        **kwargs,
+    ) -> 'KVDBSession':
+        """
+        Retrieves or Initializes a KVDB Session
+        """
+        name = name or self.module_name
+        if name not in self._kdb_sessions:
+            from kvdb import KVDBClient
+            self._kdb_sessions[name] = KVDBClient.get_session(
+                name = name,
+                serializer = serializer,
+                **kwargs,
+            )
+        return self._kdb_sessions[name]
+    
+
+    def get_persistent_dict(
+        self,
+        base_key: str,
+        expiration: Optional[int] = None,
+        aliases: Optional[List[str]] = None,
+        **kwargs,
+    ) -> 'PersistentDict':
+        """
+        Lazily initializes a persistent dict
+        """
+        if base_key not in self._persistent_dicts and base_key not in self._persistent_dict_aliases:
+            url = kwargs.pop('url', None)
+            session = self.get_kdb_session('persistence', serializer = None, url = url)
+            self._persistent_dicts[base_key] = session.create_persistence(
+                base_key = base_key,
+                expiration = expiration,
+                **kwargs,
+            )
+            if aliases:
+                for alias in aliases:
+                    self._persistent_dict_aliases[alias] = base_key
+        elif base_key in self._persistent_dict_aliases:
+            base_key = self._persistent_dict_aliases[base_key]
+        return self._persistent_dicts[base_key]
+
+    def update_client_registry(
+        self,
+        clients: Dict[str, str],
+        kind: Optional[str] = 'client',
+        state: Literal['global', 'local'] = 'global',
+        include_kind: Optional[bool] = None,
+    ) -> None:
+        """
+        Updates the client registry
+        """
+        from lazyops.libs.fastapi_utils.state.registry import update_client_registry_mapping
+        include_kind = include_kind if include_kind is not None else self.include_kind_in_client_name
+        if include_kind:
+            prefix = f'{self.module_name}.{kind}' if kind else self.module_name
+        else:
+            prefix = self.module_name
+        
+        client_mapping = {
+            (f'{prefix}.{k}' if prefix not in k else k): v for k, v in clients.items()
+        }
+        update_client_registry_mapping(client_mapping)
+        if state == 'global':
+            self._global_clients.update(clients)
+        else:
+            self._local_clients.update(clients)
+
+    def get_client_registry_mapping(self) -> Dict[str, str]:
+        """
+        Retrieves the client registry mapping
+        """
+        return {
+            **self._global_clients,
+            **self._local_clients,
+        }
+
+    def register_client(
+        self,
+        client: 'ClientTypes',
+        kind: Optional[str] = 'client',
+        include_kind: Optional[bool] = None,
+    ) -> None:
+        """
+        Registers a client
+        """
+        from lazyops.libs.fastapi_utils.state.registry import register_client
+        include_kind = include_kind if include_kind is not None else self.include_kind_in_client_name
+        if include_kind:
+            kind = kind or getattr(client, 'kind', 'client')
+            prefix = f'{self.module_name}.{kind}'
+        else:
+            prefix = self.module_name
+        name = f'{prefix}.{client.name}'
+        return register_client(client, name)
+    
+
+    def get_client(
+        self, 
+        name: str,
+        state: Optional[Literal['global', 'local']] = None,
+        kind: Optional[str] = 'client',
+        include_kind: Optional[bool] = None,
+        **kwargs,
+    ) -> 'ClientTypes':
+        """
+        Retrieves a client
+        """
+        if state is None:
+            state = 'global' if name in self._global_clients else 'local'
+        
+        from lazyops.libs.fastapi_utils.state.registry import (
+            get_client as _get_client, 
+            get_global_client as _get_global_client, 
+        )
+        method = _get_global_client if state == 'global' else _get_client
+        include_kind = include_kind if include_kind is not None else self.include_kind_in_client_name
+        if include_kind:
+            prefix = f'{self.module_name}.{kind}' if kind else self.module_name
+        else:
+            prefix = self.module_name
+        client_name = name
+        if prefix not in client_name:
+            client_name = f'{prefix}.{client_name}'
+        if self.client_kwarg_function:
+            if isinstance(self.client_kwarg_function, str):
+                from lazyops.utils.lazy import lazy_import
+                self.client_kwarg_function = lazy_import(self.client_kwarg_function)
+            kwargs = self.client_kwarg_function(name, **kwargs)
+        client = method(client_name, **kwargs)
+        if self.client_hook_function:
+            if isinstance(self.client_hook_function, str):
+                from lazyops.utils.lazy import lazy_import
+                self.client_hook_function = lazy_import(self.client_hook_function)
+            self.client_hook_function(name, client)
+        return client
 
 
+    def update_component_client_registry(
+        self,
+        components: Dict[str, Union[str, Dict]],
+        kind: Optional[str] = None,
+        include_kind: Optional[bool] = None,
+    ) -> None:
+        """
+        Updates the component client registry
+        """
+        from lazyops.libs.fastapi_utils.state.registry import update_client_registry_mapping
+        from lazyops.libs.abcs.utils.helpers import flatten_dict_value 
+        include_kind = include_kind if include_kind is not None else self.include_kind_in_component_name
+        if include_kind:
+            prefix = f'{self.module_name}.{kind}' if kind else self.module_name
+        else:
+            prefix = self.module_name
 
-class ApplicationContextManagerClass(abc.ABC):
+        mapping = flatten_dict_value(components, prefix)
+        update_client_registry_mapping(mapping)
+        self._component_client_registry.update(components)
+
+    def get_component_client(
+        self,
+        name: str,
+        *parts: str,
+        kind: Optional[str] = None,
+        include_kind: Optional[bool] = None,
+    ) -> 'ClientTypes':
+        """
+        Gets a component client
+        """
+        from lazyops.libs.fastapi_utils.state.registry import get_client
+        include_kind = include_kind if include_kind is not None else self.include_kind_in_component_name
+        if include_kind: client_name = f'{self.module_name}.{kind}' if kind else self.module_name
+        else: client_name = self.module_name
+        if parts:
+            parts = '.'.join(parts)
+            client_name = f'{client_name}.{parts}'
+        client_name = f'{client_name}.{name}'
+        return get_client(client_name)
+    
+    def register_component_client(
+        self,
+        client: 'ClientTypes',
+        *parts: str,
+        kind: Optional[str] = None,
+        include_kind: Optional[bool] = None,
+    ):
+        """
+        Registers a component client
+        """
+        from lazyops.libs.fastapi_utils.state.registry import register_client
+        include_kind = include_kind if include_kind is not None else self.include_kind_in_component_name
+        kind = kind or getattr(client, 'kind', None)
+        if include_kind: prefix = f'{self.module_name}.{kind}' if kind else self.module_name
+        else: prefix = self.module_name
+        if parts:
+            parts = '.'.join(parts)
+            prefix = f'{prefix}.{parts}'
+        client_name = f'{prefix}.{client.name}'
+        return register_client(client, client_name)
+        
+    def update_component_schema_registry(
+        self,
+        components: Dict[str, Union[str, Dict]],
+        kind: Optional[str] = None,
+        include_kind: Optional[bool] = None,
+    ) -> None:
+        """
+        Updates the component schema registry
+        """
+        from lazyops.libs.abcs.utils.helpers import flatten_dict_value 
+        include_kind = include_kind if include_kind is not None else self.include_kind_in_component_name
+        if include_kind:
+            prefix = f'{self.module_name}.{kind}' if kind else self.module_name
+        else:
+            prefix = self.module_name
+        
+        mapping = flatten_dict_value(components, prefix)
+        self._component_schema_registry.update(mapping)
+
+    def get_component_schema(
+        self,
+        name: str,
+        *parts: str,
+        kind: Optional[str] = None,
+        include_kind: Optional[bool] = None,
+    ) -> Type['ComponentSchemaT']:
+        """
+        Gets a component schema
+        """
+        include_kind = include_kind if include_kind is not None else self.include_kind_in_component_name
+        if include_kind: schema_name = f'{self.module_name}.{kind}' if kind else self.module_name
+        else: schema_name = self.module_name
+        if parts:
+            parts = '.'.join(parts)
+            schema_name = f'{schema_name}.{parts}'
+        schema_name = f'{schema_name}.{name}'
+        if schema_name not in self._component_schema_registry:
+            raise ValueError(f"Invalid component schema: {schema_name}")
+        schema = self._component_schema_registry[schema_name]
+        if isinstance(schema, str):
+            from lazyops.utils.lazy import lazy_import
+            schema = lazy_import(schema)
+        return schema
+    
+    def get_worker(
+        self,
+        name: Optional[str] = 'worker',
+        state: Optional[Literal['global', 'local']] = None,
+        kind: Optional[str] = 'client',
+        include_kind: Optional[bool] = None,
+        **kwargs,
+    ) -> 'TaskWorkerT':
+        """
+        Retrieves the Worker
+        """
+        return self.get_client(name, state = state, kind = kind, include_kind = include_kind, **kwargs)
+        
+
+    @overload
+    def get_j2_ctx(
+        self,
+        path: Union[str, Path],
+        name: Optional[str] = None,
+        enable_async: Optional[bool] = False,
+        comment_start_string: Optional[str] = None,
+        comment_end_string: Optional[str] = None,
+        **kwargs,
+    ) -> 'jinja2.Environment':
+        """
+        Creates a jinja2 context
+
+        path can be relative to the module_dir or absolute
+        """
+        ...
+
+
+    def get_j2_ctx(
+        self,
+        
+        path: Union[str, Path],
+        name: Optional[str] = None,
+        enable_async: Optional[bool] = False,
+        **kwargs,
+    ) -> 'jinja2.Environment':
+        """
+        Creates a jinja2 context
+
+        path can be relative to the module_dir or absolute
+        """
+        base_ctx = self.j2_actxs if enable_async else self.j2_ctxs
+        name = name or self.module_name
+        if name not in base_ctx:
+            import jinja2
+            if isinstance(path, str):
+                path = self.settings.module_path.joinpath(path)
+                self.logger.info(f"Jinja2 Path: {path}")
+            base_ctx[name] = jinja2.Environment(
+                loader = jinja2.FileSystemLoader(path),
+                enable_async = enable_async,
+                **kwargs,
+            )
+        return base_ctx[name]
+
+    def lazy_import(self, dotted_path: str, **kwargs) -> Any:
+        """
+        Lazy imports a module
+        """
+        from lazyops.utils.lazy import lazy_import
+        return lazy_import(dotted_path, **kwargs)
+
+
+# class ApplicationContextManagerClass(abc.ABC):
+
+
+@proxied
+class ApplicationContextManager(abc.ABC):
 
     """
     The context manager for the app context
@@ -268,10 +617,10 @@ class ApplicationContextManagerClass(abc.ABC):
         Creates the context manager
         """
         self.ctxs: Dict[str, ApplicationContext] = {}
-        self._global_ctx: Optional['GlobalContextClass'] = None
+        self._global_ctx = None
     
     @property
-    def global_ctx(self) -> 'GlobalContextClass':
+    def global_ctx(self): # -> 'GlobalContextClass':
         """
         Returns the global context
         """
@@ -304,6 +653,6 @@ class ApplicationContextManagerClass(abc.ABC):
     
 
 
-ApplicationContextManager: 'ApplicationContextManagerClass' = ProxyObject(
-    ApplicationContextManagerClass
-)
+# ApplicationContextManager: 'ApplicationContextManagerClass' = ProxyObject(
+#     ApplicationContextManagerClass
+# )

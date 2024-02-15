@@ -75,7 +75,10 @@ class BaseAppSettings(BaseSettings):
 
         https://stackoverflow.com/questions/25389095/python-get-path-of-root-project-structure
         """
-        return Path(pkg_resources.get_distribution(self.module_name).location)
+        p = Path(pkg_resources.get_distribution(self.module_name).location)
+        if 'src' in p.name and p.joinpath(self.module_name).exists():
+            p = p.joinpath(self.module_name)
+        return p
 
     @property
     def module_config_path(self) -> Path:

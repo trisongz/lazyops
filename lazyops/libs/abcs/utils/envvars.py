@@ -26,6 +26,12 @@ def parse_from_envvar(
     if val is None: return default
 
     # Try to evaluate the value
+    if _type is None: 
+        # print('No type: ', val)
+        return val
+        # if val.startswith(('{', '[')):
+        #     return json.loads(val)
+        # return build_dict_from_str(val) if val.startswith('{') else val.split(',')
     if _type in {list, dict}:
         if val.startswith(('{', '[')):
             return json.loads(val)
@@ -68,11 +74,12 @@ def parse_envvars_from_text(
             _type = _default
             _default = None
         else:
-            _type = type(_default) if _default is not None else str
+            _type = type(_default) if _default is not None else None
         val = parse_from_envvar(envvar, default=_default, _type=_type)
         # if val is not None:
         values[envvar] = val
-        text = text.replace(match, val)
+        # print(match, val, values)
+        text = text.replace(match, val if val is not None else '')
 
     return text, values
 

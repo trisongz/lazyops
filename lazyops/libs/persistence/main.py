@@ -514,7 +514,7 @@ class PersistentDict(collections.abc.MutableMapping):
             self._mutation_tracker = {}
             self._mutation_hashes = {}
 
-    def __getitem__(self, key: str) -> ObjectValue:
+    def __getitem__(self, key: str) -> Union[ObjectValue, List, Dict[str, Union[List, Dict]]]:
         """
         Gets an Item from the DB
         """

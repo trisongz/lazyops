@@ -12,7 +12,8 @@ from pathlib import Path
 from pydantic import model_validator
 from lazyops.utils.logs import Logger, null_logger
 from lazyops.imports._pydantic import BaseAppSettings, BaseModel
-from lazyops.libs.fastapi_utils import GlobalContext
+# from lazyops.libs.fastapi_utils import GlobalContext
+from lazyops.libs.abcs.state import GlobalContext
 from lazyops.libs.fastapi_utils.types.persistence import TemporaryData
 from typing import List, Optional, Dict, Any, Callable, Union, Type, TYPE_CHECKING
 from .types import AppEnv, get_app_env
@@ -205,7 +206,7 @@ class AppSettings(BaseAppSettings):
         return self.ctx.get_app_ingress(app_host = app_host, app_port = app_port)
 
     @property
-    def global_ctx(self) -> Type[GlobalContext]:
+    def global_ctx(self):
         """
         Returns the global context
         """
@@ -215,7 +216,7 @@ class AppSettings(BaseAppSettings):
         """
         Registers a function to be called on close
         """
-        GlobalContext.register_on_close(func, *args, **kwargs)
+        self.global_ctx.register_on_close(func, *args, **kwargs)
 
     
 
