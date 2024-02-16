@@ -240,7 +240,7 @@ class ApplicationContext(abc.ABC):
             AppEnv.LOCAL,
             AppEnv.DEVELOPMENT,
             AppEnv.CICD,
-        ]
+        ] or os.environ.get('DISABLE_ENFORCE_ENV', 'false').lower() == 'true'
         configs_path = configs_path or self.config_path
         envs_path = configs_path.joinpath('envs')
         if name is not None:

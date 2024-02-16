@@ -105,7 +105,13 @@ class AppSettings(BaseAppSettings):
         Returns if this is the primary server process
         """
         return self.ctx.is_primary_server_process
-
+    
+    @property
+    def is_primary_node(self) -> bool:
+        """
+        Returns whether or not this is the primary node
+        """
+        return self.host_name[-1] == '0' if self.in_k8s else True
 
     @property
     def is_local_env(self) -> bool:
@@ -206,7 +212,7 @@ class AppSettings(BaseAppSettings):
         return self.ctx.get_app_ingress(app_host = app_host, app_port = app_port)
 
     @property
-    def global_ctx(self):
+    def global_ctx(self) -> GlobalContext:
         """
         Returns the global context
         """

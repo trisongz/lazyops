@@ -4,7 +4,9 @@ import os
 import abc
 import signal
 import contextlib
-import multiprocessing 
+import multiprocessing
+import pathlib
+import asyncio
 
 from typing import Optional, List, TypeVar, Callable, Dict, Any, overload, Type, Union, TYPE_CHECKING
 from lazyops.utils.lazy import lazy_import
@@ -382,6 +384,41 @@ class GlobalContext(abc.ABC):
                 self.logger.error(e)
                 break
         sys.exit(0)
+
+
+    async def arun_until_complete(
+        self,
+        termination_file: str = None,
+    ):
+        """
+        Runs the event loop until complete
+        """
+
+        if termination_file is None:
+            termination_file = os.getenv('WORKER_TERMINATION_FILE')
+        
+        from .types import GracefulKiller
+        watch = GracefulKiller()
+        tmp_kill_file = pathlib.Path(termination_file) if termination_file is not None else None
+        while not watch.kill_now:
+            try: 
+                await asyncio.sleep(1.0)
+                if tmp_kill_file is not None and tmp_kill_file.exists():
+                    self.logger.warning(f"Found termination file: {tmp_kill_file}")
+                    break
+            except KeyboardInterrupt:
+                self.logger.warning("Keyboard Interrupt")
+                break
+            except Exception as e:
+                self.logger.error(f"Error: {e}")
+                break
+        
+        self.end_all_processes()
+        await self.aclose_processes()
+
+
+
+    
 
 
 
