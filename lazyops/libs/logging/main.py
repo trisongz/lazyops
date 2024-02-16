@@ -341,7 +341,7 @@ class Logger(_Logger):
         if isinstance(msg, str): return msg[:max_length] if max_length else msg
         if isinstance(msg, (float, int, bool, type(None))): return str(msg)[:max_length] if max_length else str(msg)
         if isinstance(msg, (list, set)):
-            _msg = str(msg) if _is_part else "".join(f'- {item}\n' for item in msg)
+            _msg = str(msg) if _is_part else "\n" + "".join(f'- {item}\n' for item in msg)
             return _msg[:max_length] if max_length else _msg
         
         prefix, suffix = '', ''
@@ -426,12 +426,13 @@ class Logger(_Logger):
         if colored:
             # Add escape characters to prevent errors
             _message = _message.replace("<fg", ">|fg")
-            _message = _message.replace("<", "\<")
+            _message = _message.replace("<", "\</")
             _message = find_and_format_seps(_message)
             # print(_message)
             for key, value in COLORED_MESSAGE_MAP.items():
                 _message = _message.replace(key, value)
             _message = _message.replace(">|fg", "<fg")
+            _message = _message.replace("\</", "<")
             _message += RESET_COLOR
         return _message
 

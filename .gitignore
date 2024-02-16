@@ -31,3 +31,4 @@ tests/local.cache
 tests/local.hash
 tests/local.lock
 tests/libs/abcs/private_test_wrapper.py
+tests/**/private**
