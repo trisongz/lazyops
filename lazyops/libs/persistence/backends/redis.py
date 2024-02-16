@@ -70,7 +70,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
         if not self.base_key: return key
         return key if self.base_key in key else f'{self.base_key}{self.keyjoin}{key}'
     
-    def get(self, key: str, default: Optional[Any] = None, **kwargs) -> Optional[Any]:
+    def get(self, key: str, default: Optional[Any] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
         """
         Gets a Value from the DB
         """
@@ -78,13 +78,13 @@ class RedisStatefulBackend(BaseStatefulBackend):
         else: value = self.cache.client.get(self.get_key(key))
         if value is None: return default
         try:
-            return self.decode_value(value)
+            return self.decode_value(value, _raw = _raw, **kwargs)
         except Exception as e:
             logger.error(f'Error Getting Value for Key: {key} - {e}')
             self.delete(key)
             return default
 
-    def get_values(self, keys: Iterable[str]) -> List[Any]:
+    def get_values(self, keys: Iterable[str], **kwargs) -> List[Any]:
         """
         Gets a Value from the DB
         """
@@ -93,7 +93,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
         results = []
         for key, value in zip(keys, values):
             try:
-                results.append(self.decode_value(value))
+                results.append(self.decode_value(value, **kwargs))
             except Exception as e:
                 logger.error(f'Error Getting Value for Key: {key} - {e}')
                 self.delete(key)
@@ -101,23 +101,23 @@ class RedisStatefulBackend(BaseStatefulBackend):
         return results
 
 
-    def set(self, key: str, value: Any, ex: Optional[int] = None, **kwargs) -> None:
+    def set(self, key: str, value: Any, ex: Optional[int] = None, _raw: Optional[bool] = None, **kwargs) -> None:
         """
         Saves a Value to the DB
         """
         ex = ex or self.expiration
         if self.hset_enabled:
-            self.cache.hset(self.base_key, key, self.encode_value(value))
+            self.cache.hset(self.base_key, key, self.encode_value(value, _raw = _raw, **kwargs))
             if ex is not None: self.cache.expire(self.base_key, ex)
         else:
-            self.cache.client.set(self.get_key(key), self.encode_value(value), ex = ex)
+            self.cache.client.set(self.get_key(key), self.encode_value(value, _raw = _raw, **kwargs), ex = ex)
     
     def set_batch(self, data: Dict[str, Any], ex: Optional[int] = None, **kwargs) -> None:
         """
         Saves a Value to the DB
         """
         ex = ex or self.expiration
-        data = {k: self.encode_value(v) for k, v in data.items()}
+        data = {k: self.encode_value(v, **kwargs) for k, v in data.items()}
         if self.hset_enabled:
             self.cache.client.hset(self.base_key, mapping = data)
             if ex is not None: self.cache.expire(self.base_key, ex)
@@ -150,7 +150,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
             keys = self.cache.client.keys(f'{self.base_key}{self.keyjoin}*')
             if keys: self.cache.client.delete(*keys)
     
-    async def aget(self, key: str, default: Optional[Any] = None, **kwargs) -> Optional[Any]:
+    async def aget(self, key: str, default: Optional[Any] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
         """
         Gets a Value from the DB
         """
@@ -158,13 +158,13 @@ class RedisStatefulBackend(BaseStatefulBackend):
         else: value = await self.cache.async_client.get(self.get_key(key))
         if value is None: return default
         try:
-            return self.decode_value(value)
+            return self.decode_value(value, _raw = _raw, **kwargs)
         except Exception as e:
             logger.error(f'Error Getting Value for Key: {key} - {e}')
             await self.adelete(key)
             return default
 
-    async def aget_values(self, keys: Iterable[str]) -> List[Any]:
+    async def aget_values(self, keys: Iterable[str], **kwargs) -> List[Any]:
         """
         Gets a Value from the DB
         """
@@ -172,30 +172,30 @@ class RedisStatefulBackend(BaseStatefulBackend):
         else: values = await self.cache.async_client.mget([self.get_key(key) for key in keys])
         results = []
         for key, value in zip(keys, values):
-            try: results.append(self.decode_value(value))
+            try: results.append(self.decode_value(value, **kwargs))
             except Exception as e:
                 logger.error(f'Error Getting Value for Key: {key} - {e}')
                 await self.adelete(key)
                 results.append(None)
         return results
         
-    async def aset(self, key: str, value: Any, ex: Optional[int] = None, **kwargs) -> None:
+    async def aset(self, key: str, value: Any, ex: Optional[int] = None, _raw: Optional[bool] = None, **kwargs) -> None:
         """
         Saves a Value to the DB
         """
         ex = ex or self.expiration
         if self.hset_enabled:
-            await self.cache.async_hset(self.base_key, key, self.encode_value(value))
+            await self.cache.async_hset(self.base_key, key, self.encode_value(value, _raw = _raw, **kwargs))
             if ex is not None: await self.cache.async_expire(self.base_key, ex)
         else:
-            await self.cache.async_client.set(self.get_key(key), self.encode_value(value), ex = ex)
+            await self.cache.async_client.set(self.get_key(key), self.encode_value(value, _raw = _raw, **kwargs), ex = ex)
 
     async def aset_batch(self, data: Dict[str, Any], ex: Optional[int] = None, **kwargs) -> None:
         """
         Saves a Value to the DB
         """
         ex = ex or self.expiration
-        data = {k: self.encode_value(v) for k, v in data.items()}
+        data = {k: self.encode_value(v, **kwargs) for k, v in data.items()}
         if self.hset_enabled:
             await self.cache.async_client.hset(self.base_key, mapping = data)
             if ex is not None: await self.cache.async_expire(self.base_key, ex)
@@ -247,7 +247,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
         return len(self.cache.client.keys(f'{self.base_key}{self.keyjoin}*'))
     
 
-    def get_all_data(self, exclude_base_key: Optional[bool] = False) -> Dict[str, Any]:
+    def get_all_data(self, exclude_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
         """
         Loads all the Data
         """
@@ -258,7 +258,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
             results = {}
             for key, value in data.items():
                 if isinstance(key, bytes): key = key.decode()
-                try: results[key] = self.decode_value(value)
+                try: results[key] = self.decode_value(value, **kwargs)
                 except AttributeError:
                     logger.warning(f'Unable to decode value for {key}')
                     self.delete(key)
@@ -270,7 +270,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
         for key, value in zip(keys, data_list):
             if isinstance(key, bytes): key = key.decode()
             try:
-                results[key] = self.decode_value(value)
+                results[key] = self.decode_value(value, **kwargs)
             except AttributeError:
                 logger.warning(f'Unable to decode value for {key}')
                 self.delete(key)
@@ -278,7 +278,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
             results = {k.replace(f'{self.base_key}.', ''): v for k, v in results.items()}
         return results
     
-    def get_all_keys(self, exclude_base_key: Optional[bool] = False) -> List[str]:
+    def get_all_keys(self, exclude_base_key: Optional[bool] = False, **kwargs) -> List[str]:
         """
         Returns all the Keys
         """
@@ -290,7 +290,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
             keys = [key.replace(f'{self.base_key}.', '') for key in keys]
         return keys
     
-    def get_all_values(self) -> List[Any]:
+    def get_all_values(self, **kwargs) -> List[Any]:
         """
         Returns all the Values
         """
@@ -301,7 +301,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
             results = []
             for key, value in data.items():
                 try:
-                    results.append(self.decode_value(value))
+                    results.append(self.decode_value(value, **kwargs))
                 except Exception as e:
                     logger.warning(f'Unable to decode value for {key}: {e}')
                     self.delete(key)
@@ -311,13 +311,13 @@ class RedisStatefulBackend(BaseStatefulBackend):
         results = []
         for key, value in zip(keys, data_list):
             try:
-                results.append(self.decode_value(value))
+                results.append(self.decode_value(value, **kwargs))
             except Exception as e:
                 logger.warning(f'Unable to decode value for {key}: {e}')
                 self.delete(key)
         return results
 
-    async def aget_all_data(self, exclude_base_key: Optional[bool] = False) -> Dict[str, Any]:
+    async def aget_all_data(self, exclude_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
         """
         Loads all the Data
         """
@@ -329,7 +329,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
             for key, value in data.items():
                 if isinstance(key, bytes): key = key.decode()
                 try:
-                    results[key] = self.decode_value(value)
+                    results[key] = self.decode_value(value, **kwargs)
                 except Exception as e:
                     logger.warning(f'Unable to decode value for {key}: {e}')
                     await self.adelete(key)
@@ -339,7 +339,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
         results: Dict[str, Any] = {}
         for key, value in zip(keys, data_list):
             try:
-                results[key] = self.decode_value(value)
+                results[key] = self.decode_value(value, **kwargs)
             except Exception as e:
                 logger.warning(f'Unable to decode value for {key}: {e}')
                 await self.adelete(key)
@@ -347,7 +347,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
             results = {k.replace(f'{self.base_key}.', ''): v for k, v in results.items()}
         return results
     
-    async def aget_all_keys(self, exclude_base_key: Optional[bool] = False) -> List[str]:
+    async def aget_all_keys(self, exclude_base_key: Optional[bool] = False, **kwargs) -> List[str]:
         """
         Returns all the Keys
         """
@@ -360,7 +360,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
             keys = [key.replace(f'{self.base_key}.', '') for key in keys]
         return keys
     
-    async def aget_all_values(self) -> List[Any]:
+    async def aget_all_values(self, **kwargs) -> List[Any]:
         """
         Returns all the Values
         """
@@ -371,7 +371,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
             results = []
             for key, value in data.items():
                 try:
-                    results.append(self.decode_value(value))
+                    results.append(self.decode_value(value, **kwargs))
                 except Exception as e:
                     logger.warning(f'Unable to decode value for {key}: {e}')
                     await self.adelete(key)
@@ -381,27 +381,27 @@ class RedisStatefulBackend(BaseStatefulBackend):
         results = []
         for key, value in zip(keys, data_list):
             try:
-                results.append(self.decode_value(value))
+                results.append(self.decode_value(value, **kwargs))
             except Exception as e:
                 logger.warning(f'Unable to decode value for {key}: {e}')
                 await self.adelete(key)
         return results
 
-    def contains(self, key):
+    def contains(self, key, **kwargs):
         """
         Returns True if the Cache contains the Key
         """
         if self.hset_enabled: return self.cache.hexists(self.base_key, key)
         return self.cache.client.exists(self.get_key(key))
     
-    async def acontains(self, key):
+    async def acontains(self, key, **kwargs):
         """
         Returns True if the Cache contains the Key
         """
         if self.hset_enabled: return await self.cache.async_hexists(self.base_key, key)
         return await self.cache.async_client.exists(self.get_key(key))
     
-    def expire(self, key: str, ex: int) -> None:
+    def expire(self, key: str, ex: int, **kwargs) -> None:
         """
         Expires a Key
         """
@@ -410,7 +410,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
             return
         self.cache.client.expire(self.get_key(key), ex)
 
-    async def aexpire(self, key: str, ex: int) -> None:
+    async def aexpire(self, key: str, ex: int, **kwargs) -> None:
         """
         Expires a Key
         """

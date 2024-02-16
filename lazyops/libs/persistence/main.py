@@ -139,34 +139,34 @@ class PersistentDict(collections.abc.MutableMapping):
         return self.__class__(base_key = base_key, **base_kwargs)
 
 
-    def get(self, key: str, default: Optional[Any] = None, **kwargs) -> Optional[Any]:
+    def get(self, key: str, default: Optional[Any] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
         """
         Gets a Value from the DB
         """
         self._save_mutation_objects(key)
-        return self.base.get(key, default = default, **kwargs)
+        return self.base.get(key, default = default, _raw = _raw, **kwargs)
     
-    def get_values(self, keys: Iterable[str]) -> List[Any]:
+    def get_values(self, keys: Iterable[str], **kwargs) -> List[Any]:
         """
         Gets a Value from the DB
         """
         self._save_mutation_objects(*keys)
-        return self.base.get_values(keys)
+        return self.base.get_values(keys, **kwargs)
     
-    def fetch(self, key: str) -> Optional[Any]:
+    def fetch(self, key: str, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
         """
         Gets a Value from the DB
         """
-        return self.get(key) if self.contains(key) else None
+        return self.get(key, _raw = _raw, **kwargs) if self.contains(key) else None
     
-    def set(self, key: str, value: Any, **kwargs) -> None:
+    def set(self, key: str, value: Any, ex: Optional[Union[float, int]] = None, _raw: Optional[bool] = None, **kwargs) -> None:
         """
         Saves a Value to the DB
         """
         if self.base.async_enabled and is_in_async_loop():
-            ThreadPooler.create_background_task(self.base.aset(key, value, **kwargs))
+            ThreadPooler.create_background_task(self.base.aset(key, value, ex = ex, _raw = _raw, **kwargs))
         else:
-            self.base.set(key, value, **kwargs)
+            self.base.set(key, value, ex = ex, _raw = _raw, **kwargs)
     
     def set_batch(self, data: Dict[str, Any], **kwargs) -> None:
         """
@@ -201,31 +201,31 @@ class PersistentDict(collections.abc.MutableMapping):
         else:
             self.base.clear(*keys, **kwargs)
     
-    async def aget(self, key: str, default: Optional[Any] = None, **kwargs) -> Optional[Any]:
+    async def aget(self, key: str, default: Optional[Any] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
         """
         Gets a Value from the DB
         """
         await self._asave_mutation_objects(key)
-        return await self.base.aget(key, default = default, **kwargs)
+        return await self.base.aget(key, default = default, _raw = _raw, **kwargs)
     
-    async def aget_values(self, keys: Iterable[str]) -> List[Any]:
+    async def aget_values(self, keys: Iterable[str], **kwargs) -> List[Any]:
         """
         Gets a Value from the DB
         """
         await self._asave_mutation_objects(*keys)
-        return await self.base.aget_values(keys)
+        return await self.base.aget_values(keys,  **kwargs)
     
-    async def afetch(self, key: str) -> Optional[Any]:
+    async def afetch(self, key: str, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
         """
         Gets a Value from the DB
         """
-        return await self.aget(key) if await self.acontains(key) else None
+        return await self.aget(key, _raw = _raw, **kwargs) if await self.acontains(key) else None
 
-    async def aset(self, key: str, value: Any, **kwargs) -> None:
+    async def aset(self, key: str, value: Any, ex: Optional[Union[float, int]] = None, _raw: Optional[bool] = None, **kwargs) -> None:
         """
         Saves a Value to the DB
         """
-        await self.base.aset(key, value, **kwargs)
+        await self.base.aset(key, value, ex = ex, _raw = _raw, **kwargs)
 
     async def aset_batch(self, data: Dict[str, Any], **kwargs) -> None:
         """
@@ -251,97 +251,97 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         await self.base.aclear(*keys, **kwargs)
     
-    def get_all_data(self) -> Dict[str, Any]:
+    def get_all_data(self, **kwargs) -> Dict[str, Any]:
         """
         Loads all the Data
         """
         self._save_mutation_objects()
-        return self.base.get_all_data()
+        return self.base.get_all_data(**kwargs)
     
-    def get_all_keys(self) -> Iterable[str]:
+    def get_all_keys(self, **kwargs) -> Iterable[str]:
         """
         Returns all the Keys
         """
-        return self.base.get_all_keys()
+        return self.base.get_all_keys(**kwargs)
     
-    def get_keys(self, pattern: str, exclude_base_key: Optional[bool] = None) -> List[str]:
+    def get_keys(self, pattern: str, exclude_base_key: Optional[bool] = None, **kwargs) -> List[str]:
         """
         Returns all the Keys
         """
-        return self.base.get_keys(pattern, exclude_base_key = exclude_base_key)
+        return self.base.get_keys(pattern, exclude_base_key = exclude_base_key, **kwargs)
     
-    def get_all_values(self) -> Iterable[Any]:
+    def get_all_values(self, **kwargs) -> Iterable[Any]:
         """
         Returns all the Values
         """
         self._save_mutation_objects()
-        return self.base.get_all_values()
+        return self.base.get_all_values(**kwargs)
     
-    async def aget_all_data(self) -> Dict[str, Any]:
+    async def aget_all_data(self, **kwargs) -> Dict[str, Any]:
         """
         Loads all the Data
         """
         await self._asave_mutation_objects()
-        return await self.base.aget_all_data()
+        return await self.base.aget_all_data(**kwargs)
     
-    async def aget_all_keys(self) -> Iterable[str]:
+    async def aget_all_keys(self, **kwargs) -> Iterable[str]:
         """
         Returns all the Keys
         """
-        return await self.base.aget_all_keys()
+        return await self.base.aget_all_keys(**kwargs)
 
-    async def aget_keys(self, pattern: str, exclude_base_key: Optional[bool] = None) -> List[str]:
+    async def aget_keys(self, pattern: str, exclude_base_key: Optional[bool] = None, **kwargs) -> List[str]:
         """
         Returns all the Keys
         """
-        return await self.base.aget_keys(pattern, exclude_base_key = exclude_base_key)
+        return await self.base.aget_keys(pattern, exclude_base_key = exclude_base_key, **kwargs)
     
-    async def aget_all_values(self) -> Iterable[Any]:
+    async def aget_all_values(self, **kwargs) -> Iterable[Any]:
         """
         Returns all the Values
         """
         await self._asave_mutation_objects()
-        return await self.base.aget_all_values()
+        return await self.base.aget_all_values(**kwargs)
     
-    def keys(self) -> Iterable[Any]:
+    def keys(self, **kwargs) -> Iterable[Any]:
         """
         Returns the Keys
         """
-        return self.base.keys()
+        return self.base.keys(**kwargs)
     
-    def values(self) -> Iterable[Any]:
+    def values(self, **kwargs) -> Iterable[Any]:
         """
         Returns the Values
         """
         self._save_mutation_objects()
-        return self.base.values()
+        return self.base.values(**kwargs)
     
-    def items(self, iterable: Optional[bool] = True) -> Dict[Any, Any]:
+    def items(self, iterable: Optional[bool] = True, **kwargs) -> Dict[Any, Any]:
         """
         Returns the Items
         """
         self._save_mutation_objects()
-        return self.base.items(iterable = iterable)
+        return self.base.items(iterable = iterable, **kwargs)
     
-    async def akeys(self) -> Iterable[Any]:
+    async def akeys(self, **kwargs) -> Iterable[Any]:
         """
         Returns the Keys
         """
-        return await self.base.akeys()
+        return await self.base.akeys(**kwargs)
     
-    async def avalues(self) -> Iterable[Any]:
+    async def avalues(self, **kwargs) -> Iterable[Any]:
         """
         Returns the Values
         """
         await self._asave_mutation_objects()
-        return await self.base.avalues()
+        return await self.base.avalues(**kwargs)
     
-    async def aitems(self, iterable: Optional[bool] = True) -> Dict[Any, Any]:
+    async def aitems(self, iterable: Optional[bool] = True, **kwargs) -> Dict[Any, Any]:
         """
         Returns the Items
         """
         await self._asave_mutation_objects()
-        return await self.base.aitems(iterable = iterable)
+        return await self.base.aitems(iterable = iterable, **kwargs)
     
     def expire(self, key: str, timeout: Optional[int] = None, expiration: Optional[int] = None, **kwargs) -> None:
         """
@@ -349,14 +349,14 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         # Add a check to see if expiration or timeout is set
         ex = expiration if expiration is not None else timeout
-        self.base.expire(key, ex)
+        self.base.expire(key, ex, **kwargs)
 
     async def aexpire(self, key: str, timeout: Optional[int] = None, expiration: Optional[int] = None, **kwargs) -> None:
         """
         Expires a Key
         """
         ex = expiration if expiration is not None else timeout
-        await self.base.aexpire(key, ex)
+        await self.base.aexpire(key, ex, **kwargs)
 
     @contextlib.contextmanager
     def track_changes(self, key: str, func: str, *args, **kwargs):
@@ -431,43 +431,43 @@ class PersistentDict(collections.abc.MutableMapping):
             return result
         
     
-    def update(self, data: Dict[str, Any]) -> None:
+    def update(self, data: Dict[str, Any], **kwargs) -> None:
         """
         Updates the Cache
         """
         self._save_mutation_objects()
-        self.base.update(data)
+        self.base.update(data, **kwargs)
 
-    async def aupdate(self, data: Dict[str, Any]) -> None:
+    async def aupdate(self, data: Dict[str, Any], **kwargs) -> None:
         """
         Updates the Cache
         """
         await self._asave_mutation_objects()
-        await self.base.aupdate(data)
+        await self.base.aupdate(data, **kwargs)
 
-    def popitem(self) -> Any:
+    def popitem(self, **kwargs) -> Any:
         """
         Pops an Item from the Cache
         """
-        return self.base.popitem()
+        return self.base.popitem(**kwargs)
     
-    async def apopitem(self) -> Any:
+    async def apopitem(self, **kwargs) -> Any:
         """
         Pops an Item from the Cache
         """
-        return await self.base.apopitem()
+        return await self.base.apopitem(**kwargs)
     
-    def pop(self, key: str, default: Optional[Any] = None) -> Any:
+    def pop(self, key: str, default: Optional[Any] = None, **kwargs) -> Any:
         """
         Pops an Item from the Cache
         """
-        return self.base.pop(key, default)
+        return self.base.pop(key, default, **kwargs)
     
-    async def apop(self, key: str, default: Optional[Any] = None) -> Any:
+    async def apop(self, key: str, default: Optional[Any] = None, **kwargs) -> Any:
         """
         Pops an Item from the Cache
         """
-        return await self.base.apop(key, default)
+        return await self.base.apop(key, default, **kwargs)
     
     def __repr__(self):
         """
@@ -564,6 +564,17 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         return bool(self.base.keys())
     
+    def length(self, **kwargs):
+        """
+        Returns the Length of the Cache
+        """
+        return self.base.length(**kwargs)
+    
+    async def alength(self, **kwargs):
+        """
+        Returns the Length of the Cache
+        """
+        return await self.base.alength(**kwargs)
 
     def migrate_compression(self, **kwargs):
         """

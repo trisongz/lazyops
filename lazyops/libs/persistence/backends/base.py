@@ -59,29 +59,29 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         return f'{self.base_key}.{key}' if self.base_key else key
 
-    def encode_value(self, value: Union[Any, SchemaType], **kwargs) -> Union[str, bytes]:
+    def encode_value(self, value: Union[Any, SchemaType], _raw: Optional[bool] = None, **kwargs) -> Union[str, bytes]:
         """
         Encodes a Value
         """
-        return self.serializer.encode(value, **kwargs)
+        return value if _raw else self.serializer.encode(value, **kwargs)
     
-    async def aencode_value(self, value: Union[Any, SchemaType], **kwargs) -> Union[str, bytes]:
+    async def aencode_value(self, value: Union[Any, SchemaType], _raw: Optional[bool] = None,  **kwargs) -> Union[str, bytes]:
         """
         Encodes a Value
         """
-        return await self.serializer.aencode(value, **kwargs)
+        return value if _raw else await self.serializer.aencode(value, **kwargs)
 
-    def decode_value(self, value: Union[str, bytes], **kwargs) -> Any:
+    def decode_value(self, value: Union[str, bytes], _raw: Optional[bool] = None, **kwargs) -> Any:
         """
         Decodes a Value
         """
-        return self.serializer.decode(value, **kwargs)
+        return value if _raw else self.serializer.decode(value, **kwargs)
     
-    async def adecode_value(self, value: Union[str, bytes], **kwargs) -> Any:
+    async def adecode_value(self, value: Union[str, bytes], _raw: Optional[bool] = None, **kwargs) -> Any:
         """
         Decodes a Value
         """
-        return await self.serializer.adecode(value, **kwargs)
+        return value if _raw else await self.serializer.adecode(value, **kwargs)
     
     def create_hash(self, obj: 'ObjectValue') -> str:
         """
@@ -97,7 +97,7 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         pass
 
-    def get(self, key: str, default: Optional[Any] = None, **kwargs) -> Optional[Any]:
+    def get(self, key: str, default: Optional[Any] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
         """
         Gets a Value from the DB
         """
@@ -110,14 +110,14 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         raise NotImplementedError
 
 
-    def set(self, key: str, value: Any, ex: Optional[int] = None, **kwargs) -> None:
+    def set(self, key: str, value: Any, ex: Optional[int] = None, _raw: Optional[bool] = None, **kwargs) -> None:
         """
         Saves a Value to the DB
         """
         raise NotImplementedError
 
 
-    def set_batch(self, data: Dict[str, Any], ex: Optional[int] = None, **kwargs) -> None:
+    def set_batch(self, data: Dict[str, Any], ex: Optional[int] = None, _raw: Optional[bool] = None, **kwargs) -> None:
         """
         Saves a Value to the DB
         """
@@ -138,24 +138,24 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         raise NotImplementedError
 
     
-    async def aget(self, key: str, default: Optional[Any] = None, **kwargs) -> Optional[Any]:
+    async def aget(self, key: str, default: Optional[Any] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
         """
         Gets a Value from the DB
         """
-        return await ThreadPooler.run_async(self.get, key, default, **kwargs)
+        return await ThreadPooler.run_async(self.get, key, default, _raw = _raw, **kwargs)
 
-    async def aget_values(self, keys: Iterable[str]) -> List[Any]:
+    async def aget_values(self, keys: Iterable[str], **kwargs) -> List[Any]:
         """
         Gets a Value from the DB
         """
-        return await ThreadPooler.run_async(self.get_values, keys)
+        return await ThreadPooler.run_async(self.get_values, keys, **kwargs)
 
     
-    async def aset(self, key: str, value: Any, ex: Optional[int] = None, **kwargs) -> None:
+    async def aset(self, key: str, value: Any, ex: Optional[int] = None, _raw: Optional[bool] = None, **kwargs) -> None:
         """
         Saves a Value to the DB
         """
-        return await ThreadPooler.run_async(self.set, key, value, ex, **kwargs)
+        return await ThreadPooler.run_async(self.set, key, value, ex, _raw = _raw, **kwargs)
 
 
     async def aset_batch(self, data: Dict[str, Any], ex: Optional[int] = None, **kwargs) -> None:
@@ -183,128 +183,127 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         raise NotImplementedError
 
 
-    def get_all_data(self, exclude_base_key: Optional[bool] = False) -> Dict[str, Any]:
+    def get_all_data(self, exclude_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
         """
         Loads all the Data
         """
         raise NotImplementedError
 
 
-    def get_all_keys(self, exclude_base_key: Optional[bool] = False) -> List[str]:
+    def get_all_keys(self, exclude_base_key: Optional[bool] = False, **kwargs) -> List[str]:
         """
         Returns all the Keys
         """
         raise NotImplementedError
 
 
-    def get_all_values(self) -> List[Any]:
+    def get_all_values(self, **kwargs) -> List[Any]:
         """
         Returns all the Values
         """
         raise NotImplementedError
 
 
-    async def aget_all_data(self, exclude_base_key: Optional[bool] = False) -> Dict[str, Any]:
+    async def aget_all_data(self, exclude_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
         """
         Loads all the Data
         """
-        return await ThreadPooler.run_async(self.get_all_data)
+        return await ThreadPooler.run_async(self.get_all_data, exclude_base_key = exclude_base_key, **kwargs)
 
-    async def aget_all_keys(self, exclude_base_key: Optional[bool] = False) -> List[str]:
+    async def aget_all_keys(self, exclude_base_key: Optional[bool] = False, **kwargs) -> List[str]:
         """
         Returns all the Keys
         """
-        return await ThreadPooler.run_async(self.get_all_keys)
+        return await ThreadPooler.run_async(self.get_all_keys, exclude_base_key = exclude_base_key, **kwargs)
 
-    async def aget_all_values(self) -> List[Any]:
+    async def aget_all_values(self,  **kwargs) -> List[Any]:
         """
         Returns all the Values
         """
-        return await ThreadPooler.run_async(self.get_all_values)
+        return await ThreadPooler.run_async(self.get_all_values, **kwargs)
 
 
-    def pop(self, key, default = None):
+    def pop(self, key, default = None, **kwargs):
         """
         Pops an Item from the Cache
         """
         self._precheck()
-        value = self.get(key)
+        value = self.get(key, **kwargs)
         if self.async_enabled:
             ThreadPooler.create_background_task(self.adelete(key))
         else:
             self.delete(key)
         return value if value is not None else default
     
-    async def apop(self, key, default = None):
+    async def apop(self, key, default = None, **kwargs):
         """
         Pops an Item from the Cache
         """
         self._precheck()
-        value = await self.aget(key)
+        value = await self.aget(key, **kwargs)
         await self.adelete(key)
         return value if value is not None else default
 
-    def contains(self, key: str) -> bool:
+    def contains(self, key: str, **kwargs) -> bool:
         """
         Returns True if the Cache contains the Key
         """
         raise NotImplementedError
 
-    async def acontains(self, key: str) -> bool:
+    async def acontains(self, key: str, **kwargs) -> bool:
         """
         Returns True if the Cache contains the Key
         """
-        return await ThreadPooler.run_async(self.contains, key)
+        return await ThreadPooler.run_async(self.contains, key, **kwargs)
 
-    def keys(self) -> Iterable[str]:
+    def keys(self, **kwargs) -> Iterable[str]:
         """
         Returns the Keys
         """
-        return iter(self.get_all_keys(True))
+        return iter(self.get_all_keys(True, **kwargs))
 
-    def get_keys(self, pattern: str, exclude_base_key: Optional[bool] = None) -> List[str]:
+    def get_keys(self, pattern: str, exclude_base_key: Optional[bool] = None, **kwargs) -> List[str]:
         """
         Returns the Keys
         """
         raise NotImplementedError
     
-    def values(self) -> Iterable[Any]:
+    def values(self, **kwargs) -> Iterable[Any]:
         """
         Returns the Values
         """
-        return iter(self.get_all_values())
+        return iter(self.get_all_values(**kwargs))
     
-    def items(self, iterable: Optional[bool] = True) -> Union[Iterable[ItemsView], Dict[str, Any]]:
+    def items(self, iterable: Optional[bool] = True, **kwargs) -> Union[Iterable[ItemsView], Dict[str, Any]]:
         """
         Returns the Items
         """
-        items = self.get_all_data(True)
+        items = self.get_all_data(True, **kwargs)
         return items.items() if iterable else items
-        # return iter(self.get_all_data())
     
-    async def akeys(self) -> Iterable[Any]:
+    async def akeys(self, **kwargs) -> Iterable[Any]:
         """
         Returns the Keys
         """
-        return iter(await self.aget_all_keys(True))
+        return iter(await self.aget_all_keys(True, **kwargs))
     
-    async def aget_keys(self, pattern: str, exclude_base_key: Optional[bool] = None) -> List[str]:
+    async def aget_keys(self, pattern: str, exclude_base_key: Optional[bool] = None, **kwargs) -> List[str]:
         """
         Returns the Keys
         """
         raise NotImplementedError
     
-    async def avalues(self) -> Iterable[Any]:
+    async def avalues(self, **kwargs) -> Iterable[Any]:
         """
         Returns the Values
         """
-        return iter(await self.aget_all_values())
+        return iter(await self.aget_all_values(**kwargs))
     
-    async def aitems(self, iterable: Optional[bool] = True) -> Union[Iterable[ItemsView], Dict[str, Any]]:
+    async def aitems(self, iterable: Optional[bool] = True, **kwargs) -> Union[Iterable[ItemsView], Dict[str, Any]]:
         """
         Returns the Items
         """
-        items = await self.aget_all_data(True)
+        items = await self.aget_all_data(True, **kwargs)
         return items.items() if iterable else items
     
     def expire(self, key: str, ex: Optional[int] = None, **kwargs) -> None:
@@ -362,27 +361,27 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         await self.aset(key, default)
         return default
     
-    def update(self, data: Dict[str, Any]):
+    def update(self, data: Dict[str, Any], **kwargs):
         """
         Updates the Cache
         """
         for key, value in data.items():
-            self.set(key, value)
+            self.set(key, value, **kwargs)
     
-    async def aupdate(self, data: Dict[str, Any]):
+    async def aupdate(self, data: Dict[str, Any], **kwargs):
         """
         Updates the Cache
         """
         for key, value in data.items():
-            await self.aset(key, value)
+            await self.aset(key, value, **kwargs)
 
-    def popitem(self):
+    def popitem(self, **kwargs):
         """
         Pops an Item from the Cache
         """
         self._precheck()
         key = next(iter(self))
-        value = self.get(key)
+        value = self.get(key, **kwargs)
         if value is not None:
             if self.async_enabled:
                 ThreadPooler.create_background_task(self.adelete(key))
@@ -391,13 +390,13 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
             return key, value
         return None, None
     
-    async def apopitem(self):
+    async def apopitem(self, **kwargs):
         """
         Pops an Item from the Cache
         """
         self._precheck()
         key = next(iter(self))
-        value = await self.aget(key)
+        value = await self.aget(key, **kwargs)
         if value is not None:
             await self.adelete(key)
             return key, value
@@ -439,6 +438,20 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         self._precheck()
         return len(list(self.iterate()))
     
+    def length(self, **kwargs):
+        """
+        Returns the Length of the Cache
+        """
+        self._precheck()
+        return len(self.get_all_keys(**kwargs))
+
+    async def alength(self, **kwargs):
+        """
+        Returns the Length of the Cache
+        """
+        self._precheck()
+        return len(await self.aget_all_keys(**kwargs))
+
 
     def __contains__(self, key):
         """

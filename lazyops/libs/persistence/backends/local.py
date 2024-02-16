@@ -84,17 +84,19 @@ class LocalStatefulBackend(BaseStatefulBackend):
             self.cache = self.get_data()
             self.file_hash = self.file_hash_path.read_text()
     
-    def encode_value(self, value: Union[Any, SchemaType], **kwargs) -> str:
+    def encode_value(self, value: Union[Any, SchemaType], _raw: Optional[bool] = None, **kwargs) -> str:
         """
         Encodes a Value
         """
+        if _raw: return value
         result = super().encode_value(value, **kwargs)
         return result.hex() if isinstance(result, bytes) else result
     
-    def decode_value(self, value: str, **kwargs) -> Any:
+    def decode_value(self, value: str, _raw: Optional[bool] = None, **kwargs) -> Any:
         """
         Decodes a Value
         """
+        if _raw: return value
         if self.serializer.binary or self.serializer.compression_enabled:
             value = binascii.unhexlify(value)
         return super().decode_value(value, **kwargs)
@@ -105,14 +107,14 @@ class LocalStatefulBackend(BaseStatefulBackend):
         """
         self.sync()
 
-    def get(self, key: str, default: Optional[Any] = None, **kwargs) -> Optional[Any]:
+    def get(self, key: str, default: Optional[Any] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
         """
         Gets a Value from the JSON
         """
         self.sync()
         if value := self.cache.get(self.get_key(key)):
             try:
-                result = self.decode_value(value, **kwargs)
+                result = self.decode_value(value, _raw = _raw, **kwargs)
                 return result if result is not None else default
             except Exception as e:
                 logger.info(f'Error Decoding Value: |r|({type(value)}) {e}|e| {value}', colored = True)
@@ -139,12 +141,12 @@ class LocalStatefulBackend(BaseStatefulBackend):
         return results
     
 
-    def set(self, key: str, value: Any, *args, **kwargs) -> None:
+    def set(self, key: str, value: Any, *args, _raw: Optional[bool] = None, **kwargs) -> None:
         """
         Sets a Value in the JSON
         """
         self.sync()
-        self.cache[self.get_key(key)] = self.encode_value(value)
+        self.cache[self.get_key(key)] = self.encode_value(value, _raw = _raw)
         self.write_data(self.cache)
         
 
@@ -154,7 +156,7 @@ class LocalStatefulBackend(BaseStatefulBackend):
         """
         self.sync()
         for key, value in data.items():
-            self.cache[self.get_key(key)] = self.encode_value(value)
+            self.cache[self.get_key(key)] = self.encode_value(value, **kwargs)
         self.write_data(self.cache)
 
     def delete(self, key: str, **kwargs) -> None:
@@ -178,7 +180,7 @@ class LocalStatefulBackend(BaseStatefulBackend):
         self.write_data(self.cache)
 
 
-    def get_all_keys(self, exclude_base_key: Optional[bool] = False) -> List[str]:
+    def get_all_keys(self, exclude_base_key: Optional[bool] = False, **kwargs) -> List[str]:
         """
         Returns all the Keys
         """
@@ -192,7 +194,7 @@ class LocalStatefulBackend(BaseStatefulBackend):
             keys = [key.replace(f'{self.base_key}.', '') for key in keys]
         return keys
 
-    def get_all_data(self, exclude_base_key: Optional[bool] = False) -> Dict[str, Any]:
+    def get_all_data(self, exclude_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
         """
         Loads all the Data
         """
@@ -206,23 +208,23 @@ class LocalStatefulBackend(BaseStatefulBackend):
             data = {key.replace(f'{self.base_key}.', ''): value for key, value in data.items()}
         return data
     
-    def get_all_values(self) -> Iterable[Any]:
+    def get_all_values(self, **kwargs) -> Iterable[Any]:
         """
         Returns all the Values
         """
         self.sync()
-        all_keys = self.get_all_keys()
+        all_keys = self.get_all_keys(**kwargs)
         return [
-            self.decode_value(value)
+            self.decode_value(value, **kwargs)
             for key, value in self.cache.items() if key in all_keys
         ]    
 
-    def contains(self, key: str) -> bool:
+    def contains(self, key: str, **kwargs) -> bool:
         """
         Returns True if the Cache contains the Key
         """
         self.sync()
-        return key in self.get_all_keys()
+        return key in self.get_all_keys(**kwargs)
     
 
     def iterate(self, **kwargs) -> Iterable[Any]:
@@ -230,7 +232,7 @@ class LocalStatefulBackend(BaseStatefulBackend):
         Iterates over the Cache
         """
         self.sync()
-        return iter(self.get_all_keys())
+        return iter(self.get_all_keys(**kwargs))
 
 
     """
@@ -263,7 +265,7 @@ class LocalStatefulBackend(BaseStatefulBackend):
         if await self.ashould_sync():
             self.cache = await self.aget_data()
 
-    def get_data(self) -> Dict[str, Any]:
+    def get_data(self, **kwargs) -> Dict[str, Any]:
         """
         Returns the Data
         """
@@ -272,7 +274,7 @@ class LocalStatefulBackend(BaseStatefulBackend):
                 return json.loads(self.file_path.read_text())
             return self.parser.parse(self.file_path.read_bytes(), recursive=True)
     
-    async def aget_data(self) -> Dict[str, Any]:
+    async def aget_data(self, **kwargs) -> Dict[str, Any]:
         """
         Fetch the data
         """
