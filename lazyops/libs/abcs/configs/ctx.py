@@ -272,6 +272,7 @@ class ApplicationContext(abc.ABC):
         configs_path = configs_path or self.config_path
         defaults_path = configs_path.joinpath('defaults')
         suffix = suffix or 'json'
+        suffix = suffix.lstrip('.')
         if name is not None:
             if defaults_path.joinpath(f'{name}-{app_env.name}.{suffix}').exists():
                 return defaults_path.joinpath(f'{name}-{app_env.name}.{suffix}')

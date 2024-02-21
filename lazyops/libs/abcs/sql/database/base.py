@@ -47,7 +47,7 @@ class PostgresConfig(BaseModel):
     superuser_url: Optional[PostgresDsn] = None
 
     engine_poolclass: Optional[Union[Type[Union[NullPool, AsyncAdaptedQueuePool]], str]] = 'sqlalchemy.pool.AsyncAdaptedQueuePool'
-    engine_json_serializer: Optional[Union[Type[Callable], str]] = 'json'
+    engine_json_serializer: Optional[Union[Callable, str]] = 'json'
 
     engine_kwargs: Optional[Dict[str, Any]] = Field(default_factory = dict)
     engine_rw_kwargs: Optional[Dict[str, Any]] = Field(default_factory = dict)
@@ -170,6 +170,7 @@ class PostgresConfig(BaseModel):
             kwargs['json_serializer'] = self.engine_json_serializer
         if self.engine_poolclass:
             kwargs['poolclass'] = self.engine_poolclass
+        # logger.info(kwargs, prefix = 'Engine KWargs')
         return kwargs
     
     def get_session_kwargs(self, readonly: Optional[bool] = False, **session_kwargs) -> Dict[str, Any]:
@@ -183,6 +184,7 @@ class PostgresConfig(BaseModel):
             if readonly
             else update_dict(kwargs, self.session_rw_kwargs)
         )
+        # logger.info(kwargs, prefix = 'Session KWargs')
         return kwargs
     
 
@@ -296,13 +298,13 @@ class DatabaseClientBase(abc.ABC):
         """
         Returns the SQL Templates
         """
-        if not self._sql:
+        if not self._sql_template:
             from .templates import SQLTemplates
-            self._sql = SQLTemplates(
+            self._sql_template = SQLTemplates(
                 settings = self.settings,
                 **self._sql_template_kwargs
             )
-        return self._sql
+        return self._sql_template
 
     @property
     def settings(self) -> 'AppSettings':
@@ -312,7 +314,7 @@ class DatabaseClientBase(abc.ABC):
         # assert self._settings, 'The settings must be set'
         if self._settings is None:
             from lazyops.libs.abcs.configs.lazy import get_module_settings
-            self._settings = get_module_settings(self.__module__.__name__)
+            self._settings = get_module_settings(self.__module__)
         return self._settings
 
     def is_verbose_for(self, method: str) -> bool:
@@ -367,7 +369,7 @@ class DatabaseClientBase(abc.ABC):
                 class_ = AsyncSession, 
                 **self.config.get_session_kwargs(
                     readonly = False, 
-                    verbose = self.is_verbose_for('postgres_url'),
+                    # verbose = self.is_verbose_for('postgres_url'),
                     **self._kwargs
                 )
             )
@@ -383,7 +385,7 @@ class DatabaseClientBase(abc.ABC):
             self._session_ro = async_sessionmaker(
                 self.engine_ro, class_ = AsyncSession, **self.config.get_session_kwargs(
                     readonly = True, 
-                    verbose = self.is_verbose_for('postgres_readonly_warning'),
+                    # verbose = self.is_verbose_for('postgres_readonly_warning'),
                     **self._kwargs
                 )
             )

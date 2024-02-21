@@ -271,11 +271,19 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         * `auto_commit`: Whether or not to auto commit (True by default. Use False to allow for batch operations)
         """
         self.model = model
-        self.schema = schema
+        
         self.defer_attrs = defer_attrs or []
         self.auto_commit = auto_commit
+        self._schema = schema
         self._logger: Optional['Logger'] = None
         self._kwargs = kwargs
+        self._post_init(**kwargs)
+
+    def _post_init(self, **kwargs):
+        """
+        Post-Init
+        """
+        pass
 
 
     @property
@@ -454,6 +462,17 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
     Create Operations
     """
 
+    def prepare_encoded_object(
+        self,
+        obj_in: SourceSchemaType,
+        method: str,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Encodes the object
+        """
+        return jsonable_encoder(obj_in, **kwargs)
+
     async def create(
         self, 
         db: AsyncSession, 
@@ -463,7 +482,7 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         """
         Creates an object
         """
-        obj_in_data = jsonable_encoder(obj_in)
+        obj_in_data = self.prepare_encoded_object(obj_in, method = 'create')
         db_obj = self.model(**obj_in_data)  # type: ignore
         if hasattr(db_obj, 'created_at'):
             db_obj.created_at = datetime.datetime.now(datetime.timezone.utc)
@@ -485,7 +504,7 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         """
         Creates an object if it does not exist
         """
-        values = jsonable_encoder(obj_in, exclude = exclude_attrs, **kwargs)
+        values = self.prepare_encoded_object(obj_in, method = 'create_if_not_exists', exclude = exclude_attrs, **kwargs)
         stmt = insert(self.model).values(
             **values
         ).on_conflict_do_nothing(
@@ -511,7 +530,7 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         Upserts an object
         """
         index_elements = index_elements or ['id']
-        values = jsonable_encoder(obj_in, exclude = exclude_attrs, **kwargs)
+        values = self.prepare_encoded_object(obj_in, method = 'upsert', exclude = exclude_attrs, **kwargs)
         stmt = insert(self.model).values(
             **values
         ).on_conflict_do_update(
@@ -523,7 +542,7 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
             await db.commit()
 
     
-    async def upsert_multi(
+    async def upsert_many(
         self,
         db: AsyncSession,
         *,
@@ -547,10 +566,10 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         Upserts multiple objects
         """
         for i in range(0, len(objs_in), batch_size):
-            await self.upsert_multi(db, objs_in = objs_in[i:i+batch_size])
+            await self.upsert_many(db, objs_in = objs_in[i:i+batch_size])
 
     
-    async def upsert_multi_with_idx(
+    async def upsert_many_with_idx(
         self,
         db: AsyncSession,
         *,
