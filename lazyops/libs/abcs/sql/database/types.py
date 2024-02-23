@@ -617,7 +617,7 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         completed_idx: List[int] = []
         failed_idx: List[int] = []
         for i in range(0, len(objs_in), batch_size):
-            idxs = await self.upsert_multi_with_idx(db, objs_in = objs_in[i:i+batch_size], start_idx = i, raise_errors = raise_errors)
+            idxs = await self.upsert_many_with_idx(db, objs_in = objs_in[i:i+batch_size], start_idx = i, raise_errors = raise_errors)
             completed, failed = idxs
             if completed: completed_idx += completed
             if failed: failed_idx += failed

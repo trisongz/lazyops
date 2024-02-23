@@ -32,3 +32,4 @@ tests/local.hash
 tests/local.lock
 tests/libs/abcs/private_test_wrapper.py
 tests/**/private**
+tests/libs/abcs/k8s.py

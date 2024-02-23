@@ -223,6 +223,8 @@ class DatabaseClientBase(abc.ABC):
         elif config: self.config = config
         self.post_init(**kwargs)
         self._kwargs = kwargs
+    
+
 
     def configure(
         self, 
@@ -293,6 +295,12 @@ class DatabaseClientBase(abc.ABC):
             self._tpool = ThreadPooler
         return self._tpool
     
+    def configure_sql_templates(self, **kwargs):
+        """
+        Configures the SQL Templates
+        """
+        pass
+
     @property
     def sql_template(self) -> 'SQLTemplates':
         """
@@ -300,6 +308,7 @@ class DatabaseClientBase(abc.ABC):
         """
         if not self._sql_template:
             from .templates import SQLTemplates
+            self.configure_sql_templates()
             self._sql_template = SQLTemplates(
                 settings = self.settings,
                 **self._sql_template_kwargs
@@ -461,7 +470,7 @@ class DatabaseClientBase(abc.ABC):
             sess: AsyncSession = sess_type()
             yield sess
         except Exception as e:
-            logger.trace('Session error', e, depth = 2)
+            logger.trace('Session error', e, depth = 5)
             self.run_error_callbacks(e)
             if auto_rollback: 
                 try:

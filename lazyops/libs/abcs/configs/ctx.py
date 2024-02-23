@@ -585,7 +585,10 @@ class ApplicationContext(abc.ABC):
         if name not in base_ctx:
             import jinja2
             if isinstance(path, str):
-                path = self.settings.module_path.joinpath(path)
+                if path.startswith('/'):
+                    path = Path(path)
+                else:
+                    path = self.settings.module_path.joinpath(path)
                 self.logger.info(f"Jinja2 Path: {path}")
             base_ctx[name] = jinja2.Environment(
                 loader = jinja2.FileSystemLoader(path),

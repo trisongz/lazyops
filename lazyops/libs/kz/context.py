@@ -147,6 +147,30 @@ class KubernetesContext(abc.ABC):
         return self.objects['apod']
     
 
+    @property
+    def Service(self) -> Type['objects.Service']:
+        """
+        Returns the Service object
+        """
+        if 'service' not in self.objects:
+            _service = objects.Service
+            _service.__init__ = functools.partialmethod(_service.__init__, api = self.client)
+            self.objects['service'] = _service
+        return self.objects['service']
+    
+    @property
+    def aService(self) -> Type['aobjects.Service']:
+        """
+        Returns the async Service object
+        """
+        self.raise_if_not_ainit()
+        if 'aservice' not in self.objects:
+            _service = aobjects.Service
+            _service.__init__ = functools.partialmethod(_service.__init__, api = self.aclient)
+            self.objects['aservice'] = _service
+        return self.objects['aservice']
+    
+
     @overload
     def get(
         self,

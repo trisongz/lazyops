@@ -63,6 +63,8 @@ import inspect
 import pkg_resources
 from pathlib import Path
 
+# _AppModulePaths: typing.Dict[str, Path] = {}
+
 class BaseAppSettings(BaseSettings):
     """
     BaseSettings with additional helpers
@@ -75,10 +77,19 @@ class BaseAppSettings(BaseSettings):
 
         https://stackoverflow.com/questions/25389095/python-get-path-of-root-project-structure
         """
+        # For some reason, whenever it gets recomputed, it returns the wrong path
+        # global _AppModulePaths
+        # if self.module_name not in _AppModulePaths:
         p = Path(pkg_resources.get_distribution(self.module_name).location)
+        # print(p, self.module_name, self.__class__.__qualname__)
         if 'src' in p.name and p.joinpath(self.module_name).exists():
             p = p.joinpath(self.module_name)
+        elif p.joinpath('src').exists() and p.joinpath('src', self.module_name).exists():
+            p = p.joinpath('src', self.module_name)
+        # print(p, self.module_name, self.__class__.__qualname__)
         return p
+        #     _AppModulePaths[self.module_name] = p
+        # return _AppModulePaths[self.module_name]
 
     @property
     def module_config_path(self) -> Path:

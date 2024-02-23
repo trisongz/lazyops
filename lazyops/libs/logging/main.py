@@ -64,6 +64,7 @@ QUEUE_STATUS_COLORS = {
 
     'retry': '<fg #F48C06>',
     'scheduled': '<fg #34A0A4>',
+    'reschedule': '<fg #34A0A4>',
     'startup': '<fg #168AAD>',
     'shutdown': '<fg #6A040F>',
     'process': '<fg #184E77>',
@@ -432,7 +433,7 @@ class Logger(_Logger):
             for key, value in COLORED_MESSAGE_MAP.items():
                 _message = _message.replace(key, value)
             _message = _message.replace(">|fg", "<fg")
-            _message = _message.replace("\</", "<")
+            _message = _message.replace("\</", "\<")
             _message += RESET_COLOR
         return _message
 

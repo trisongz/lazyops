@@ -59,8 +59,8 @@ class TemporaryData(abc.ABC):
         """
         Loads the data
         """
-        # if not self.filepath.exists():
-        #     self.filepath.write_text('{}')
+        if not self.filepath.exists():
+            self.filepath.write_text('{}')
         return Json.loads(self.filepath.read_text())
 
     @property
@@ -230,4 +230,6 @@ class TemporaryData(abc.ABC):
         module_dir = module_path.joinpath(data_dir)
         module_dir.mkdir(parents = True, exist_ok = True)
         filepath = module_dir.joinpath(f'{module_name}.tmp.json')
+        if not filepath.exists():
+            filepath.write_text('{}')
         return cls(filepath = filepath, is_multithreaded = is_multithreaded, **kwargs)

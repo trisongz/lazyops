@@ -495,6 +495,7 @@ class BaseAPIClient(BaseGlobalClient):
             if not isinstance(return_type, str):
                 # Must be a model
                 return return_type.model_validate(response.json())
+            return_type = str(return_type).lower()
             if return_type == 'json':
                 return response.json()
             if return_type == 'text':
