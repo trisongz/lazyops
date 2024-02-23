@@ -105,6 +105,8 @@ class SQLTemplates(abc.ABC):
         """
         Renders the template
         """
+        # template = self.aget_template(*parts)
+        # template.
         return await self.aget_template(*parts).render_async(**kwargs)
     
     def __call__(

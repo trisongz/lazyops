@@ -589,7 +589,7 @@ class ApplicationContext(abc.ABC):
                     path = Path(path)
                 else:
                     path = self.settings.module_path.joinpath(path)
-                self.logger.info(f"Jinja2 Path: {path}")
+            self.logger.info(f"Jinja2 Path: {path} for {name}")
             base_ctx[name] = jinja2.Environment(
                 loader = jinja2.FileSystemLoader(path),
                 enable_async = enable_async,
