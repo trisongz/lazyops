@@ -697,3 +697,21 @@ class DatabaseClientBase(abc.ABC):
         async with self.session() as session:
             result = await session.execute(statement, {'index_name': index_name})
             return result.scalar_one()
+
+
+    async def database_exists(
+        self,
+        db_name: str,
+    ) -> bool:
+        """
+        Checks if the database exists
+        """
+        statement = self.text(
+            f"SELECT 1 FROM pg_database WHERE datname = '{db_name}';"
+        )
+        async with self.session() as session:
+            result = await session.execute(statement)
+            output = result.scalar_one()
+            logger.info(f'Database Exists: {output}')
+            return output
+        

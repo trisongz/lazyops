@@ -83,6 +83,7 @@ class BaseAPIClient(BaseGlobalClient):
             'callback',
             'retryable',
             'retry_limit',
+            'validate_url',
         ]
     
     def configure_api_client(self, *args, **kwargs) -> aiohttpx.Client:
@@ -351,7 +352,7 @@ class BaseAPIClient(BaseGlobalClient):
         Quickly validates a URL
         """
         try:
-            response = self.api.head(url)
+            response = self.api.head(url, follow_redirects = True)
             try:
                 response.raise_for_status()
                 return True
@@ -365,7 +366,7 @@ class BaseAPIClient(BaseGlobalClient):
         Fetches the content type
         """
         try:
-            response = self.api.head(url)
+            response = self.api.head(url, follow_redirects = True)
             return response.headers.get('content-type')
         except Exception as e:
             return None
@@ -387,7 +388,7 @@ class BaseAPIClient(BaseGlobalClient):
         Quickly validates a URL
         """
         try:
-            response = await self.api.async_head(url)
+            response = await self.api.async_head(url, follow_redirects = True)
             try:
                 response.raise_for_status()
                 return True
@@ -401,7 +402,7 @@ class BaseAPIClient(BaseGlobalClient):
         Fetches the content type
         """
         try:
-            response = await self.api.async_head(url)
+            response = await self.api.async_head(url, follow_redirects = True)
             return response.headers.get('content-type')
         except Exception as e:
             return None
@@ -578,17 +579,19 @@ class HTTPPoolClient(BaseAPIClient):
     def __get_pdftotext(
         self,
         url: str,
+        validate_url: Optional[bool] = False,
         raise_errors: Optional[bool] = None,
         **kwargs
     ) -> Optional[str]:
         """
         Transform a PDF File to Text directly from URL
         """
-        validate_result = self._validate_url(url)
-        if validate_result != True:
-            if raise_errors: raise ValueError(f'Invalid URL: {url}. {validate_result}')
-            self.logger.error(f'Invalid URL: {url}. {validate_result}')
-            return None
+        if validate_url:
+            validate_result = self._validate_url(url)
+            if validate_result != True:
+                if raise_errors: raise ValueError(f'Invalid URL: {url}. {validate_result}')
+                self.logger.error(f'Invalid URL: {url}. {validate_result}')
+                return None
         
         cmd = f'curl -s {url} | pdftotext -layout -nopgbrk -eol unix -colspacing 0.7 -y 58 -x 0 -H 741 -W 596 - -'
         process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -605,6 +608,7 @@ class HTTPPoolClient(BaseAPIClient):
     def _get_pdftotext(
         self,
         url: str,
+        validate_url: Optional[bool] = False,
         retryable: Optional[bool] = False,
         retry_limit: Optional[int] = 3,
         raise_errors: Optional[bool] = None,
@@ -623,17 +627,19 @@ class HTTPPoolClient(BaseAPIClient):
     async def __aget_pdftotext(
         self,
         url: str,
+        validate_url: Optional[bool] = False,
         raise_errors: Optional[bool] = None,
         **kwargs
     ) -> Optional[str]:
         """
         Transform a PDF File to Text directly from URL
         """
-        validate_result = await self._avalidate_url(url)
-        if validate_result != True:
-            if raise_errors: raise ValueError(f'Invalid URL: {url}. {validate_result}')
-            self.logger.error(f'Invalid URL: {url}. {validate_result}')
-            return None
+        if validate_url:
+            validate_result = await self._avalidate_url(url)
+            if validate_result != True:
+                if raise_errors: raise ValueError(f'Invalid URL: {url}. {validate_result}')
+                self.logger.error(f'Invalid URL: {url}. {validate_result}')
+                return None
         cmd = f'curl -s {url} | pdftotext -layout -nopgbrk -eol unix -colspacing 0.7 -y 58 -x 0 -H 741 -W 596 - -'
         process = await asyncio.subprocess.create_subprocess_shell(cmd, shell=True, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
         try:
