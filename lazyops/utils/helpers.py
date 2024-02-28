@@ -301,7 +301,10 @@ def timed_cache(
     secs: typing.Optional[int] = 60 * 60, 
     maxsize: int = 1024,
     invalidate_cache_key: typing.Optional[str] = '_invalidate_cache',
-    **kwargs,
+    cache_if_result: typing.Optional[typing.Any] = None,
+    cache_if_type: typing.Optional[typing.Type] = None,
+    exclude_none: typing.Optional[bool] = False,
+    **_kwargs,
 ):
     """
     Wrapper for creating a expiring cached function
@@ -310,7 +313,7 @@ def timed_cache(
         maxsize: maxsize of the cache
         invalidate_cache_key: key to invalidate the cache
     """
-    if 'ttl' in kwargs: secs = kwargs.pop('ttl')
+    if 'ttl' in _kwargs: secs = _kwargs.pop('ttl')
     if secs is None: secs = 60
     def wrapper_cache(func):
         if is_coro_func(func):
@@ -323,10 +326,16 @@ def timed_cache(
             async def wrapped_func(*args, **kwargs):
                 _invalidate = kwargs.pop(invalidate_cache_key, None) if invalidate_cache_key else None
                 args, kwargs = freeze_args_and_kwargs(*args, **kwargs)
-                if _invalidate is True:
+                if _invalidate is True: _wrapped.cache_invalidate(*args, **kwargs)
+                result = await _wrapped(*args, **kwargs)
+                if exclude_none is True and result is None:
                     _wrapped.cache_invalidate(*args, **kwargs)
-                # print(f'wrapped: {_wrapped.cache_info()}')
-                return await _wrapped(*args, **kwargs)
+                elif cache_if_result is not None and result != cache_if_result:
+                    _wrapped.cache_invalidate(*args, **kwargs)
+                elif cache_if_type is not None and not isinstance(result, cache_if_type):
+                    _wrapped.cache_invalidate(*args, **kwargs)
+                    # print(f'Invalidating cache for {func.__name__}')
+                return result
             
             return wrapped_func
         
@@ -343,7 +352,14 @@ def timed_cache(
             def wrapped_func(*args, **kwargs):
                 _check_cache(func, invalidate = kwargs.pop(invalidate_cache_key, None) if invalidate_cache_key else None)
                 args, kwargs = freeze_args_and_kwargs(*args, **kwargs)
-                return func(*args, **kwargs)
+                result = func(*args, **kwargs)
+                if exclude_none is True and result is None:
+                    func.cache_clear()
+                elif cache_if_result is not None and result != cache_if_result:
+                    func.cache_clear()
+                elif cache_if_type is not None and not isinstance(result, cache_if_type):
+                    func.cache_clear()
+                return result
             
             return wrapped_func
 
