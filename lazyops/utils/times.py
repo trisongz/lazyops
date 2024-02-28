@@ -180,7 +180,6 @@ class Timer(abc.ABC, dict):
         """
         return self.get_duration()
         
-    
     @property
     def duration_s(self) -> str:
         """
@@ -190,6 +189,31 @@ class Timer(abc.ABC, dict):
         # when duration is called and then duration_s is called
         # in logging.
         return self.pformat(self.get_duration(False))
+
+    def duration_average(self, count: int, checkpoint: Optional[bool] = False) -> float:
+        """
+        Returns the average duration of the timer
+        """
+        return self.get_duration(checkpoint) / count
+
+    def duration_average_s(self, count: int, checkpoint: Optional[bool] = False) -> str:
+        """
+        Returns the average duration of the timer as a string
+        """
+        return self.pformat(self.duration_average(count, checkpoint))
+
+    def duration_average_iter(self, count: int, checkpoint: Optional[bool] = False) -> float:
+        """
+        Returns the average count/duration of the timer
+        """
+        return count / self.get_duration(checkpoint)
+    
+    def duration_average_iter_s(self, count: int, unit: Optional[str] = None, checkpoint: Optional[bool] = False) -> str:
+        """
+        Returns the average count/duration of the timer as a string
+        """
+        avg = self.duration_average_iter(count, checkpoint)
+        return f'{avg:.2f}/sec' if unit is None else f'{avg:.2f} {unit}/sec'
     
 
     @property
@@ -209,7 +233,7 @@ class Timer(abc.ABC, dict):
     
     def total_average(self, count: int) -> float:
         """
-        Returns the average duration of the timer
+        Returns the average total duration/count of the timer
         """
         return self.total / count
     
@@ -219,6 +243,19 @@ class Timer(abc.ABC, dict):
         """
         return self.pformat(self.total_average(count))
     
+    def total_average_iter(self, count: int) -> float:
+        """
+        Returns the average count/total duration of the timer
+        """
+        return count / self.total
+    
+    def total_average_iter_s(self, count: int, unit: Optional[str] = None) -> str:
+        """
+        Returns the average count/total duration of the timer as a string
+        """
+        avg = self.total_average_iter(count)
+        return f'{avg:.2f}/sec' if unit is None else f'{avg:.2f} {unit}/sec'
+
     @property
     def elapsed(self) -> float:
         """
@@ -246,6 +283,20 @@ class Timer(abc.ABC, dict):
         Returns the average duration of the timer as a string
         """
         return self.pformat(self.elapsed_average(count))
+
+    def elapsed_average_iter(self, count: int) -> float:
+        """
+        Returns the average count/elapsed duration of the timer
+        """
+        return count / self.elapsed
+    
+    def elapsed_average_iter_s(self, count: int, unit: Optional[str] = None) -> str:
+        """
+        Returns the average count/elapsed duration of the timer as a string
+        """
+        avg = self.elapsed_average_iter(count)
+        return f'{avg:.2f}/sec' if unit is None else f'{avg:.2f} {unit}/sec'
+
 
     @property
     def average(self) -> float:
