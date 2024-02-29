@@ -97,6 +97,9 @@ class ApplicationContext(abc.ABC):
         # Jinja2 Contexts
         self.j2_ctxs: Dict[str, 'jinja2.Environment'] = {}
         self.j2_actxs: Dict[str, 'jinja2.Environment'] = {}
+    
+        # Temp State
+        self.temp_state: Dict[str, Any] = {}
 
 
     @property
