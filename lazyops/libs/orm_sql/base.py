@@ -291,6 +291,7 @@ class CRUDBase(Generic[ModelTypeORM, SourceSchemaType]):
         """
         Returns the first object of the query
         """
+        stmt = stmt.limit(1) # Potential cause for memory leak
         res = (await db.scalars(stmt)).first()
         res = cast(self.model, res)
         self._raise_for_not_found(res, raise_for_not_found)
