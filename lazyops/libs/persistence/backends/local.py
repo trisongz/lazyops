@@ -300,3 +300,78 @@ class LocalStatefulBackend(BaseStatefulBackend):
             await self.file_path.async_write_text(json.dumps(data, indent = 4, ensure_ascii = False))
             self.file_hash = create_unique_id()
             await self.file_hash_path.async_write_text(self.file_hash)
+
+    
+
+    def incrby(self, key: str, amount: int = 1, **kwargs) -> int:
+        # sourcery skip: class-extract-method
+        """
+        [int] Increments the value of the key by the given amount
+        """
+        existing = self.get(key, 0)
+        value = existing + amount
+        self.set(key, value)
+        return value
+    
+    def incrbyfloat(self, key: str, amount: float = 1.0, **kwargs) -> float:
+        """
+        [float] Increments the value of the key by the given amount
+        """
+        existing = self.get(key, 0.0)
+        value = existing + amount
+        self.set(key, value)
+        return value
+    
+    async def aincrby(self, key: str, amount: int = 1, **kwargs) -> int:
+        """
+        [int] Increments the value of the key by the given amount
+        """
+        existing = await self.aget(key, 0)
+        value = existing + amount
+        await self.aset(key, value)
+        return value
+    
+    async def aincrbyfloat(self, key: str, amount: float = 1.0, **kwargs) -> float:
+        """
+        [float] Increments the value of the key by the given amount
+        """
+        existing = await self.aget(key, 0.0)
+        value = existing + amount
+        await self.aset(key, value)
+        return value
+    
+    def decrby(self, key: str, amount: int = 1, **kwargs) -> int:
+        """
+        [int] Decrements the value of the key by the given amount
+        """
+        existing = self.get(key, 0)
+        value = existing - amount
+        self.set(key, value)
+        return value
+    
+    def decrbyfloat(self, key: str, amount: float = 1.0, **kwargs) -> float:
+        """
+        [float] Decrements the value of the key by the given amount
+        """
+        existing = self.get(key, 0.0)
+        value = existing - amount
+        self.set(key, value)
+        return value
+    
+    async def adecrby(self, key: str, amount: int = 1, **kwargs) -> int:
+        """
+        [int] Decrements the value of the key by the given amount
+        """
+        existing = await self.aget(key, 0)
+        value = existing - amount
+        await self.aset(key, value)
+        return value
+    
+    async def adecrbyfloat(self, key: str, amount: float = 1.0, **kwargs) -> float:
+        """
+        [float] Decrements the value of the key by the given amount
+        """
+        existing = await self.aget(key, 0.0)
+        value = existing - amount
+        await self.aset(key, value)
+        return value

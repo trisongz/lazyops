@@ -655,4 +655,121 @@ class PersistentDict(collections.abc.MutableMapping):
         await self.base.areplicate_from(source, **kwargs)
 
     
+    """
+    Math Related Methods
+    """
 
+    def incr(self, key: str, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
+        """
+        Increments the value of the key by the given amount
+        """
+        return self.base.incr(key, amount = amount, **kwargs)
+    
+    async def aincr(self, key: str, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
+        """
+        Increments the value of the key by the given amount
+        """
+        return await self.base.aincr(key, amount = amount, **kwargs)
+    
+    def decr(self, key: str, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
+        """
+        Decrements the value of the key by the given amount
+        """
+        return self.base.decr(key, amount = amount, **kwargs)
+    
+    async def adecr(self, key: str, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
+        """
+        Decrements the value of the key by the given amount
+        """
+        return await self.base.adecr(key, amount = amount, **kwargs)
+    
+
+    """
+    Set Operations
+    """
+
+    def sadd(self, key: str, *values: Any, **kwargs) -> int:
+        """
+        Adds the value to the set
+        """
+        return self.base.sadd(key, *values, **kwargs)
+    
+    async def asadd(self, key: str, *value: Any, **kwargs) -> int:
+        """
+        Adds the value to the set
+        """
+        return await self.base.asadd(key, *value, **kwargs)
+    
+    def slength(self, key: str, **kwargs) -> int:
+        """
+        Returns the length of the set
+        """
+        return self.base.slength(key, **kwargs)
+    
+    async def aslength(self, key: str, **kwargs) -> int:
+        """
+        Returns the length of the set
+        """
+        return await self.base.aslength(key, **kwargs)
+    
+    
+    def sismember(self, key: str, value: Any, **kwargs) -> bool:
+        """
+        Returns whether the value is a member of the set
+        """
+        return self.base.sismember(key, value, **kwargs)
+    
+    async def asismember(self, key: str, value: Any, **kwargs) -> bool:
+        """
+        Returns whether the value is a member of the set
+        """
+        return await self.base.asismember(key, value, **kwargs)
+    
+    def smembers(self, key: str, **kwargs) -> List[Any]:
+        """
+        Returns the members of the set
+        """
+        return self.base.smembers(key, **kwargs)
+
+    async def assembers(self, key: str, **kwargs) -> List[Any]:
+        """
+        Returns the members of the set
+        """
+        return await self.base.assembers(key, **kwargs)
+    
+    def smismember(self, key: str, *values: Any, **kwargs) -> bool:
+        """
+        Returns whether the values are members of the set
+        """
+        return self.base.smismember(key, *values, **kwargs)
+
+    async def assmismember(self, key: str, *values: Any, **kwargs) -> bool:
+        """
+        Returns whether the values are members of the set
+        """
+        return await self.base.assmismember(key, *values, **kwargs)
+
+    def srem(self, key: str, *values: Any, **kwargs) -> int:
+        """
+        Removes the value from the set
+        """
+        return self.base.srem(key, *values, **kwargs)
+    
+    async def assrem(self, key: str, *values: Any, **kwargs) -> int:
+        """
+        Removes the value from the set
+        """
+        return await self.base.assrem(key, *values, **kwargs)
+    
+    def spop(self, key: str, **kwargs) -> Any:
+        """
+        Removes and returns a random member of the set
+        """
+        return self.base.spop(key, **kwargs)
+    
+    async def aspop(self, key: str, **kwargs) -> Any:
+        """
+        Removes and returns a random member of the set
+        """
+        return await self.base.aspop(key, **kwargs) 
+    

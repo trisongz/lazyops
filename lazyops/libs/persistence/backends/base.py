@@ -531,3 +531,173 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         Replicates the Cache from a Source
         """
         return await ThreadPooler.run_async(self.replicate_from, source, **kwargs)
+
+    """
+    Math Related Methods
+    """
+
+    def incr(self, key: str, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
+        """
+        [int/float] Increments the value of the key by the given amount
+        """
+        if isinstance(amount, int): return self.incrby(key, amount = amount, **kwargs)
+        return self.incrbyfloat(key, amount = amount, **kwargs)
+    
+    def incrby(self, key: str, amount: int = 1, **kwargs) -> int:
+        """
+        [int] Increments the value of the key by the given amount
+        """
+        raise NotImplementedError
+    
+    def incrbyfloat(self, key: str, amount: float = 1.0, **kwargs) -> float:
+        """
+        [float] Increments the value of the key by the given amount
+        """
+        raise NotImplementedError
+    
+    async def aincr(self, key: str, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
+        """
+        Increments the value of the key by the given amount
+        """
+        if isinstance(amount, int): return await self.aincrby(key, amount = amount, **kwargs)
+        return await self.aincrbyfloat(key, amount = amount, **kwargs)
+    
+    async def aincrby(self, key: str, amount: int = 1, **kwargs) -> int:
+        """
+        [int] Increments the value of the key by the given amount
+        """
+        raise NotImplementedError
+    
+    async def aincrbyfloat(self, key: str, amount: float = 1.0, **kwargs) -> float:
+        """
+        [float] Increments the value of the key by the given amount
+        """
+        raise NotImplementedError
+    
+    def decr(self, key: str, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
+        """
+        [int/float] Decrements the value of the key by the given amount
+        """
+        if isinstance(amount, int): return self.decrby(key, amount = amount, **kwargs)
+        return self.decrbyfloat(key, amount = amount, **kwargs)
+    
+    def decrby(self, key: str, amount: int = 1, **kwargs) -> int:
+        """
+        [int] Decrements the value of the key by the given amount
+        """
+        raise NotImplementedError
+    
+    def decrbyfloat(self, key: str, amount: float = 1.0, **kwargs) -> float:
+        """
+        [float] Decrements the value of the key by the given amount
+        """
+        raise NotImplementedError
+    
+    async def adecr(self, key: str, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
+        """
+        Decrements the value of the key by the given amount
+        """
+        if isinstance(amount, int): return await self.adecrby(key, amount = amount, **kwargs)
+        return await self.adecrbyfloat(key, amount = amount, **kwargs)
+    
+    async def adecrby(self, key: str, amount: int = 1, **kwargs) -> int:
+        """
+        [int] Decrements the value of the key by the given amount
+        """
+        raise NotImplementedError
+    
+    async def adecrbyfloat(self, key: str, amount: float = 1.0, **kwargs) -> float:
+        """
+        [float] Decrements the value of the key by the given amount
+        """
+        raise NotImplementedError
+
+    """
+    Set Operations
+    """
+
+    def sadd(self, key: str, *values: Any, **kwargs) -> int:
+        """
+        Adds the value to the set
+        """
+        raise NotImplementedError
+        
+    async def asadd(self, key: str, *values: Any, **kwargs) -> int:
+        """
+        Adds the value to the set
+        """
+        return await ThreadPooler.run_async(self.sadd, key, *values, **kwargs)
+    
+    def slength(self, key: str, **kwargs) -> int:
+        """
+        Returns the length of the set
+        """
+        raise NotImplementedError
+    
+    async def aslength(self, key: str, **kwargs) -> int:
+        """
+        Returns the length of the set
+        """
+        return await ThreadPooler.run_async(self.slength, key, **kwargs)
+    
+    
+    def sismember(self, key: str, value: Any, **kwargs) -> bool:
+        """
+        Returns whether the value is a member of the set
+        """
+        raise NotImplementedError
+    
+    async def asismember(self, key: str, value: Any, **kwargs) -> bool:
+        """
+        Returns whether the value is a member of the set
+        """
+        return await ThreadPooler.run_async(self.sismember, key, value, **kwargs)
+    
+    def smembers(self, key: str, **kwargs) -> List[Any]:
+        """
+        Returns the members of the set
+        """
+        raise NotImplementedError
+
+    async def assembers(self, key: str, **kwargs) -> List[Any]:
+        """
+        Returns the members of the set
+        """
+        return await ThreadPooler.run_async(self.smembers, key, **kwargs)
+
+    def smismember(self, key: str, *values: Any, **kwargs) -> bool:
+        """
+        Returns whether the values are members of the set
+        """
+        raise NotImplementedError
+    
+    async def assmismember(self, key: str, *values: Any, **kwargs) -> bool:
+        """
+        Returns whether the values are members of the set
+        """
+        return await ThreadPooler.run_async(self.smismember, key, *values, **kwargs)
+
+    def srem(self, key: str, *values: Any, **kwargs) -> int:
+        """
+        Removes the value from the set
+        """
+        raise NotImplementedError
+    
+    async def assrem(self, key: str, *values: Any, **kwargs) -> int:
+        """
+        Removes the value from the set
+        """
+        return await ThreadPooler.run_async(self.srem, key, *values, **kwargs)
+    
+    def spop(self, key: str, **kwargs) -> Any:
+        """
+        Removes and returns a random member of the set
+        """
+        raise NotImplementedError
+    
+    async def aspop(self, key: str, **kwargs) -> Any:
+        """
+        Removes and returns a random member of the set
+        """
+        return await ThreadPooler.run_async(self.spop, key, **kwargs)
+    

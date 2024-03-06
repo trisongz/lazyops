@@ -545,3 +545,72 @@ class RedisStatefulBackend(BaseStatefulBackend):
         if results: await self.aset_batch(results)
         if failed_keys: logger.warning(f'Failed to migrate keys: {failed_keys}')
         return failed_keys
+    
+    """
+    Math Related Methods
+    """
+
+    def incrby(self, key: str, amount: int = 1, **kwargs) -> int:
+        """
+        [int] Increments the value of the key by the given amount
+        """
+        if self.hset_enabled:
+            return self.cache.hincrby(self.base_key, key, amount = amount, **kwargs)
+        return self.cache.incrby(self.get_key(key), amount = amount, **kwargs)
+    
+    def incrbyfloat(self, key: str, amount: float = 1.0, **kwargs) -> float:
+        """
+        [float] Increments the value of the key by the given amount
+        """
+        if self.hset_enabled:
+            return self.cache.hincrbyfloat(self.base_key, key, amount = amount, **kwargs)
+        return self.cache.incrbyfloat(self.get_key(key), amount = amount, **kwargs)
+    
+    async def aincrby(self, key: str, amount: int = 1, **kwargs) -> int:
+        """
+        [int] Increments the value of the key by the given amount
+        """
+        if self.hset_enabled:
+            return await self.cache.async_hincrby(self.base_key, key, amount = amount, **kwargs)
+        return await self.cache.async_incrby(self.get_key(key), amount = amount, **kwargs)
+    
+    async def aincrbyfloat(self, key: str, amount: float = 1.0, **kwargs) -> float:
+        """
+        [float] Increments the value of the key by the given amount
+        """
+        if self.hset_enabled:
+            return await self.cache.async_hincrbyfloat(self.base_key, key, amount = amount, **kwargs)
+        return await self.cache.async_incrbyfloat(self.get_key(key), amount = amount, **kwargs)
+    
+    def decrby(self, key: str, amount: int = 1, **kwargs) -> int:
+        """
+        [int] Decrements the value of the key by the given amount
+        """
+        if self.hset_enabled:
+            return self.cache.hincrby(self.base_key, key, amount = (amount * -1), **kwargs)
+        return self.cache.decrby(self.get_key(key), amount = amount, **kwargs)
+
+    def decrbyfloat(self, key: str, amount: float = 1.0, **kwargs) -> float:
+        """
+        [float] Decrements the value of the key by the given amount
+        """
+        if self.hset_enabled:
+            return self.cache.hincrbyfloat(self.base_key, key, amount = (amount * -1), **kwargs)
+        return self.cache.incrbyfloat(self.get_key(key), amount = (amount * -1), **kwargs)
+    
+    async def adecrby(self, key: str, amount: int = 1, **kwargs) -> int:
+        """
+        [int] Decrements the value of the key by the given amount
+        """
+        if self.hset_enabled:
+            return await self.cache.async_hincrby(self.base_key, key, amount = (amount * -1), **kwargs)
+        return await self.cache.async_decrby(self.get_key(key), amount = amount, **kwargs)
+    
+    async def adecrbyfloat(self, key: str, amount: float = 1.0, **kwargs) -> float:
+        """
+        [float] Decrements the value of the key by the given amount
+        """
+        if self.hset_enabled:
+            return await self.cache.async_hincrbyfloat(self.base_key, key, amount = (amount * -1), **kwargs)
+        return await self.cache.async_incrbyfloat(self.get_key(key), amount = (amount * -1), **kwargs)
+
