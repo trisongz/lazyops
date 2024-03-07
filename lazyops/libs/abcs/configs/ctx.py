@@ -101,6 +101,12 @@ class ApplicationContext(abc.ABC):
         # Temp State
         self.temp_state: Dict[str, Any] = {}
 
+    @property
+    def disable_enforce_env(self) -> bool:
+        """
+        Returns whether to disable the enforce env
+        """
+        return os.getenv('DISABLE_ENFORCE_ENV', 'false').lower() in {'true', '1'}
 
     @property
     def app_env(self) -> AppEnv:
