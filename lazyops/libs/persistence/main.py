@@ -67,6 +67,13 @@ class PersistentDict(collections.abc.MutableMapping):
         self.name = name
         self.base_key = base_key
         self.settings = settings
+
+        # Allow for handling of parent/child keys
+        # Maybe do something for deeply nested keys
+        self.parent_base_key = kwargs.pop('parent_base_key', None)
+        self.child_base_key = kwargs.pop('child_base_key', None)
+        self.is_child_cache = self.child_base_key is not None
+
         self._kwargs = kwargs
         self._kwargs['serializer'] = serializer
         self._kwargs['serializer_kwargs'] = serializer_kwargs
@@ -114,6 +121,15 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         return self.base.serializer.compression_level
     
+    @property
+    def cache_save_key(self) -> str:
+        """
+        Returns the cache save key that can be used to save the cache file for globbing
+        """
+        if not self.is_child_cache: return self.base_key
+        return f'p:{self.parent_base_key}:c:{self.child_base_key}'
+        
+    
     def get_child_kwargs(self, **kwargs) -> Dict[str, Any]:
         """
         Returns the Child Kwargs
@@ -136,7 +152,7 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         base_key = f'{self.base_key}:{key}' if self.base_key else key
         base_kwargs = self.get_child_kwargs(**kwargs)
-        return self.__class__(base_key = base_key, **base_kwargs)
+        return self.__class__(base_key = base_key, parent_base_key = self.base_key, child_base_key = key, **base_kwargs)
 
 
     def get(self, key: str, default: Optional[Any] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
