@@ -83,7 +83,13 @@ def parse_one(
     else:
         args.add(f'--{name}')
         if field.json_schema_extra and field.json_schema_extra.get('alt'):
-            args.add(f'-{field.json_schema_extra["alt"]}')
+            alt = field.json_schema_extra['alt']
+            if isinstance(alt, str): alt = [alt]
+            for a in alt:
+                if not isinstance(a, str): a = str(a)
+                if not a.startswith('-'): a = f'-{a}'
+                args.add(a)
+            # args.add(f'-{field.json_schema_extra["alt"]}')
         
         elif len(name) > 3:
             if '_' in name:
