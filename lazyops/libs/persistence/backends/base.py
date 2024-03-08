@@ -659,7 +659,7 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         raise NotImplementedError
 
-    async def assembers(self, key: str, **kwargs) -> List[Any]:
+    async def asembers(self, key: str, **kwargs) -> List[Any]:
         """
         Returns the members of the set
         """
@@ -671,7 +671,7 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         raise NotImplementedError
     
-    async def assmismember(self, key: str, *values: Any, **kwargs) -> bool:
+    async def asmismember(self, key: str, *values: Any, **kwargs) -> bool:
         """
         Returns whether the values are members of the set
         """
@@ -683,7 +683,7 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         raise NotImplementedError
     
-    async def assrem(self, key: str, *values: Any, **kwargs) -> int:
+    async def asrem(self, key: str, *values: Any, **kwargs) -> int:
         """
         Removes the value from the set
         """

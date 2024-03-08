@@ -3,6 +3,7 @@ Persistence Types
 
 - Handles persistence of data with Redis or JSON+Pickle
 """
+import gc
 import atexit
 import asyncio
 import contextlib
@@ -508,11 +509,13 @@ class PersistentDict(collections.abc.MutableMapping):
                 if key in self._mutation_tracker:
                     self.base.set(key, self._mutation_tracker[key])
                     self._clear_from_mutation_tracker(key)
+        
         else:
             autologger.info(f'_save_mutation_objects: {list(self._mutation_tracker.keys())}')
             self.base.set_batch(self._mutation_tracker)
             self._mutation_tracker = {}
             self._mutation_hashes = {}
+        gc.collect()
 
     async def _asave_mutation_objects(self, *keys: str):
         """
@@ -529,6 +532,7 @@ class PersistentDict(collections.abc.MutableMapping):
             await self.base.aset_batch(self._mutation_tracker)
             self._mutation_tracker = {}
             self._mutation_hashes = {}
+        gc.collect()
 
     def __getitem__(self, key: str) -> Union[ObjectValue, List, Dict[str, Union[List, Dict]]]:
         """
@@ -747,11 +751,11 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         return self.base.smembers(key, **kwargs)
 
-    async def assembers(self, key: str, **kwargs) -> List[Any]:
+    async def asembers(self, key: str, **kwargs) -> List[Any]:
         """
         Returns the members of the set
         """
-        return await self.base.assembers(key, **kwargs)
+        return await self.base.asembers(key, **kwargs)
     
     def smismember(self, key: str, *values: Any, **kwargs) -> bool:
         """
@@ -759,11 +763,11 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         return self.base.smismember(key, *values, **kwargs)
 
-    async def assmismember(self, key: str, *values: Any, **kwargs) -> bool:
+    async def asmismember(self, key: str, *values: Any, **kwargs) -> bool:
         """
         Returns whether the values are members of the set
         """
-        return await self.base.assmismember(key, *values, **kwargs)
+        return await self.base.asmismember(key, *values, **kwargs)
 
     def srem(self, key: str, *values: Any, **kwargs) -> int:
         """
@@ -771,11 +775,11 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         return self.base.srem(key, *values, **kwargs)
     
-    async def assrem(self, key: str, *values: Any, **kwargs) -> int:
+    async def asrem(self, key: str, *values: Any, **kwargs) -> int:
         """
         Removes the value from the set
         """
-        return await self.base.assrem(key, *values, **kwargs)
+        return await self.base.asrem(key, *values, **kwargs)
     
     def spop(self, key: str, **kwargs) -> Any:
         """
