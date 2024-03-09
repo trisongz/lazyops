@@ -43,7 +43,7 @@ class UserSession(BaseModel):
         """
         Returns the TTL
         """
-        return self.expiration_ts - int(time.time())
+        return max(self.expiration_ts - int(time.time()), 0)
 
     def update(self, **kwargs):
         """
@@ -83,3 +83,10 @@ class UserSession(BaseModel):
         Deletes the Item
         """
         del self.data[key]
+
+    def __contains__(self, key: str) -> bool:
+        """
+        Returns True if the Item is in the User Session
+        """
+        return key in self.data
+    

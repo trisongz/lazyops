@@ -70,6 +70,7 @@ class UserRole(UpperStrEnum):
         """
         Returns True if the user role is equal to the other
         """
+        if other is None: other = UserRole.ANON
         if isinstance(other, int):
             return self.privilage_level == other
         if hasattr(other, 'privilage_level'):
@@ -80,6 +81,7 @@ class UserRole(UpperStrEnum):
         """
         Returns True if the user role is not equal to the other
         """
+        if other is None: other = UserRole.ANON
         if isinstance(other, int):
             return self.privilage_level != other
         if hasattr(other, 'privilage_level'):
@@ -90,6 +92,7 @@ class UserRole(UpperStrEnum):
         """
         Returns True if the user role is less than the other
         """
+        if other is None: other = UserRole.ANON
         if isinstance(other, int):
             return self.privilage_level < other
         if hasattr(other, 'privilage_level'):
@@ -100,6 +103,7 @@ class UserRole(UpperStrEnum):
         """
         Returns True if the user role is less than or equal to the other
         """
+        if other is None: other = UserRole.ANON
         if isinstance(other, int):
             return self.privilage_level <= other
         if hasattr(other, 'privilage_level'):
@@ -110,6 +114,7 @@ class UserRole(UpperStrEnum):
         """
         Returns True if the user role is greater than the other
         """
+        if other is None: other = UserRole.ANON
         if isinstance(other, int):
             return self.privilage_level > other
         if hasattr(other, 'privilage_level'):
@@ -120,6 +125,18 @@ class UserRole(UpperStrEnum):
         """
         Returns True if the user role is greater than or equal to the other
         """
+        if other is None: other = UserRole.ANON
+        if isinstance(other, int):
+            return self.privilage_level >= other
+        if hasattr(other, 'privilage_level'):
+            return self.privilage_level >= other.privilage_level
+        return self.privilage_level >= UserPrivilageLevel[other.upper()]
+    
+    def __contains__(self, other: Union[int, str, 'UserRole']) -> bool:
+        """
+        Returns True if the user role is contained in the other
+        """
+        if other is None: other = UserRole.ANON
         if isinstance(other, int):
             return self.privilage_level >= other
         if hasattr(other, 'privilage_level'):
@@ -131,5 +148,8 @@ class UserRole(UpperStrEnum):
         """
         Parses the role
         """
+        if role is None: return UserRole.ANON
         return cls(UserPrivilageIntLevel[role]) if isinstance(role, int) else cls(role)
+    
+
 

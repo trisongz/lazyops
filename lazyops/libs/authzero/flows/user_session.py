@@ -11,7 +11,7 @@ from typing import List, Optional, Any, Dict, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from fastapi import Request
-
+    from ..types.current_user import CurrentUser
 
 class UserSessionFlow(StatefulProperty[UserSession]):
     """
@@ -23,10 +23,39 @@ class UserSessionFlow(StatefulProperty[UserSession]):
 
     def __init__(
         self, 
-        session_key: str
+        user_id: str,
     ):
-        super().__init__(cache_key = session_key)
+        cache_key = self.create_hash_key(user_id) if self.settings.session_user_id_hashed else user_id
+        super().__init__(cache_key = cache_key)
+        self.user_id = user_id
 
+    @property
+    def session(self) -> UserSession:
+        """
+        Returns the Session
+        """
+        return self.resource
+    
+    @property
+    async def asession(self) -> UserSession:
+        """
+        Returns the Session
+        """
+        return await self.aresource
+    
+    @property
+    def session_data(self) -> Dict[str, Any]:
+        """
+        Returns the Session User Data
+        """
+        return self.load_data()
+    
+    @property
+    async def asession_data(self) -> Dict[str, Any]:
+        """
+        Returns the User Data
+        """
+        return await self.aload_data()
 
     def fetch(self) -> 'UserSession':
         """
@@ -59,7 +88,7 @@ class UserSessionFlow(StatefulProperty[UserSession]):
         """
         Returns the TTL
         """
-        return max(data.expiration_ts - int(time.time()), 0)
+        return data.ttl
     
     def load_data(self) -> Dict[str, Any]:
         """
@@ -79,6 +108,7 @@ class UserSessionFlow(StatefulProperty[UserSession]):
         """
         self.pdict.set(self.data_cache_key, data, ex = ex)
 
+
     async def asave_data(self, data: Dict[str, Any], ex: Optional[int] = None):
         """
         Saves the Data
@@ -89,32 +119,46 @@ class UserSessionFlow(StatefulProperty[UserSession]):
     @classmethod
     def get(
         cls, 
+        user: 'CurrentUser',
         request: 'Request',
-        *args, 
         **kwargs
     ) -> Optional[UserSession]:
         """
         Get the value
         """
-        return cls(*args, **kwargs).fetch()
+        if user.settings.session_cookie_key not in request.cookies:
+            return None
+        session_key = request.cookies[user.settings.session_cookie_key]
+        return cls(session_key).fetch()
     
     @classmethod
     async def aget(
         cls, 
+        user: 'CurrentUser',
         request: 'Request',
-        *args, 
         **kwargs
     ) -> Optional[UserSession]:
         """
         Get the value
         """
-        return await cls(*args, **kwargs).aget()
+        if user.settings.session_cookie_key not in request.cookies:
+            return None
+        session_key = request.cookies[user.settings.session_cookie_key]
+        return await cls(session_key).aget()
 
     if TYPE_CHECKING:
 
         @property
-        def _obj_(self) -> UserSession:
+        def resource(self) -> UserSession:
             """
             Returns the Object
             """
             ...
+
+        @property
+        async def aresource(self) -> UserSession:
+            """
+            Returns the Object Resource
+            """
+            ...
+        

@@ -95,3 +95,11 @@ def parse_scopes(
         else: scopes.append(scope)
     return scopes or None
 
+def normalize_audience_name(name: str) -> str:
+    """
+    Normalizes the audience name to transform the url
+
+    >>> normalize_audience_name('https://domain.us.auth0.com/userinfo')
+    'domain-us-auth0-com-userinfo'
+    """
+    return name.replace('https://', '').replace('http://', '').replace('/', '-').replace('.', '-').lower()

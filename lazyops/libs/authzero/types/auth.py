@@ -2,8 +2,9 @@
 Authentication Objects
 """
 import base64
+import httpx
 from lazyops.libs import lazyload
-from typing import Optional, List, Dict, Any, Union, Iterable
+from typing import Optional, List, Dict, Any, Union, Iterable, Generator, AsyncGenerator
 from .base import BaseModel
 from .user_data import AZUserData
 from .claims import APIKeyJWTClaims
@@ -19,9 +20,11 @@ if lazyload.TYPE_CHECKING:
 # else:
     # niquests = lazyload.LazyLoad("niquests")
 
-class AuthZeroTokenAuth:
+class AuthZeroTokenAuth(httpx.Auth):
     """
-    [niquests] Implements the AuthBase for the AuthZero HTTP Token
+    [niquests/httpx] Implements the AuthBase for the AuthZero HTTP Token
+
+    - It will always use the `Authorization` header and automatically handle token expiration
     """
 
     def __init__(
@@ -30,6 +33,9 @@ class AuthZeroTokenAuth:
     ):
         self.token_flow = token_flow
 
+    """
+    Implements the niquests logic
+    """
     def __eq__(self, other: Union[str, 'AccessToken', 'AuthZeroTokenAuth']) -> bool:
         """
         Compares the token to the other
@@ -50,6 +56,19 @@ class AuthZeroTokenAuth:
         """
         r.headers['Authorization'] = f'Bearer {self.token_flow.access_token}'
         return r
+    
+    """
+    Implements the httpx logic
+    """
+
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response, None]:
+        """
+        Implements the httpx auth flow
+        """
+        request.headers['Authorization'] = f'Bearer {self.token_flow.access_token}'
+        yield request
+
+
 
 
 

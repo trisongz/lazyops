@@ -65,6 +65,19 @@ class UserDataFlow(StatefulProperty[AZUserData]):
         """
         return data.is_expired
     
+    @property
+    def user_data(self) -> AZUserData:
+        """
+        Returns the User Data
+        """
+        return self.resource
+    
+    @property
+    async def auser_data(self) -> AZUserData:
+        """
+        Returns the User Data
+        """
+        return await self.aresource
 
     if TYPE_CHECKING:
         
@@ -95,9 +108,16 @@ class UserDataFlow(StatefulProperty[AZUserData]):
             ...
 
         @property
-        def _obj_(self) -> AZUserData:
+        def resource(self) -> AZUserData:
             """
             Returns the Object
+            """
+            ...
+
+        @property
+        async def aresource(self) -> AZUserData:
+            """
+            Returns the Object Resource
             """
             ...
 

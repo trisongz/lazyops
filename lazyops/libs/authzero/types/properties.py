@@ -60,34 +60,47 @@ class StatefulProperty(Generic[SchemaType], ABC):
         """
         if self._pdict is None:
             from lazyops.libs.authzero.utils.lazy import get_az_pdict
+            base_key = f'authzero.{self.settings.app_env.name}.{self.name}'
+            if self.settings.app_name:
+                base_key += f'.{self.settings.app_name}'
             self._pdict = get_az_pdict(
-                base_key = f'authzero.{self.settings.app_env.name}.{self.name}',
+                base_key = base_key,
                 **self._pdict_kwargs,
             )
         return self._pdict
 
     @property
-    def _obj_(self) -> SchemaType:
+    def resource(self) -> SchemaType:
         """
-        Returns the Object
+        Returns the Object Resource
         """
-        if self.__obj_ is None or (self.__obj_ is not None and self.is_expired(self.__obj_)):
-            self.__obj__ = self.fetch()
+        # if self.__obj_ is None or (self.__obj_ is not None and self.is_expired(self.__obj_)):
+        if self.__obj_ is None or self.is_expired(self.__obj_):
+            self.__obj_ = self.fetch()
+        return self.__obj_
+    
+    @property
+    async def aresource(self) -> SchemaType:
+        """
+        Returns the Object Resource
+        """
+        if self.__obj_ is None or self.is_expired(self.__obj_):
+            self.__obj_ = await self.afetch()
         return self.__obj_
 
     def __call__(self, *args, **kwargs) -> Any:
         """
         Call the proxy object
         """
-        return self._obj_(*args, **kwargs)
+        return self.resource(*args, **kwargs)
 
     def __getattr__(self, name):
         """
         Forward all unknown attributes to the proxy object
         """
-        if hasattr(self._obj_, name):
-            return getattr(self._obj_, name)
-        raise AttributeError(f"Property {name} not found")
+        if hasattr(self.resource, name):
+            return getattr(self.resource, name)
+        raise AttributeError(f"Property {name} not found in {self.name}")
 
     def fetch(self) -> SchemaType:
         """
@@ -121,7 +134,7 @@ class StatefulProperty(Generic[SchemaType], ABC):
         """
         Get the value
         """
-        return await cls(*args, **kwargs).aget()
+        return await cls(*args, **kwargs).afetch()
 
     def is_valid_type(self, data: Any) -> bool:
         """
@@ -213,5 +226,14 @@ class StatefulProperty(Generic[SchemaType], ABC):
         """
         await self.pdict.adelete(self.data_cache_key)
 
+    @classmethod
+    def create_hash_key(cls, data: Any) -> str:
+        """
+        Creates a hash for the data
+        """
+        from ..utils.helpers import get_hashed_key
+        return get_hashed_key(data)
+    
+    
     
 

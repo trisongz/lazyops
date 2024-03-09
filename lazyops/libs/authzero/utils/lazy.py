@@ -7,11 +7,16 @@ Lazy Loading Utilities
 from lazyops.libs import lazyload
 from lazyops.libs.pooler import ThreadPooler
 from lazyops.utils.logs import logger
-from typing import Any, Callable, Dict, List, Optional, Union
+from lazyops.utils.lazy import lazy_import
+from lazyops.utils.helpers import fail_after
+from typing import Any, Callable, Dict, List, Optional, Union, Type
 
 if lazyload.TYPE_CHECKING:
     from lazyops.libs.authzero.configs import AuthZeroSettings
     from kvdb import KVDBSession, PersistentDict, KVDBClient
+    from ..types import AZResource, AZResourceSchema
+    from ..flows import AZFlow, AZFlowSchema
+
 else:
     KVDBClient = lazyload.LazyLoad("kvdb.KVDBClient", package = 'kvdb')
 
@@ -52,24 +57,40 @@ def get_az_pdict(
     """
     global _az_pdicts, _az_pdict_aliases
     if base_key not in _az_pdicts and base_key not in _az_pdict_aliases:
+        s = get_az_settings()
         sess = get_az_kdb(
             'persistence',
             serializer = None,
         )
-        _az_pdicts[base_key] = sess.create_persistence(
-            base_key = base_key,
-            expiration = expiration,
-            hset_disabled = hset_disabled,
-            **kwargs,
-        )
+        if s.local_persistence_fallback:
+            try:
+                with fail_after(5):
+                    sess.ping()
+            except Exception as e:
+                logger.warning(f'Failed to connect to KVDB persistence backend, falling back to local: {e}')
+        if sess is not None:
+            _az_pdicts[base_key] = sess.create_persistence(
+                base_key = base_key,
+                expiration = expiration,
+                hset_disabled = hset_disabled,
+                **kwargs,
+            )
+        else:
+            from lazyops.libs.persistence import PersistentDict
+            _az_pdicts[base_key] = PersistentDict(
+                base_key = base_key,
+                expiration = expiration,
+                hset_disabled = hset_disabled,
+                file_path = s.data_dir.joinpath(f'{s.app_name}.cache'),
+                **kwargs,
+            )
+
         if aliases:
             for alias in aliases:
                 _az_pdict_aliases[alias] = base_key
     elif base_key in _az_pdict_aliases:
         base_key = _az_pdict_aliases[base_key]
     return _az_pdicts[base_key]
-
-
 
 
 def get_az_settings() -> 'AuthZeroSettings':
@@ -81,3 +102,63 @@ def get_az_settings() -> 'AuthZeroSettings':
         from authzero.configs import AuthZeroSettings
         _az_settings = AuthZeroSettings()
     return _az_settings
+
+
+_az_flow_schemas: Dict[str, 'AZFlowSchema'] = {
+    'user_data': 'lazyops.libs.authzero.flows.user_data.UserDataFlow',
+    'user_session': 'lazyops.libs.authzero.flows.user_session.UserSessionFlow',
+    'client_credentials': 'lazyops.libs.authzero.flows.tokens.ClientCredentialsFlow',
+    'api_client_credentials': 'lazyops.libs.authzero.flows.tokens.APIClientCredentialsFlow',
+}
+
+def get_az_flow(
+    name: str, 
+    *args, 
+    **kwargs
+) -> 'AZFlow':
+    """
+    Returns the AZFlow
+    """
+    global _az_flow_schemas
+    if name not in _az_flow_schemas:
+        raise ValueError(f"Invalid AuthZero Flow: {name}, must be one of {list(_az_flow_schemas.keys())}")
+    if isinstance(_az_flow_schemas[name], str):
+        _az_flow_schemas[name] = lazy_import(_az_flow_schemas[name])
+    return _az_flow_schemas[name](*args, **kwargs)
+
+
+_az_resource_schemas: Dict[str, 'AZResourceSchema'] = {
+    'current_user': 'lazyops.libs.authzero.types.current_user.CurrentUser',
+    'user_role': 'lazyops.libs.authzero.types.user_roles.UserRole',
+    'user_data': 'lazyops.libs.authzero.types.user_data.AZUserData',
+    'auth_object': 'lazyops.libs.authzero.types.auth.AuthObject',
+    'user_jwt_claims': 'lazyops.libs.authzero.types.claims.UserJWTClaims',
+    'api_key_jwt_claims': 'lazyops.libs.authzero.types.claims.APIKeyJWTClaims',
+    'auth_zero_token_auth': 'lazyops.libs.authzero.types.auth.AuthZeroTokenAuth',
+}
+
+def get_az_resource_schema(
+    name: str,
+) -> 'AZResourceSchema':
+    """
+    Returns the AZResource Schema
+    """
+    global _az_resource_schemas
+    if name not in _az_resource_schemas:
+        raise ValueError(f"Invalid AuthZero Resource: {name}, must be one of {list(_az_resource_schemas.keys())}")
+    if isinstance(_az_resource_schemas[name], str):
+        _az_resource_schemas[name] = lazy_import(_az_resource_schemas[name])
+    return _az_resource_schemas[name]
+
+
+def get_az_resource(
+    name: str,
+    *args, 
+    **kwargs
+) -> 'AZResource':
+    """
+    Returns the AZResource
+    """
+    schema = get_az_resource_schema(name)
+    return schema(*args, **kwargs)
+

@@ -9,6 +9,7 @@ from lazyops.libs.abcs.configs.types import AppEnv
 from ..types.properties import StatefulProperty
 from ..types.tokens import AccessToken
 from ..utils.lazy import get_az_settings, logger
+from ..utils.helpers import normalize_audience_name
 from typing import List, Optional, Any, Dict, Union, TYPE_CHECKING
 
 if lazyload.TYPE_CHECKING:
@@ -45,19 +46,41 @@ class BaseTokenFlow(StatefulProperty[AccessToken]):
 
     
     @property
+    def access_token(self) -> AccessToken:
+        """
+        Returns the Access Token
+        """
+        return self.resource
+    
+    @property
+    def token(self) -> str:
+        """
+        Returns the Access Token
+        """
+        return self.resource.access_token
+    
+    @property
+    async def atoken(self) -> str:
+        """
+        Returns the Access Token
+        """
+        return (await self.aresource).access_token
+    
+    @property
     def auth_headers(self) -> Dict[str, str]:
         """
         Returns the Auth Headers
         """
-        return {'Authorization': f'Bearer {self._obj_.access_token}'}
+        return {'Authorization': f'Bearer {self.token}'}
     
     @property
-    def access_token(self) -> str:
+    async def aauth_headers(self) -> Dict[str, str]:
         """
-        Returns the Access Token
+        Returns the Auth Headers
         """
-        return self._obj_.access_token
-
+        return {'Authorization': f'Bearer {await self.atoken}'}
+    
+    
     def load(self) -> AccessToken:
         """
         Retrieves the Access Token from the API
@@ -94,6 +117,7 @@ class BaseTokenFlow(StatefulProperty[AccessToken]):
         """
         return data.expires_in - 60
     
+
     def is_expired(self, data: AccessToken) -> bool:
         """
         Returns True if the Data is Expired
@@ -145,9 +169,16 @@ class BaseTokenFlow(StatefulProperty[AccessToken]):
             ...
 
         @property
-        def _obj_(self) -> AccessToken:
+        def resource(self) -> AccessToken:
             """
             Returns the Object
+            """
+            ...
+
+        @property
+        async def aresource(self) -> AccessToken:
+            """
+            Returns the Object Resource
             """
             ...
 
@@ -185,12 +216,13 @@ class APIClientCredentialsFlow(BaseTokenFlow):
         """
         Initializes the API Client Credentials for the Audience
         """
-        key = endpoint.split('://', 1)[-1].replace('/', '_')
+        # key = endpoint.split('://', 1)[-1].replace('/', '_')
+        key = normalize_audience_name(endpoint)
         if api_client_id: key += f'.{api_client_id}'
         if api_client_env: 
             if isinstance(api_client_env, AppEnv): api_client_env = api_client_env.name
             key += f'.{api_client_env}'
-        if audience: key += f'.{audience}'
+        if audience: key += f'.{normalize_audience_name(audience)}'
         super().__init__(
             cache_key = key,
             **kwargs,

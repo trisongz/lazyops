@@ -12,11 +12,13 @@ from lazyops.utils.logs import logger as _logger, null_logger as _null_logger, L
 from lazyops.imports._pydantic import BaseSettings
 from lazyops.libs import lazyload
 from lazyops.libs.proxyobj import ProxyObject
+
 from lazyops.libs.abcs.configs.types import AppEnv
 from lazyops.libs.fastapi_utils.types.persistence import TemporaryData
+from lazyops.libs.authzero.types.user_roles import UserRole
 from pydantic import model_validator, computed_field, Field
-from ..utils.helpers import get_hashed_key, encrypt_key, decrypt_key, aencrypt_key, adecrypt_key
-from typing import List, Optional, Dict, Any, Union, overload, TYPE_CHECKING
+from ..utils.helpers import get_hashed_key, encrypt_key, decrypt_key, aencrypt_key, adecrypt_key, normalize_audience_name
+from typing import List, Optional, Dict, Any, Union, overload, Callable, Tuple, TYPE_CHECKING
 
 if lazyload.TYPE_CHECKING:
     import niquests
@@ -57,6 +59,45 @@ def get_az_temp_data() -> TemporaryData:
         _az_temp_data = TemporaryData(lib_path.joinpath('data', 'authzero.cache'))
     return _az_temp_data
 
+class AuthZeroContextObject:
+    """
+    The Auth Zero Context
+    """
+    pre_validate_hooks: Optional[List[Callable]] = None
+    post_validate_hooks: Optional[List[Callable]] = None
+
+    validation_order: Optional[List[str]] = [
+        'session',
+        'api_key',
+        'token'
+    ]
+
+    def add_post_validate_hook(self, hook: Callable):
+        """
+        Adds a post validate hook
+        """
+        if self.post_validate_hooks is None:
+            self.post_validate_hooks = []
+        self.post_validate_hooks.append(hook)
+    
+    def add_pre_validate_hook(self, hook: Callable):
+        """
+        Adds a pre validate hook
+        """
+        if self.pre_validate_hooks is None:
+            self.pre_validate_hooks = []
+        self.pre_validate_hooks.append(hook)
+
+    def get_validation_hooks(self) -> Tuple[List[Callable], List[Callable]]:
+        """
+        Returns the validation hooks
+        """
+        return self.pre_validate_hooks.copy(), self.post_validate_hooks.copy()
+
+
+AuthZeroContext: AuthZeroContextObject = ProxyObject(
+    AuthZeroContextObject,
+)
 
 class AuthZeroSettings(BaseSettings):
     """
@@ -79,6 +120,7 @@ class AuthZeroSettings(BaseSettings):
     # Persistence
     cache_key_prefix: Optional[str] = None
     data_dir: Optional[Path] = None
+    local_persistence_fallback: Optional[bool] = True
 
     # API Keys
     api_key_prefix: Optional[str] = "xai-"
@@ -88,7 +130,10 @@ class AuthZeroSettings(BaseSettings):
     api_key_hashes: Optional[List[str]] = None
 
     # Can be a list or a dict of {key: role}
-    allowed_api_keys: Optional[Union[List[str], Dict[str, str]]] = None
+    if TYPE_CHECKING:
+        allowed_api_keys: Optional[Union[List[str], Dict[str, UserRole]]] = None
+    else:
+        allowed_api_keys: Optional[Union[str, List[str], Dict[str, str]]] = None
 
 
     # Metadata
@@ -96,6 +141,7 @@ class AuthZeroSettings(BaseSettings):
     session_enabled: Optional[bool] = None
     session_configure_enabled: Optional[bool] = None
     session_cookie_key: Optional[str] = None
+    session_user_id_hashed: Optional[bool] = True
     enable_multi_audiences: Optional[bool] = None # allow for multiple audiences to be used
 
     # App Metadata - Used to identify the app
@@ -113,10 +159,13 @@ class AuthZeroSettings(BaseSettings):
     user_data_expiration: Optional[int] = 60 * 60 # 60 mins
     user_session_expiration: Optional[int] = 60 * 60 * 24 * 30 # 30 days
 
-
     debug_enabled: Optional[bool] = False
-
     has_completed_validation: Optional[bool] = Field(None, exclude = True)
+    
+    if TYPE_CHECKING:
+        ctx: Optional[AuthZeroContextObject] = None
+    else:
+        ctx: Optional[Any] = None
 
     class Config:
         env_prefix = "AUTH_ZERO_"
@@ -210,7 +259,7 @@ class AuthZeroSettings(BaseSettings):
         """
         Returns the Cache Key
         """
-        return f'{self.get_cache_key_prefix()}.{self.client_id[-10:]}.{audience}'
+        return f'{self.get_cache_key_prefix()}.{self.client_id[-10:]}.{normalize_audience_name(audience)}'
 
 
     def create_cache_key(
@@ -310,11 +359,18 @@ class AuthZeroSettings(BaseSettings):
 
     def get_jwt_audiences(self) -> List[str]:
         """
-        v2 - Returns the JWT Audiences
+        Returns the JWT Audiences
         """
         if self.enable_multi_audiences and self.audiences:
             return self.audiences
         return [self.audience]
+
+    def add_allowed_api_key(self, key: str, role: Optional[UserRole] = None):
+        """
+        Adds an allowed api key
+        """
+        if self.allowed_api_keys is None: self.allowed_api_keys = {}
+        self.allowed_api_keys[key] = UserRole.USER if role is None else UserRole.parse_role(role)
 
     """
     Misc Properties
@@ -379,7 +435,6 @@ class AuthZeroSettings(BaseSettings):
     Validate/Configure the AuthZero Settings
     """
 
-
     def validate_audiences(self):
         """
         Validates the audience
@@ -406,6 +461,24 @@ class AuthZeroSettings(BaseSettings):
             else:
                 self.app_ingress = f'https://{self.app_ingress}'
         self.app_ingress = self.app_ingress.rstrip('/')
+
+    def validate_allowed_api_keys(self):
+        """
+        Validates the allow api keys
+        """
+        if self.allowed_api_keys is None: return
+        if isinstance(self.allowed_api_keys, str): self.allowed_api_keys = [self.allowed_api_keys]
+        # Transform it to a dict
+        if isinstance(self.allowed_api_keys, list):
+            allowed = {key: UserRole.USER for key in self.allowed_api_keys}
+            self.allowed_api_keys = allowed
+        elif isinstance(self.allowed_api_keys, dict):
+            for key in self.allowed_api_keys:
+                if self.allowed_api_keys[key] is None:
+                    self.allowed_api_keys[key] = UserRole.USER
+                elif self.allowed_api_keys[key] not in UserRole:
+                    raise ValueError(f'Invalid User Role: {self.allowed_api_keys[key]}')
+
 
     def validate_config(self):
         """
@@ -438,6 +511,7 @@ class AuthZeroSettings(BaseSettings):
         elif len(self.api_key_access_key) != 16: raise ValueError("API Key Access Key must be 16 characters")
         self.validate_audiences()
         self.validate_app_ingress()
+        self.validate_allowed_api_keys()
         # Validate Session Cookie Key
         if self.session_cookie_key is None:
             if self.app_name and self.app_env: self.session_cookie_key = f'{self.app_name}-{self.app_env.name}-session'.replace(' ', '-').lower()
@@ -453,6 +527,7 @@ class AuthZeroSettings(BaseSettings):
         """
         if self.data_dir is None: self.data_dir = lib_path.joinpath('data')
         if self.app_env is None: self.app_env = AppEnv.from_module_name('authzero')
+        if self.ctx is None: self.ctx = AuthZeroContext()
         if not self.enabled or not self.is_enabled: return self
         self.validate_config()
         return self
