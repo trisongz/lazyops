@@ -26,6 +26,28 @@ class AppEnv(str, Enum):
         if "local" in env_value: return cls.LOCAL
         raise ValueError(f"Invalid app environment: {env_value} ({type(env_value)})")
     
+    @classmethod
+    def from_module_name(cls, module_name: str) -> 'AppEnv':
+        """
+        Retrieves the app environment
+        """
+        module_name = module_name.replace(".", "_").upper()
+        for key in {
+            "SERVER_ENV",
+            f"{module_name}_ENV",
+            "APP_ENV",
+            "ENVIRONMENT",
+        }:
+            if env_value := os.getenv(key):
+                return cls.from_env(env_value)
+
+        from lazyops.utils.system import is_in_kubernetes, get_host_name
+        if is_in_kubernetes():
+            parts = get_host_name().split("-")
+            return cls.from_env(parts[2]) if len(parts) > 3 else cls.PRODUCTION
+        
+        return cls.LOCAL
+    
     def __eq__(self, other: Any) -> bool:
         """
         Equality operator
@@ -38,14 +60,14 @@ class AppEnv(str, Enum):
         """
         Returns True if the app environment is development
         """
-        return self in [AppEnv.LOCAL, AppEnv.CICD, AppEnv.DEVELOPMENT]
+        return self in [self.LOCAL, self.CICD, self.DEVELOPMENT]
 
     @property
     def is_local(self) -> bool:
         """
         Returns True if the app environment is local
         """
-        return self in [AppEnv.LOCAL, AppEnv.CICD]
+        return self in [self.LOCAL, self.CICD]
 
     @property
     def name(self) -> str:

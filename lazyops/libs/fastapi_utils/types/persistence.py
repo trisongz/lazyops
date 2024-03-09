@@ -23,7 +23,7 @@ class TemporaryData(abc.ABC):
         timeout: Optional[int] = 10,
     ):
         if not filepath: filepath = pathlib.Path(tempfile.mktemp())
-        self.filepath = filepath
+        self.filepath = pathlib.Path(filepath)
         self.filelock_path = filepath.with_suffix('.lock')
         self.timeout = timeout
         self.is_multithreaded = is_multithreaded
