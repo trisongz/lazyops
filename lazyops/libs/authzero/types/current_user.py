@@ -960,6 +960,21 @@ class CurrentUser(BaseModel):
         from ..configs.base import AuthZeroContext
         AuthZeroContext.add_pre_validate_hook(hook)
 
+    @classmethod
+    def fetch_user_data(cls, user_id: str, **kwargs) -> 'AZUserData':
+        """
+        Returns the user data
+        """
+        return cls.get_flow('user_data', user_id = user_id).get(**kwargs)
+    
+    @classmethod
+    async def afetch_user_data(cls, user_id: str, **kwargs) -> 'AZUserData':
+        """
+        Returns the user data
+        """
+        return await cls.get_flow('user_data', user_id = user_id).aget(**kwargs)
+
+
     """
     Hook Methods
     """
