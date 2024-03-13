@@ -40,6 +40,11 @@ extras = {
     'builder': [
         'pyyaml',
         'typer',
+    ],
+    'authzero': [
+        'niquests',
+        'tldextract',
+        'fastapi',
     ]
 }
 args = {

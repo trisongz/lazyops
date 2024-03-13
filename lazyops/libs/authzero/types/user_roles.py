@@ -151,5 +151,10 @@ class UserRole(UpperStrEnum):
         if role is None: return UserRole.ANON
         return cls(UserPrivilageIntLevel[role]) if isinstance(role, int) else cls(role.upper())
     
+    def __hash__(self):
+        """
+        Returns the hash of the user role
+        """
+        return hash(self.value)
 
 

@@ -10,9 +10,14 @@ from .utils.lazy import (
     get_az_mtg_api,
 )
 
-from .configs import settings as az_settings
+from .configs import AuthZeroSettings, settings as az_settings
 from .types.auth import AuthZeroTokenAuth
 from .types.user_roles import UserRole
+from .types.security import (
+    Authorization,
+    APIKey,
+)
+from .types import errors
 from .clients import (
     AuthZeroOAuthClient,
     AuthZeroAPIClient,
@@ -20,5 +25,7 @@ from .clients import (
     OptionalUser, 
     ValidUser, 
     get_current_user, 
-    require_auth_role
+    require_auth_role,
+    require_roles,
+    require_api_key,
 )

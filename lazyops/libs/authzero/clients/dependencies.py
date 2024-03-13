@@ -63,6 +63,50 @@ def require_auth_role(
         return
     return create_function_wrapper(validation_func)
 
+def require_roles(
+    roles: Union[str, List[str]],
+    require_all: Optional[bool] = False,
+    dry_run: Optional[bool] = False,
+    verbose: Optional[bool] = True,
+):
+    """
+    Creates a role validator wrapper
+    """
+    if not isinstance(roles, list): roles = [roles]
+    def validation_func(*args, **kwargs):
+        """
+        Validation Function
+        """        
+        current_user = extract_current_user(*args, **kwargs)
+        if not current_user.has_user_roles(roles, require_all = require_all):
+            if verbose: logger.info(f'User {current_user.user_id} does not have required roles: {roles} / {current_user.role}')
+            if dry_run:  return
+            raise errors.InvalidRolesException(detail = f'User {current_user.user_id} does not have required roles: {roles}')
+
+    return create_function_wrapper(validation_func)
+
+
+def require_api_key(
+    api_keys: Union[str, List[str]],
+    dry_run: Optional[bool] = False,
+    verbose: Optional[bool] = False,
+):
+    """
+    Creates an api key validator wrapper
+    """
+    if not isinstance(api_keys, list): api_keys = [api_keys]
+    def has_api_key(*args, api_key: APIKey, **kwargs):
+        """
+        Checks if the api key is valid
+        """
+        if api_key not in api_keys: 
+            if verbose: logger.info(f'`{api_key}` is not a valid api key')
+            if dry_run: return
+            raise errors.InvalidAPIKeyException(detail = f'`{api_key}` is not a valid api key')
+    
+    return create_function_wrapper(has_api_key)
+
+
 def get_current_user(
     required: Optional[bool] = True,
     roles_enabled: Optional[bool] = False,

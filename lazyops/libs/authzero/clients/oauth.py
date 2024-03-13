@@ -220,7 +220,6 @@ class AuthZeroOAuthClient(ABC):
         Gets the app redirection
         """
         if redirect.startswith('http'): return redirect
-        
         if 'docs=' in redirect:
             base_url = str(self.app.url_path_for('docs').make_absolute_url(self.app_ingress)) + '#/operations'
             redirect = redirect.replace('docs=', '')
@@ -240,6 +239,22 @@ class AuthZeroOAuthClient(ABC):
                     self.docs_schema_index[doc_name] = schema['paths'][path][method]['operationId']
 
 
+    def create_openapi_source_spec(self, spec: Dict[str, Any], spec_map: Optional[Dict[str, Any]] = None):
+        """
+        Creates the Source Spec
+
+        - Handles some custom logic for the OpenAPI Spec
+            Namely:
+            - AppResponse-Input -> AppResponse
+            - AppResponse-Output -> AppResponse
+        """
+        if not spec_map: return
+        _spec = json.dumps(spec)
+        for key, value in spec_map.items():
+            _spec = _spec.replace(key, value)
+        self.source_openapi_schema = json.loads(_spec)
+
+
     def mount_oauth_components(
         self, 
         login_path: Optional[str] = '/login',
@@ -250,6 +265,8 @@ class AuthZeroOAuthClient(ABC):
 
         enable_authorize: Optional[bool] = True,
         authorize_path: Optional[str] = '/authorize',
+
+        enable_whoami: Optional[bool] = None,
 
         include_in_schema: Optional[bool] = None,
         user_class: Optional[Type['CurrentUser']] = None,
@@ -363,7 +380,7 @@ class AuthZeroOAuthClient(ABC):
                 response.set_cookie(**current_user.get_session_cookie_kwargs())
                 return response
 
-        if self.settings.is_local_env:
+        if enable_whoami or self.settings.is_local_env:
             @router.get('/whoami')
             async def get_whoami_for_user(
                 current_user: Optional[_CurrentUser] = Depends(get_current_user(required = False, user_class = user_class)),

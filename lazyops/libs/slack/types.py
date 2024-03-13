@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pydantic import model_validator
 from lazyops.types import BaseModel, Field
 from typing import Optional, Dict, Any, Union, List
 
@@ -38,4 +39,17 @@ class SlackPayload(BaseModel):
     response_url: Optional[str] = None
     trigger_id: Optional[str] = None
     api_app_id: Optional[str] = None
+
+    ccommand: Optional[str] = None # A mutable copy of the command
+    ctext: Optional[str] = None # A mutable copy of the text
     
+    @model_validator(mode = 'after')
+    def set_mutable_context(self):
+        """
+        Sets the ctext
+        """
+        if self.text is not None: self.ctext = self.text
+        if self.command is not None: self.ccommand = self.command
+        return self
+
+        

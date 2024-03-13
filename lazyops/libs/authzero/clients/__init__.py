@@ -5,5 +5,7 @@ from .dependencies import (
     OptionalUser, 
     ValidUser, 
     get_current_user, 
-    require_auth_role
+    require_auth_role,
+    require_roles,
+    require_api_key,
 )

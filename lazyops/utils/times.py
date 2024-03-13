@@ -72,20 +72,18 @@ class Timer(abc.ABC, dict):
         # so that it won't be assumed to be empty
         self['_start'] = self.start
 
-    def dformat(
-        self,
+    @classmethod
+    def dformat_duration(
+        cls,
         duration: float,
-        pretty: bool = None,
-        short: int = None,
-        include_ms: bool = None,
+        pretty: bool = True,
+        short: int = 0,
+        include_ms: bool = False,
         as_int: bool = False,
     ) -> Dict[str, Union[float, int]]:    # sourcery skip: low-code-quality
         """
         Formats a duration (secs) into a dict
         """
-        pretty = pretty if pretty is not None else self.format_pretty
-        short = short if short is not None else self.format_short
-        include_ms = include_ms if include_ms is not None else self.format_ms
         if not pretty:
             unit = 'secs' if short else 'seconds'
             value = int(duration) if as_int else duration
@@ -128,6 +126,54 @@ class Timer(abc.ABC, dict):
             milliseconds = int(duration * 1000)
             data[unit] = milliseconds
         return data
+    
+    @classmethod
+    def pformat_duration(
+        cls,
+        duration: float,
+        pretty: bool = True,
+        short: int = 0,
+        include_ms: bool = False,
+    ) -> str:  # sourcery skip: low-code-quality
+        """
+        Formats a duration (secs) into a string
+
+        535003.0 -> 5 days, 5 hours, 50 minutes, 3 seconds
+        3593.0 -> 59 minutes, 53 seconds
+        """
+        data = cls.dformat_duration(
+            duration = duration,
+            pretty = pretty,
+            short = short,
+            include_ms = include_ms,
+            as_int = True
+        )
+        if not data: return '0 secs'
+        sep = '' if short > 1 else ' '
+        if short > 2: return ''.join([f'{v}{sep}{k}' for k, v in data.items()])
+        return ' '.join([f'{v}{sep}{k}' for k, v in data.items()]) if short else ', '.join([f'{v}{sep}{k}' for k, v in data.items()])
+
+    def dformat(
+        self,
+        duration: float,
+        pretty: bool = None,
+        short: int = None,
+        include_ms: bool = None,
+        as_int: bool = False,
+    ) -> Dict[str, Union[float, int]]:    # sourcery skip: low-code-quality
+        """
+        Formats a duration (secs) into a dict
+        """
+        pretty = pretty if pretty is not None else self.format_pretty
+        short = short if short is not None else self.format_short
+        include_ms = include_ms if include_ms is not None else self.format_ms
+        return self.dformat_duration(
+            duration,
+            pretty = pretty,
+            short = short,
+            include_ms = include_ms,
+            as_int = as_int,
+        )
 
     def pformat(
         self, 
@@ -145,17 +191,13 @@ class Timer(abc.ABC, dict):
         pretty = pretty if pretty is not None else self.format_pretty
         short = short if short is not None else self.format_short
         include_ms = include_ms if include_ms is not None else self.format_ms
-        data = self.dformat(
-            duration = duration,
+        return self.pformat_duration(
+            duration,
             pretty = pretty,
             short = short,
             include_ms = include_ms,
-            as_int = True
         )
-        if not data: return '0 secs'
-        sep = '' if short > 1 else ' '
-        if short > 2: return ''.join([f'{v}{sep}{k}' for k, v in data.items()])
-        return ' '.join([f'{v}{sep}{k}' for k, v in data.items()]) if short else ', '.join([f'{v}{sep}{k}' for k, v in data.items()])
+
 
     def checkpoint(self):
         """
