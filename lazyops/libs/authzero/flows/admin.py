@@ -10,9 +10,11 @@ from urllib.parse import urljoin
 from fastapi import HTTPException
 from lazyops.libs import lazyload
 from lazyops.libs.proxyobj import ProxyObject
+from lazyops.utils.helpers import timed_cache
 
 from ..types.errors import InvalidOperationException
 from ..types.auth import AuthZeroTokenAuth
+from ..types.clients import AuthZeroClientObject
 from ..utils.lazy import get_az_settings, logger
 from .tokens import ClientCredentialsFlow
 
@@ -61,23 +63,30 @@ class AZManagementAPI(ABC):
         self.use_http_session = use_http_session
         self._session: Optional['Session'] = None
         self._asession: Optional['AsyncSession'] = None
+
+    def get_url(self, path: str) -> str:
+        """
+        Returns the URL
+        """
+        # if path.startswith('http'): return path
+        return urljoin(self.management_api_url, path)
     
     def hget(self, path: str, **kwargs) -> 'Response':
         """
         Returns the Response
         """
         if not self.use_http_session:
-            return niquests.get(urljoin(self.management_api_url, path), auth = self.auth, **kwargs)
-        return self.session.get(urljoin(self.management_api_url, path), **kwargs)
+            return niquests.get(self.get_url(path), auth = self.auth, **kwargs)
+        return self.session.get(self.get_url(path), auth = self.auth, **kwargs)
     
     async def ahget(self, path: str, **kwargs) -> 'AsyncResponse':
         """
         Returns the Response
         """
         if self.use_http_session:
-            return await self.asession.get(urljoin(self.management_api_url, path), **kwargs)
-        async with niquests.AsyncSession(auth = self.auth) as s:
-            return await s.get(urljoin(self.management_api_url, path), **kwargs)
+            return await self.asession.get(self.get_url(path), auth = self.auth, **kwargs)
+        async with niquests.AsyncSession() as s:
+            return await s.get(self.get_url(path), auth = self.auth, **kwargs)
     
     
     def hpost(self, path: str, **kwargs) -> 'Response':
@@ -85,17 +94,34 @@ class AZManagementAPI(ABC):
         Returns the Response
         """
         if not self.use_http_session:
-            return niquests.post(urljoin(self.management_api_url, path), auth = self.auth, **kwargs)
-        return self.session.post(urljoin(self.management_api_url, path), **kwargs)
+            return niquests.post(self.get_url(path), auth = self.auth, **kwargs)
+        return self.session.post(self.get_url(path), auth = self.auth, **kwargs)
     
     async def ahpost(self, path: str, **kwargs) -> 'AsyncResponse':
         """
         Returns the Response
         """
         if self.use_http_session:
-            return await self.asession.post(urljoin(self.management_api_url, path), **kwargs)
-        async with niquests.AsyncSession(auth = self.auth) as s:
-            return await s.post(urljoin(self.management_api_url, path), **kwargs)
+            return await self.asession.post(self.get_url(path), auth = self.auth, **kwargs)
+        async with niquests.AsyncSession() as s:
+            return await s.post(self.get_url(path), auth = self.auth, **kwargs)
+
+    def hput(self, path: str, **kwargs) -> 'Response':
+        """
+        Returns the Response
+        """
+        if not self.use_http_session:
+            return niquests.put(self.get_url(path), auth = self.auth, **kwargs)
+        return self.session.put(self.get_url(path), auth = self.auth, **kwargs)
+    
+    async def ahput(self, path: str, **kwargs) -> 'AsyncResponse':
+        """
+        Returns the Response
+        """
+        if self.use_http_session:
+            return await self.asession.put(self.get_url(path), auth = self.auth, **kwargs)
+        async with niquests.AsyncSession() as s:
+            return await s.put(self.get_url(path), auth = self.auth, **kwargs)
 
     def _validate_response(self, response: Union['Response', 'AsyncResponse']):
         """
@@ -120,48 +146,15 @@ class AZManagementAPI(ABC):
         """
         Processes the Response
         """
-        # try:
-        #     response.raise_for_status()
-        # except niquests.HTTPError as e:
-        #     if e.response.status_code in {400, 404}:
-        #         raise HTTPException(status_code = e.response.status_code, detail = e.response.text) from e
-        #     operation_name = f'{self.__class__.__name__}.{inspect.stack()[1].function}'
-        #     msg = f'[{response.status_code}] Error doing `{operation_name}`'
-        #     if hasattr(self, 'user_id'):
-        #         msg += f' on user {self.user_id}'
-        #     msg += f': {e.response.text}'
-        #     logger.error(msg)
-        #     raise InvalidOperationException(detail = msg) from e
         self._validate_response(response)
         if response.content: return response.json()
-    
-    async def _aprocess_response(self, response: 'AsyncResponse') -> Optional[Union[List, Dict]]:
-        # sourcery skip: extract-method
-        """
-        Processes the Response
-        """
-        # try:
-        #     response.raise_for_status()
-        # except niquests.HTTPError as e:
-        #     if e.response.status_code in {400, 404}:
-        #         raise HTTPException(status_code = e.response.status_code, detail = await e.response.text) from e
-        #     operation_name = f'{self.__class__.__name__}.{inspect.stack()[1].function}'
-        #     msg = f'[{response.status_code}] Error doing `{operation_name}`'
-        #     if hasattr(self, 'user_id'):
-        #         msg += f' on user {self.user_id}'
-        #     msg += f': {await e.response.text}'
-        #     logger.error(msg)
-        #     raise InvalidOperationException(detail = msg) from e
-        self._validate_response(response)
-        if await response.content: return await response.json()
     
     def _404_to_empty_list(self, response: Union['Response', 'AsyncResponse']) -> Optional[List]:
         """
         Handles the Response
         """
         try:
-            return self._aprocess_response(response) if hasattr(response, 'raw') else \
-                self._process_response(response)
+            return self._process_response(response)
         except HTTPException as e:
             if e.status_code == 404: return []
             raise e
@@ -174,8 +167,7 @@ class AZManagementAPI(ABC):
         """
         if self._session is None:
             self._session = niquests.Session(
-                auth = AuthZeroTokenAuth(token_flow=self.token_flow),
-                pool_connections = 5,
+                pool_connections = 10,
                 pool_maxsize = 10,
                 retries = 5,
             )
@@ -188,15 +180,71 @@ class AZManagementAPI(ABC):
         """
         if self._asession is None:
             self._asession = niquests.AsyncSession(
-                auth = AuthZeroTokenAuth(token_flow=self.token_flow),
-                pool_connections = 5,
+                pool_connections = 10,
                 pool_maxsize = 10,
                 retries = 5,
             )
         return self._asession
-        
+    
+
+    """
+    API Methods
+    """
+
+    def get_az_client(
+        self,
+        client_id: str,
+        **kwargs
+    ) -> Optional['AuthZeroClientObject']:
+        """
+        Returns the AuthZero Client
+        """
+        response = self.hget(f'clients/{client_id}')
+        if response.status_code == 200:
+            return AuthZeroClientObject.model_validate(response.json())
+        logger.warning(f'[{response.status_code}] Error getting client: `{client_id}` {response.text}')
+        return None
+    
+
+    async def aget_az_client(
+        self,
+        client_id: str,
+        **kwargs
+    ) -> Optional['AuthZeroClientObject']:
+        """
+        Returns the AuthZero Client
+        """
+        response = await self.ahget(f'clients/{client_id}')
+        if response.status_code == 200:
+            return AuthZeroClientObject.model_validate(response.json())
+        logger.warning(f'[{response.status_code}] Error getting client: `{client_id}` {response.text}')
+        return None
+    
+    @timed_cache(600)
+    def get_service_client_name(
+        self,
+        client_id: str,
+    ) -> Optional[str]:
+        """
+        Returns the Service Client Name
+        """
+        client = self.get_az_client(client_id = client_id)
+        return None if client is None else client.name
+
+    @timed_cache(600)
+    async def aget_service_client_name(
+        self,
+        client_id: str,
+    ) -> Optional[str]:
+        """
+        Returns the Service Client Name
+        """
+        client = await self.aget_az_client(client_id = client_id)
+        return None if client is None else client.name
+
+
 
 AZManagementClient: AZManagementAPI = ProxyObject(
     AZManagementAPI,
-    obj_kwargs = {'use_http_session': True},
+    obj_kwargs = {'use_http_session': False},
 )

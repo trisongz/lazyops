@@ -30,8 +30,12 @@ class AuthZeroTokenAuth(httpx.Auth):
     def __init__(
         self,
         token_flow: Union['ClientCredentialsFlow', 'APIClientCredentialsFlow'],
+        x_api_key: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
     ):
         self.token_flow = token_flow
+        self.x_api_key = x_api_key
+        self.headers = headers or {}
 
     """
     Implements the niquests logic
@@ -40,9 +44,9 @@ class AuthZeroTokenAuth(httpx.Auth):
         """
         Compares the token to the other
         """
-        if isinstance(other, str): return self.token_flow.access_token == other
-        if hasattr(other, 'token_flow'): return self.token_flow.access_token == other.token_flow.access_token
-        return self.token_flow.access_token == getattr(other, "access_token", None)
+        if isinstance(other, str): return self.token_flow.token == other
+        if hasattr(other, 'token_flow'): return self.token_flow.token == other.token_flow.token
+        return self.token_flow.token == getattr(other, "token", None)
     
     def __ne__(self, other: Union[str, 'AccessToken', 'AuthZeroTokenAuth']) -> bool:
         """
@@ -54,7 +58,12 @@ class AuthZeroTokenAuth(httpx.Auth):
         """
         Implements the AuthZero HTTP Credential Injection
         """
-        r.headers['Authorization'] = f'Bearer {self.token_flow.access_token}'
+        r.headers['Authorization'] = f'Bearer {self.token_flow.token}'
+        if self.x_api_key is not None: r.headers['x-api-key'] = self.x_api_key
+        if self.headers: 
+            for key, value in self.headers.items():
+                if key not in r.headers: r.headers[key] = value
+        # print(r.headers)
         return r
     
     """
@@ -65,10 +74,12 @@ class AuthZeroTokenAuth(httpx.Auth):
         """
         Implements the httpx auth flow
         """
-        request.headers['Authorization'] = f'Bearer {self.token_flow.access_token}'
+        request.headers['Authorization'] = f'Bearer {self.token_flow.token}'
+        if self.x_api_key is not None: request.headers['x-api-key'] = self.x_api_key
+        if self.headers: 
+            for key, value in self.headers.items():
+                if key not in request.headers: request.headers[key] = value
         yield request
-
-
 
 
 
@@ -91,6 +102,13 @@ class AuthObject(BaseModel):
         Returns True if the X-API-Key is Present
         """
         return bool(self.x_api_key)
+    
+    @property
+    def has_both_auth(self) -> bool:
+        """
+        Returns True if the Auth Token and X-API-Key are Present
+        """
+        return self.has_auth_token and self.has_x_api_key
     
     @classmethod
     def get_auth_token(cls, data: Union['Headers', Dict[str, str]], settings: Optional['AuthZeroSettings'] = None) -> Optional[str]:
@@ -181,7 +199,7 @@ class AuthObject(BaseModel):
     
 
 
-class ApiKeyData(BaseModel):
+class APIKeyData(BaseModel):
     """
     The stored API Key Data
     """

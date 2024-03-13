@@ -149,7 +149,7 @@ class UserRole(UpperStrEnum):
         Parses the role
         """
         if role is None: return UserRole.ANON
-        return cls(UserPrivilageIntLevel[role]) if isinstance(role, int) else cls(role)
+        return cls(UserPrivilageIntLevel[role]) if isinstance(role, int) else cls(role.upper())
     
 
 

@@ -24,6 +24,7 @@ class TemporaryData(abc.ABC):
     ):
         if not filepath: filepath = pathlib.Path(tempfile.mktemp())
         self.filepath = pathlib.Path(filepath)
+        self.filepath.parent.mkdir(parents = True, exist_ok = True)
         self.filelock_path = filepath.with_suffix('.lock')
         self.timeout = timeout
         self.is_multithreaded = is_multithreaded

@@ -5,13 +5,18 @@ Hash Utilities
 """
 
 import uuid
+import hashlib
+import base64
 from pydantic import ValidationError
 from lazyops.libs import lazyload
 from lazyops.libs.pooler import ThreadPooler
-from typing import Any, Optional, List
+from lazyops.utils.helpers import lazy_import
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
+from typing import Any, Optional, List, Dict
 
 if lazyload.TYPE_CHECKING:
     import xxhash
+    import jose
     from Cryptodome.Cipher import AES
     from fastapi import Request
     from fastapi.datastructures import Headers
@@ -20,10 +25,16 @@ if lazyload.TYPE_CHECKING:
 
 else:
     xxhash = lazyload.LazyLoad("xxhash")
-    AES = lazyload.LazyLoad("Cryptodome.Cipher.AES", package = 'pycryptodomex')
-    jose = lazyload.LazyLoad('jose')
-    jwt = lazyload.LazyLoad('jose.jwt')
-    JWTError = lazyload.LazyLoad('jose.exceptions.JWTError')
+    # jose = lazyload.LazyLoad('jose')
+    # jwt = jose.jwt
+    # JWTError = jose.JWTError
+    jwt = lazy_import('jose.jwt', is_module=True, allow_module=True)
+    JWTError = lazy_import('jose.exceptions.JWTError')
+    AES = lazy_import('Cryptodome.Cipher.AES', is_module=True, allow_module=True)
+    # AES = lazyload.LazyLoad("Cryptodome.Cipher.AES", package = 'pycryptodomex')
+
+    # jwt = lazyload.LazyLoad('jose.jwt')
+    # JWTError = lazyload.LazyLoad('jose.exceptions.JWTError')
 
 def create_uuid() -> str:
     """
@@ -35,7 +46,8 @@ def get_hashed_key(key: Any) -> str:
     """
     Returns a Hashed Key
     """
-    return xxhash.xxh128_hexdigest(str(key).encode())
+    return hashlib.sha256(str(key).encode()).hexdigest()
+    # return xxhash.xxh128_hexdigest(str(key).encode())
 
 def resize_key(key: str, length: int = 16) -> str:
     """
@@ -103,3 +115,19 @@ def normalize_audience_name(name: str) -> str:
     'domain-us-auth0-com-userinfo'
     """
     return name.replace('https://', '').replace('http://', '').replace('/', '-').replace('.', '-').lower()
+
+def create_code_challenge(secret_key: str) -> str:
+    """
+    Creates a code challenge
+    """
+    return base64.urlsafe_b64encode(hashlib.sha256(secret_key.encode()).digest()).decode().rstrip('=')
+
+def encode_params_to_url(params: Dict[str, Any], url: str) -> str:
+    """
+    Encodes the params to a url
+    """
+    url_parts = list(urlparse(url))
+    query = dict(parse_qsl(url_parts[4]))
+    query.update(params)
+    url_parts[4] = urlencode(query)
+    return urlunparse(url_parts)

@@ -15,9 +15,11 @@ from lazyops.libs.proxyobj import ProxyObject
 
 from lazyops.libs.abcs.configs.types import AppEnv
 from lazyops.libs.fastapi_utils.types.persistence import TemporaryData
-from lazyops.libs.authzero.types.user_roles import UserRole
 from pydantic import model_validator, computed_field, Field
+
+from ..types.user_roles import UserRole
 from ..utils.helpers import get_hashed_key, encrypt_key, decrypt_key, aencrypt_key, adecrypt_key, normalize_audience_name
+
 from typing import List, Optional, Dict, Any, Union, overload, Callable, Tuple, TYPE_CHECKING
 
 if lazyload.TYPE_CHECKING:
@@ -63,8 +65,9 @@ class AuthZeroContextObject:
     """
     The Auth Zero Context
     """
-    pre_validate_hooks: Optional[List[Callable]] = None
-    post_validate_hooks: Optional[List[Callable]] = None
+    pre_validate_hooks: Optional[List[Callable]] = []
+    post_validate_hooks: Optional[List[Callable]] = []
+    configured_validators: List[str] = []
 
     validation_order: Optional[List[str]] = [
         'session',
@@ -117,7 +120,11 @@ class AuthZeroSettings(BaseSettings):
     domain: Optional[str] = None
     jwks_dict: Optional[Dict[str, Any]] = None
 
+    admin_emails: Optional[List[str]] = None
+    staff_email_domains: Optional[List[str]] = None
+
     # Persistence
+    base_cache_key: Optional[str] = 'authzero'
     cache_key_prefix: Optional[str] = None
     data_dir: Optional[Path] = None
     local_persistence_fallback: Optional[bool] = True
@@ -131,7 +138,7 @@ class AuthZeroSettings(BaseSettings):
 
     # Can be a list or a dict of {key: role}
     if TYPE_CHECKING:
-        allowed_api_keys: Optional[Union[List[str], Dict[str, UserRole]]] = None
+        allowed_api_keys: Optional[Union[List[str], Dict[str, Dict[str, Union[str, UserRole]]]]] = None
     else:
         allowed_api_keys: Optional[Union[str, List[str], Dict[str, str]]] = None
 
@@ -150,14 +157,23 @@ class AuthZeroSettings(BaseSettings):
     app_ingress: Optional[str] = None
     app_client_id: Optional[str] = None
 
+    app_scopes: Optional[List[str]] = None
+
     # API Clients
     api_client_id_header_key: Optional[str] = 'x-az-client-id'
     api_client_env_header_key: Optional[str] = 'x-az-client-env'
     api_client_api_key_prefix: Optional[str] = 'xaic-'
 
     # Expirations
-    user_data_expiration: Optional[int] = 60 * 60 # 60 mins
+    user_data_expiration: Optional[int] = 60 * 60 * 24 * 7 # 7 days
     user_session_expiration: Optional[int] = 60 * 60 * 24 * 30 # 30 days
+    
+    # Hook Configurations
+    user_session_enabled: Optional[bool] = True
+    user_request_id_enabled: Optional[bool] = True
+    user_domain_source_enabled: Optional[bool] = False
+    user_role_configure_enabled: Optional[bool] = True
+
 
     debug_enabled: Optional[bool] = False
     has_completed_validation: Optional[bool] = Field(None, exclude = True)
@@ -165,7 +181,7 @@ class AuthZeroSettings(BaseSettings):
     if TYPE_CHECKING:
         ctx: Optional[AuthZeroContextObject] = None
     else:
-        ctx: Optional[Any] = None
+        ctx: Optional[Any] = AuthZeroContext
 
     class Config:
         env_prefix = "AUTH_ZERO_"
@@ -272,10 +288,12 @@ class AuthZeroSettings(BaseSettings):
         """
         Creates a Cache Key based on the Prefix, Suffix, and Kind
         """
-        assert prefix is not None or kind is not None, "Either prefix or kind must be specified"
+        # assert prefix is not None or kind is not None, "Either prefix or kind must be specified"
         cache_key_prefix = None
         if prefix is not None: cache_key_prefix = prefix
-        else: cache_key_prefix = f'{self.get_cache_key_prefix()}.{kind}'
+        elif kind is not None: cache_key_prefix = f'{self.get_cache_key_prefix()}.{kind}'
+        else: cache_key_prefix = self.get_cache_key_prefix()
+        # else: cache_key_prefix = f'{self.get_cache_key_prefix()}.{kind}'
         if include_client_id: cache_key_prefix = f'{cache_key_prefix}.{self.client_id[-10:]}'
         if suffix is not None: cache_key_prefix = f'{cache_key_prefix}.{suffix}'
         return cache_key_prefix
@@ -462,6 +480,24 @@ class AuthZeroSettings(BaseSettings):
                 self.app_ingress = f'https://{self.app_ingress}'
         self.app_ingress = self.app_ingress.rstrip('/')
 
+    def parse_allowed_api_key(self, api_key: str) -> Tuple[str, str, UserRole]:
+        """
+        Parses the allowed api key
+
+        Formats: 
+        - {api_key}:{client_name}:{role}
+        - {api_key}:{client_name}
+        - {api_key}
+        """
+        parts = api_key.split(':')
+        if len(parts) == 3:
+            return parts[0], parts[1], UserRole.parse_role(parts[2])
+        elif len(parts) == 2:
+            return parts[0], parts[1], UserRole.API_CLIENT
+        else:
+            return api_key, 'default', UserRole.API_CLIENT
+
+
     def validate_allowed_api_keys(self):
         """
         Validates the allow api keys
@@ -470,15 +506,45 @@ class AuthZeroSettings(BaseSettings):
         if isinstance(self.allowed_api_keys, str): self.allowed_api_keys = [self.allowed_api_keys]
         # Transform it to a dict
         if isinstance(self.allowed_api_keys, list):
-            allowed = {key: UserRole.USER for key in self.allowed_api_keys}
-            self.allowed_api_keys = allowed
+            allowed_api_keys = {}
+            for allowed_api_key in self.allowed_api_keys:
+                key, client_name, role = self.parse_allowed_api_key(allowed_api_key)
+                allowed_api_keys[key] = {
+                    'client_name': client_name,
+                    'role': role,
+                }
+            # allowed = {key: UserRole.USER for key in self.allowed_api_keys}
+            self.allowed_api_keys = allowed_api_keys
         elif isinstance(self.allowed_api_keys, dict):
-            for key in self.allowed_api_keys:
-                if self.allowed_api_keys[key] is None:
-                    self.allowed_api_keys[key] = UserRole.USER
-                elif self.allowed_api_keys[key] not in UserRole:
-                    raise ValueError(f'Invalid User Role: {self.allowed_api_keys[key]}')
+            # allowed_api_keys = {}
+            for key, value in self.allowed_api_keys.items():
+                if isinstance(value, str):  
+                    self.allowed_api_keys[key] = {
+                        'client_name': 'default',
+                        'role': UserRole.parse_role(value),
+                    }
+                elif isinstance(value, dict) and 'role' not in value and 'client_name' not in value:
+                    self.allowed_api_keys[key] = {
+                        'client_name': value.get('client_name', 'default'),
+                        'role': UserRole.parse_role(value.get('role', 'API_CLIENT')),
+                    }
+                
+                # allowed_api_keys[key] = value
+            # for key in self.allowed_api_keys:
+            #     if self.allowed_api_keys[key] is None:
+            #         self.allowed_api_keys[key] = UserRole.USER
+            #     elif self.allowed_api_keys[key] not in UserRole:
+            #         raise ValueError(f'Invalid User Role: {self.allowed_api_keys[key]}')
 
+    def validate_app_scopes(self):
+        """
+        Validates the app scopes
+        """
+        if self.app_scopes is None: 
+            self.app_scopes = ['openid', 'profile', 'email']
+            return
+        if not isinstance(self.app_scopes, list): self.app_scopes = [self.app_scopes]
+        else: self.app_scopes = list(set(self.app_scopes))
 
     def validate_config(self):
         """
@@ -512,6 +578,7 @@ class AuthZeroSettings(BaseSettings):
         self.validate_audiences()
         self.validate_app_ingress()
         self.validate_allowed_api_keys()
+        self.validate_app_scopes()
         # Validate Session Cookie Key
         if self.session_cookie_key is None:
             if self.app_name and self.app_env: self.session_cookie_key = f'{self.app_name}-{self.app_env.name}-session'.replace(' ', '-').lower()
@@ -527,7 +594,7 @@ class AuthZeroSettings(BaseSettings):
         """
         if self.data_dir is None: self.data_dir = lib_path.joinpath('data')
         if self.app_env is None: self.app_env = AppEnv.from_module_name('authzero')
-        if self.ctx is None: self.ctx = AuthZeroContext()
+        if self.ctx is None: self.ctx = AuthZeroContext
         if not self.enabled or not self.is_enabled: return self
         self.validate_config()
         return self

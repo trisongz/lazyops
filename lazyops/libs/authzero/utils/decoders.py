@@ -7,7 +7,7 @@ Token Decoding Utilities
 from pydantic import ValidationError
 from lazyops.libs import lazyload
 from lazyops.libs.pooler import ThreadPooler
-from .lazy import get_az_settings
+from .lazy import get_az_settings, get_az_resource
 from typing import Any, Optional, List
 
 if lazyload.TYPE_CHECKING:
@@ -47,8 +47,9 @@ def decode_token(
             err = e
     if jwt_claim is None:
         from ..types.errors import InvalidTokenException
-        raise InvalidTokenException(detail = str(err)) from err
-    return UserJWTClaims(**jwt_claim)
+        raise InvalidTokenException(error = e) from err
+    return get_az_resource('user_jwt_claims', **jwt_claim)
+    # return UserJWTClaims(**jwt_claim)
 
 def decode_token_v1(
     request: Optional['Request'] = None, 
@@ -74,7 +75,7 @@ def decode_token_v1(
         )
     except (JWTError, ValidationError) as e:
         from ..types.errors import InvalidTokenException
-        raise InvalidTokenException(detail = str(e)) from e
+        raise InvalidTokenException(error = e) from e
     return claims
 
 
@@ -90,7 +91,7 @@ def get_auth_token(headers: 'Headers') -> str:
         if scheme.lower() == settings.authorization_scheme:
             return param
     from ..types.errors import NoTokenException
-    raise NoTokenException()
+    raise NoTokenException(detail = f'No Valid Authorization found on `{settings.authorization_header}')
 
 
 def get_auth_token_v1(headers: 'Headers'):
@@ -103,4 +104,4 @@ def get_auth_token_v1(headers: 'Headers'):
         if scheme.lower() == "bearer":
             return param
     from ..types.errors import NoTokenException
-    raise NoTokenException()
+    raise NoTokenException(detail = 'Invalid Authorization Header')

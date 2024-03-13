@@ -35,8 +35,10 @@ class BaseTokenFlow(StatefulProperty[AccessToken]):
         """
         Initializes the Token Flow
         """
+        cache_key = kwargs.pop('cache_key', None)
+        cache_key = cache_key or self.settings.create_cache_key(audience)
         super().__init__(
-            cache_key = self.settings.get_cache_key(audience),
+            cache_key = cache_key,
             **kwargs,
         )
         self.audience = audience
@@ -91,6 +93,7 @@ class BaseTokenFlow(StatefulProperty[AccessToken]):
             'audience': self.audience,
             'grant_type': 'client_credentials',
         }
+        logger.info(f'Retrieving Access Token from {self.oauth_url}')
         response = niquests.post(self.oauth_url, data = data)
         response.raise_for_status()
         return AccessToken(**response.json())
@@ -105,6 +108,7 @@ class BaseTokenFlow(StatefulProperty[AccessToken]):
             'audience': self.audience,
             'grant_type': 'client_credentials',
         }
+        # logger.info(f'Retrieving Access Token from {self.oauth_url}')
         async with niquests.AsyncSession() as s:
             response = await s.post(self.oauth_url, data = data)
             response.raise_for_status()
@@ -224,13 +228,13 @@ class APIClientCredentialsFlow(BaseTokenFlow):
             key += f'.{api_client_env}'
         if audience: key += f'.{normalize_audience_name(audience)}'
         super().__init__(
+            audience = audience or self.settings.management_api_url,
+            client_id = client_id or self.settings.client_id,
+            client_secret = client_secret or self.settings.client_secret,
+            oauth_url = oauth_url or self.settings.oauth_url,
             cache_key = key,
             **kwargs,
         )
-        self.audience = audience or self.settings.management_api_url
-        self.client_id = client_id or self.settings.client_id
-        self.client_secret = client_secret or self.settings.client_secret
-        self.oauth_url = oauth_url or self.settings.oauth_url
         self.endpoint = endpoint
 
     """

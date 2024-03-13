@@ -11,14 +11,18 @@ class Token(BaseModel):
     token_type: str
     expires_in: int
     expiration_ts: Optional[int] = None
+    issued_at: Optional[int] = None
 
     @model_validator(mode = 'after')
     def validate_expiration(self):
         """
         Validates the expiration
         """
-        if not self.expiration_ts:
-            self.expiration_ts = int(time.time()) + (self.expires_in - 45)
+        if self.issued_at is None:
+            self.issued_at = int(time.time())
+        if self.expiration_ts is None:
+            # self.expiration_ts = self.issued_at + 30
+            self.expiration_ts = self.issued_at + (self.expires_in - 30)
         return self
         
 

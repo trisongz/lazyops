@@ -34,6 +34,14 @@ class BaseClaims(BaseModel):
         return self.scope.split(' ')
 
 
+class APIKeyJWTClaims(BaseClaims):
+    """
+    API Key JWT Claims
+    """
+
+    model_config = {'extra': 'ignore', 'arbitrary_types_allowed': True}
+
+
 class UserJWTClaims(BaseClaims):
     """
     User JWT Claims
@@ -48,10 +56,8 @@ class UserJWTClaims(BaseClaims):
         """
         return self.exp < (int(time.time()) - 45)
 
-
-class APIKeyJWTClaims(BaseClaims):
-    """
-    API Key JWT Claims
-    """
-
-    model_config = {'extra': 'ignore', 'arbitrary_types_allowed': True}
+    def to_api_key_claims(self) -> 'APIKeyJWTClaims':
+        """
+        Converts the User JWT Claims to an API Key JWT Claims
+        """
+        return APIKeyJWTClaims.model_validate(self, from_attributes=True)

@@ -23,7 +23,10 @@ class UserDataFlow(StatefulProperty[AZUserData]):
         user_id: str,
         **kwargs,
     ):
-        if '@clients' in user_id: user_id = user_id.split('@clients')[0]
+        self.is_client_id: Optional[bool] = False
+        if '@clients' in user_id: 
+            user_id = user_id.split('@clients')[0]
+            self.is_client_id = True
         cache_key = self.settings.create_cache_key(
             prefix = self.cache_key_prefix,
             suffix = user_id,
@@ -41,7 +44,9 @@ class UserDataFlow(StatefulProperty[AZUserData]):
         """
         Retrieves the User Data
         """
-        response = self.mtg.hget(f'/users/{self.user_id}')
+        if self.is_client_id:
+            return AZUserData(user_id = self.user_id, user_metadata = {}, app_metadata = {})
+        response = self.mtg.hget(f'users/{self.user_id}')
         result = self.mtg._process_response(response)
         return AZUserData(**result)
 
@@ -49,21 +54,25 @@ class UserDataFlow(StatefulProperty[AZUserData]):
         """
         Loads the User Data
         """
-        response = await self.mtg.ahget(f'/users/{self.user_id}')
-        result = await self.mtg._aprocess_response(response)
+        if self.is_client_id:
+            return AZUserData(user_id = self.user_id, user_metadata = {}, app_metadata = {})
+        response = await self.mtg.ahget(f'users/{self.user_id}')
+        result = self.mtg._process_response(response)
         return AZUserData(**result)
     
     def get_ttl(self, data: AZUserData) -> int:
         """
         Returns the TTL
         """
-        return data.expiration_ts - int(time.time())
+        return None if self.is_client_id else self.settings.user_data_expiration or 60
+        # return data.expiration_ts - int(time.time())
 
     def is_expired(self, data: AZUserData) -> bool:
         """
         Returns True if the Data is Expired
         """
-        return data.is_expired
+        # self.settings.autologger.info(f'Checking if User Data is Expired: {self.user_id}: {data.is_expired}')
+        return False if self.is_client_id else data.is_expired
     
     @property
     def user_data(self) -> AZUserData:

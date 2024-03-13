@@ -5,7 +5,8 @@ User data model for Auth0
 """
 
 import time
-from pydantic import BaseModel, Field, model_validator
+from .base import BaseModel
+from pydantic import Field, model_validator
 from typing import Dict, Optional, List, Any
 
 class UserDataBase(BaseModel):
@@ -38,7 +39,8 @@ class AZUserData(UserDataBase):
         """
         Sets the Expiration Timestamp
         """
-        if not self.expiration_ts: self.expiration_ts = int(time.time()) + 60
+        if self.expiration_ts is None: 
+            self.expiration_ts = int(time.time()) + (self.settings.user_data_expiration or 60)
         return self
     
 

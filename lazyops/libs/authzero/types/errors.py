@@ -2,152 +2,249 @@
 Exceptions
 """
 
+import traceback
 from lazyops.libs import lazyload
+from typing import List, Optional
+
 if lazyload.TYPE_CHECKING:
-    from fastapi import HTTPException
+    import fastapi
+    # from fastapi import HTTPException
 else:
-    HTTPException = lazyload.LazyLoad("fastapi.HTTPException")
+    fastapi = lazyload.LazyLoad("fastapi")
+    # HTTPException = lazyload.LazyLoad("fastapi.HTTPException")
 
-class ExpiredJWTException(HTTPException):
+class AuthZeroException(fastapi.HTTPException):
     """
-    Exception for expired JWT
+    Base Auth Zero Exception
     """
-    def __init__(self, detail: str = None, **kwargs):
+
+    base: Optional[str] = None
+    concat_detail: Optional[bool] = True
+    verbose: Optional[int] = None
+    default_status_code: Optional[int] = 400
+
+    log_error: Optional[bool] = False # Always log the error message
+    log_devel: Optional[bool] = False # Log the error message if in development mode
+
+    def __init__(self, detail: str = None, error: Optional[Exception] = None, status_code: Optional[int] = None, **kwargs):
         """
         Constructor
         """
-        super().__init__(status_code=401, detail=detail or 'Expired JWT', **kwargs)
+        from ..configs import settings
+        message = ""
+        if not detail or self.concat_detail:
+            message += f"{self.base}: " or ''
+        if detail: message += detail
+        if error and self.verbose is not None:
+            if self.verbose >= 1:
+                message += f"\nError: {error}"
+            elif self.verbose <= 5:
+                message += f"\nError: {error}\nTraceback: {traceback.format_exc()}"
+        status_code = status_code or self.default_status_code
+        super().__init__(status_code=status_code, detail=message, **kwargs)
+        if self.log_error or (self.log_devel and settings.is_development_env):
+            self.display(message, status_code)
 
-class InvalidJWTException(HTTPException):
-    """
-    Exception for invalid JWT
-    """
-    def __init__(self, detail: str = None, **kwargs):
+    def display(self, message: str, status_code: int):
         """
-        Constructor
+        Displays the error
         """
-        super().__init__(status_code=401, detail=detail or 'Invalid JWT', **kwargs)
-    
-
-class InvalidOperationException(HTTPException):
-    """
-    Exception for invalid operation
-    """
-    def __init__(self, detail: str = None, **kwargs):
-        """
-        Constructor
-        """
-        super().__init__(status_code=400, detail=detail or 'Invalid Operation', **kwargs)
-
-
-class InvalidTokenException(HTTPException):
-    """
-    Exception for invalid token
-    """
-    def __init__(self, detail: str = None, **kwargs):
-        """
-        Constructor
-        """
-        super().__init__(status_code=401, detail = f'Invalid Token: {detail}', **kwargs)
-
-class NoTokenException(HTTPException):
-    """
-    Exception for no token
-    """
-    def __init__(self, detail: str = None, **kwargs):
-        """
-        Constructor
-        """
-        detail = detail or 'Not Authorized: no auth token found'
-        super().__init__(status_code=401, detail = detail, **kwargs)
+        from ..utils.lazy import logger
+        logger.error(f'[{self.__class__.__name__} - {status_code}]: {message}')
 
 
-class NoAPIKeyException(HTTPException):
+class ExpiredJWTException(AuthZeroException):
     """
-    Exception for no API Key
+    Expired JWT Exception
     """
+    base = "Expired JWT"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 401
+
+class InvalidJWTException(AuthZeroException):
+    """
+    Invalid JWT Exception
+    """
+    base = "Invalid JWT"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 401
+
+class InvalidOperationException(AuthZeroException):
+    """
+    Invalid Operation Exception
+    """
+    base = "Invalid Operation"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 400
+
+class InvalidTokenException(AuthZeroException):
+    """
+    Invalid Token Exception
+    """
+    base = "Invalid Token"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 401
+
+class NoTokenException(AuthZeroException):
+    """
+    No Token Exception
+    """
+    base = "Not Authorized: no auth token found"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 401
+
+
+class NoAPIKeyException(AuthZeroException):
+    """
+    No API Key Exception
+    """
+    base = "Not Authorized"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 401
+
     def __init__(self, key: str = 'x-api-key', detail: str = None, **kwargs):
         """
         Constructor
         """
-        detail = detail or f'Not Authorized: no `{key}` found'
-        super().__init__(status_code=401, detail = detail, **kwargs)
+        self.base += f' no `{key}` found'
+        super().__init__(detail = detail, **kwargs)
+
+class InvalidAPIKeyException(AuthZeroException):
+    """
+    Invalid API Key Exception
+    """
+    base = "Invalid API Key"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 401
+
+class InvalidAPIKeyPrefixException(AuthZeroException):
+    """
+    Invalid API Key Prefix Exception
+    """
+    base = "Invalid API Key Prefix. Your API Key may be deprecated. Please regenerate your API Key by logging in again"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 401
+
+class InvalidAPIKeySecretException(AuthZeroException):
+    """
+    Invalid API Key Secret Exception
+    """
+    base = "Invalid API Key. Your API Key may not belong to the correct application / environment. Please regenerate your API Key by logging in again"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 401
+
+class InsufficientPermissionsException(AuthZeroException):
+    """
+    Insufficient Permissions Exception
+    """
+    base = "Insufficient Permissions"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 403
+
+class InvalidAuthorizationException(AuthZeroException):
+    """
+    Invalid Authorization Exception
+    """
+    base = "Invalid Authorization"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 403
+
+class ExpiredSesssionException(AuthZeroException):
+    """
+    Expired Session Exception
+    """
+    base = "Session Expired. Please log in again"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 403
+
+class AuthorizationException(AuthZeroException):
+    """
+    Authorization Exception
+    """
+    base = "Authorization Failed"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 403
 
 
-class InvalidAPIKeyException(HTTPException):
+class InvalidRoleException(AuthZeroException):
     """
-    Exception for invalid API Key
+    Invalid Role Exception
     """
-    def __init__(self, detail: str = None, **kwargs):
-        """
-        Constructor
-        """
-        detail = detail or 'Invalid API Key'
-        super().__init__(status_code=401, detail = detail, **kwargs)
+    base = "User does not have role"
+    concat_detail = False
+    log_devel = True
+    default_status_code = 403
 
-class InvalidAPIKeyPrefixException(HTTPException):
-    """
-    Exception for invalid API Key prefix
-    """
-    def __init__(self, detail: str = None, **kwargs):
+    def __init__(self, role: str):
         """
-        Constructor
+        Initializes the invalid role exception
         """
-        detail = detail or 'Invalid API Key Prefix. Your API Key may be deprecated. Please regenerate your API Key by logging in again.'
-        super().__init__(status_code=401, detail = detail, **kwargs)
+        detail = f'User does not have role `{role}`'
+        super().__init__(detail = detail)
 
-class InvalidAPIKeySecretException(HTTPException):
+class InvalidRolesException(AuthZeroException):
     """
-    Exception for invalid API Key secret
+    Invalid Roles Exception
     """
-    def __init__(self, detail: str = None, **kwargs):
-        """
-        Constructor
-        """
-        detail = detail or 'Invalid API Key. Your API Key may not belong to the correct application / environment. Please regenerate your API Key by logging in again.'
-        super().__init__(status_code=401, detail = detail, **kwargs)
+    base = "User does not have sufficient roles"
+    concat_detail = False
+    log_devel = True
+    default_status_code = 403
 
-class InsufficientPermissionsException(HTTPException):
-    """
-    Exception for insufficient permissions
-    """
-    def __init__(self, detail: str = None, **kwargs):
+    def __init__(self, roles: List[str], require_all: bool = False):
         """
-        Constructor
+        Initializes the invalid roles exception
         """
-        detail = detail or 'Insufficient Permissions'
-        super().__init__(status_code=403, detail = detail, **kwargs)
-
-class InvalidAuthorizationException(HTTPException):
-    """
-    Exception for invalid authorization
-    """
-    def __init__(self, detail: str = None, **kwargs):
-        """
-        Constructor
-        """
-        detail = detail or 'Invalid Authorization'
-        super().__init__(status_code=403, detail = detail, **kwargs)
-
-class ExpiredSessionException(HTTPException):
-    """
-    Exception for expired session
-    """
-    def __init__(self, detail: str = None, **kwargs):
-        """
-        Constructor
-        """
-        detail = detail or 'Session Expired. Please log in again.'
-        super().__init__(status_code=403, detail = detail, **kwargs)
+        detail = f'User does not have sufficient roles `{roles}`' if require_all else f'User does not have any of the roles `{roles}`'
+        super().__init__(detail = detail)
 
 
-class AuthorizationException(HTTPException):
+class InvalidAuthRoleException(AuthZeroException):
     """
-    Exception for authorization
+    Invalid Auth Role Exception
     """
-    def __init__(self, detail: str = None, status_code: int = 403, **kwargs):
-        """
-        Constructor
-        """
-        detail = detail or f'Authorization Failed: {detail}'
-        super().__init__(status_code = status_code, detail = detail, **kwargs)
+    base = "Invalid Auth Role"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 403
+
+class NoUserException(AuthZeroException):
+    """
+    No User Exception
+    """
+    base = "Unauthorized: no user found"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 401
+
+class InvalidAPIKeyException(AuthZeroException):
+    """
+    Invalid API Key Exception
+    """
+    base = "Invalid API Key"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 403
+
+class ExpiredAPIKeyData(AuthZeroException):
+    """
+    Expired API Key Data
+    """
+    
+    base = "Expired API Key Data"
+    concat_detail = True
+    log_devel = True
+    default_status_code = 403
