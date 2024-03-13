@@ -86,27 +86,6 @@ def require_roles(
     return create_function_wrapper(validation_func)
 
 
-def require_api_key(
-    api_keys: Union[str, List[str]],
-    dry_run: Optional[bool] = False,
-    verbose: Optional[bool] = False,
-):
-    """
-    Creates an api key validator wrapper
-    """
-    if not isinstance(api_keys, list): api_keys = [api_keys]
-    def has_api_key(*args, api_key: APIKey, **kwargs):
-        """
-        Checks if the api key is valid
-        """
-        if api_key not in api_keys: 
-            if verbose: logger.info(f'`{api_key}` is not a valid api key')
-            if dry_run: return
-            raise errors.InvalidAPIKeyException(detail = f'`{api_key}` is not a valid api key')
-    
-    return create_function_wrapper(has_api_key)
-
-
 def get_current_user(
     required: Optional[bool] = True,
     roles_enabled: Optional[bool] = False,
@@ -148,3 +127,28 @@ def get_current_user(
 
 OptionalUser = Annotated[Optional[CurrentUser], Depends(get_current_user(required = False))]
 ValidUser = Annotated[CurrentUser, Depends(get_current_user())]
+
+
+def require_api_key(
+    api_keys: Union[str, List[str]],
+    dry_run: Optional[bool] = False,
+    verbose: Optional[bool] = False,
+    allow_authorized_user: Optional[bool] = False,
+):
+    """
+    Creates an api key validator wrapper
+    """
+    if not isinstance(api_keys, list): api_keys = [api_keys]
+    def has_api_key(*args, api_key: APIKey, current_user: OptionalUser, **kwargs):
+        """
+        Checks if the api key is valid
+        """
+        if api_key not in api_keys: 
+            if allow_authorized_user and current_user and current_user.is_valid:
+                return
+            if verbose: logger.info(f'`{api_key}` is not a valid api key')
+            if dry_run: return
+            raise errors.InvalidAPIKeyException(detail = f'`{api_key}` is not a valid api key')
+    
+    return create_function_wrapper(has_api_key)
+
