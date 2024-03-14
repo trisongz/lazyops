@@ -7,7 +7,7 @@ This module provides an abstract base class for a generic Postgres SQL database 
 
 Requires `sqlalchemy` and `psycopg2` to be installed.
 """
-
+import gc
 import abc
 import asyncio
 import datetime
@@ -482,6 +482,7 @@ class DatabaseClientBase(abc.ABC):
         finally:
             if auto_commit: await sess.commit()
             await sess.close()
+            if readonly: gc.collect()
 
     @contextlib.asynccontextmanager
     async def session_readonly(
@@ -500,6 +501,7 @@ class DatabaseClientBase(abc.ABC):
             if raise_errors: raise e
         finally:
             await sess.close()
+            gc.collect()
 
 
     @staticmethod
