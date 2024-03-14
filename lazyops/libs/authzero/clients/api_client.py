@@ -198,7 +198,7 @@ class AuthZeroAPIClient(ABC):
         if resolvers and is_async:
             resolvers = resolvers[0]
         resolvers = resolvers or None
-        logger.info(f'Resolvers: {resolvers}')
+        # logger.info(f'Resolvers: {resolvers}')
         return {
             'pool_connections': self._kwargs.get('pool_connections', 10),
             'pool_maxsize': self._kwargs.get('pool_maxsize', 10),

@@ -611,7 +611,7 @@ class CurrentUser(BaseModel):
             if self.claims is None and self.auth_obj.auth_token:
                 await self.refresh_api_client_api_key_data(api_client_id = api_client_id, request = request)
             if self.claims is None:
-                raise ExpiredAPIKeyData(f'{api_client_id} is expired. Please refresh by providing a valid token.')
+                raise ExpiredAPIKeyData(f'[API Client] {api_client_id} is expired. Please refresh by providing a valid token.')
 
             self.validate_permissions() if scopes is None else self.validate_scopes(scopes)
             if self.validation_method is None: self.validation_method = 'api_key'
@@ -649,8 +649,9 @@ class CurrentUser(BaseModel):
             await self.load_api_key_data(client_id = user_id)
             if not self.claims and self.auth_obj.auth_token:
                 await self.refresh_user_api_key_data(request = request)
-            if self.claims is None or '@clients' in self.claims.sub:
-                raise ExpiredAPIKeyData(f'{user_id} is expired. Please refresh by reauthenticating.')
+            # if self.claims is None or '@clients' in self.claims.sub:
+            if self.claims is None:
+                raise ExpiredAPIKeyData(f'[User] {user_id} is expired. Please refresh by reauthenticating.')
             self.validate_permissions() if scopes is None else self.validate_scopes(scopes)
             if self.validation_method is None: self.validation_method = 'api_key'
             if self.role is None: 
@@ -658,10 +659,12 @@ class CurrentUser(BaseModel):
                     self.role = UserRole.parse_role(self.user_data.user_metadata['role'])
                 elif self.user_data and self.user_data.app_metadata.get('role'):
                     self.role = UserRole.parse_role(self.user_data.app_metadata['role'])
+                elif '@clients' in self.claims.sub:
+                    self.role = UserRole.SERVICE
                 else:
                     self.role = UserRole.USER
                 # self.role = UserRole.USER
-            self.user_type = 'user'
+            self.user_type = 'service' if '@clients' in self.claims.sub else 'user'
             self.api_key = self.auth_obj.x_api_key
         except ExpiredAPIKeyData as e:
             raise e

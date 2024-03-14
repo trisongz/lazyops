@@ -93,7 +93,7 @@ class BaseTokenFlow(StatefulProperty[AccessToken]):
             'audience': self.audience,
             'grant_type': 'client_credentials',
         }
-        logger.info(f'Retrieving Access Token from {self.oauth_url}')
+        # logger.info(f'Retrieving Access Token from {self.oauth_url}')
         response = niquests.post(self.oauth_url, data = data)
         response.raise_for_status()
         return AccessToken(**response.json())
