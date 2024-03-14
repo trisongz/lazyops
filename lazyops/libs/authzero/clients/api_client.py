@@ -182,28 +182,28 @@ class AuthZeroAPIClient(ABC):
         """
         Returns the session kwargs
         """
-        resolvers: List[str] = kwargs.pop('resolver', [])
-        if not resolvers:
-            resolvers = []
-            if self.settings.in_k8s and 'cluster.local' in self.endpoint:
-                from lazyops.utils.system import fetch_resolver_nameserver
-                if resolver := fetch_resolver_nameserver():
-                    resolvers.append(f'dou://{resolver}')
-            resolvers.extend(
-                [
-                    'doh+cloudflare://',
-                    'doh+google://',
-                ]
-            )
-        if resolvers and is_async:
-            resolvers = resolvers[0]
-        resolvers = resolvers or None
+        # resolvers: List[str] = kwargs.pop('resolver', [])
+        # if not resolvers:
+        #     resolvers = []
+        #     if self.settings.in_k8s and 'cluster.local' in self.endpoint:
+        #         from lazyops.utils.system import fetch_resolver_nameserver
+        #         if resolver := fetch_resolver_nameserver():
+        #             resolvers.append(f'dou://{resolver}')
+        #     resolvers.extend(
+        #         [
+        #             'doh+cloudflare://',
+        #             'doh+google://',
+        #         ]
+        #     )
+        # if resolvers and is_async:
+        #     resolvers = resolvers[0]
+        # resolvers = resolvers or None
         # logger.info(f'Resolvers: {resolvers}')
         return {
             'pool_connections': self._kwargs.get('pool_connections', 10),
             'pool_maxsize': self._kwargs.get('pool_maxsize', 10),
             'retries': self._kwargs.get('retries', self.default_retries),
-            'resolver': resolvers,
+            # 'resolver': resolvers,
             **kwargs,
         }
 
