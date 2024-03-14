@@ -123,12 +123,23 @@ def get_current_user(
         return None
     return inner
 
-
+ValidUserDependency = Depends(get_current_user())
+OptionalUserDependency = Depends(get_current_user(required = False))
 
 OptionalUser = Annotated[Optional[CurrentUser], Depends(get_current_user(required = False))]
 ValidUser = Annotated[CurrentUser, Depends(get_current_user())]
 
 
+"""
+These are able to be used as injections
+
+@app.get('/')
+@require_auth_role('admin')
+async def index(current_user: ValidUser):
+    ...
+
+
+"""
 def require_api_key(
     api_keys: Union[str, List[str]],
     dry_run: Optional[bool] = False,
@@ -152,3 +163,101 @@ def require_api_key(
     
     return create_function_wrapper(has_api_key)
 
+
+def require_api_key_or_user_role(
+    api_keys: Union[str, List[str]],
+    role: Optional[Union[str, UserRole]] = None,
+    dry_run: Optional[bool] = False,
+    verbose: Optional[bool] = False,
+):
+    """
+    Creates an api key validator wrapper
+    """
+    if not isinstance(api_keys, list): api_keys = [api_keys]
+    user_role = UserRole.parse_role(role) if role else None
+
+    async def has_api_key_or_role(*args, current_user: OptionalUser, api_key: Optional[APIKey] = None, **kwargs):
+        """
+        Checks if the api key is valid
+        """
+        if not api_key and not current_user:
+            if verbose: logger.info('No api key or user found')
+            raise errors.NoAPIKeyException()
+        if api_key and api_key in api_keys: return
+        if current_user and current_user.is_valid:
+            if user_role and current_user.role < user_role:
+                if verbose: logger.info(f'User {current_user.user_id} does not have required role: {user_role}')
+                if dry_run: return
+                raise errors.InvalidAuthRoleException(detail = f'User {current_user.user_id} does not have required role: {user_role}')
+            return
+        if verbose: logger.info(f'`{api_key}` is not a valid api key')
+        if dry_run: return
+        raise errors.InvalidAPIKeyException(detail = f'`{api_key}` is not a valid api key')
+    
+    return create_function_wrapper(has_api_key_or_role)
+
+
+"""
+These require to be set as dependencies
+"""
+
+def auth_role_dependency(
+    role: Union[str, UserRole],
+    disabled: Optional[bool] = None,
+    dry_run: Optional[bool] = False,
+    verbose: Optional[bool] = False,
+):
+    """
+    Creates an auth role validator wrapper
+    """
+    user_role = UserRole.parse_role(role) if isinstance(role, str) else role
+
+    async def has_auth_role(current_user: ValidUser):
+        """
+        Checks if the auth role is valid
+        """
+        if disabled: return
+        if current_user.role < user_role:
+            if verbose: logger.info(f'User {current_user.user_id} does not have required role: {user_role}')
+            if dry_run: return
+            raise errors.InvalidAuthRoleException(detail = f'User {current_user.user_id} does not have required role: {user_role}')
+
+    return Depends(has_auth_role)
+
+
+
+def api_key_or_user_role_dependency(
+    api_keys: Union[str, List[str]],
+    role: Optional[Union[str, UserRole]] = None,
+    dry_run: Optional[bool] = False,
+    verbose: Optional[bool] = False,
+):
+    """
+    Creates an api key validator wrapper
+    """
+    if not isinstance(api_keys, list): api_keys = [api_keys]
+    user_role = UserRole.parse_role(role) if role else None
+
+    async def has_api_key_or_role(
+        current_user: OptionalUser,
+        api_key: Optional[APIKey] = None,
+    ):
+        """
+        Checks if the api key is valid
+        """
+        if not api_key and not current_user:
+            if verbose: logger.info('No api key or user found')
+            raise errors.NoAPIKeyException()
+        if api_key and api_key in api_keys: return
+        if current_user and current_user.is_valid:
+            if user_role and current_user.role < user_role:
+                if verbose: logger.info(f'User {current_user.user_id} does not have required role: {user_role}')
+                if dry_run: return
+                raise errors.InvalidAuthRoleException(detail = f'User {current_user.user_id} does not have required role: {user_role}')
+            return
+        if verbose: logger.info(f'`{api_key}` is not a valid api key')
+        if dry_run: return
+        raise errors.InvalidAPIKeyException(detail = f'`{api_key}` is not a valid api key')
+
+    return Depends(has_api_key_or_role)
+    
