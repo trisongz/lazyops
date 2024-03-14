@@ -45,6 +45,10 @@ extras = {
         'niquests',
         'tldextract',
         'fastapi',
+        'pycryptodomex',
+        'pyjwt[crypto]',
+        'python-jose',
+
     ]
 }
 args = {
