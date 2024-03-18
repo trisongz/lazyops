@@ -591,3 +591,9 @@ class Timer(abc.ABC, dict):
             self.durations.append(self.total % other)
         return self
     
+
+    def __hash__(self):
+        """
+        Returns the hash of the timer
+        """
+        return hash(self.start or self.total)

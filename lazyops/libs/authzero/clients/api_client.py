@@ -236,9 +236,9 @@ class AuthZeroAPIClient(ABC):
         """
         Resets the async session
         """
-        if self._asession is not None: self._asession.close()
+        if self._asession is not None: await self._asession.close()
         self._asession = None
-        if self._session is not None: await self._session.close()
+        if self._session is not None:  self._session.close()
         self._session = None
     
     @timed_cache(600, cache_if_result = True)
