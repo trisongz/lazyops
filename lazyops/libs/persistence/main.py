@@ -793,3 +793,18 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         return await self.base.aspop(key, **kwargs) 
     
+    """
+    Schema Modification Methods
+    """
+
+    def migrate_schema(self, schema_map: Dict[str, Any], overwrite: Optional[bool] = None, **kwargs) -> None:
+        """
+        Migrates the schema
+        """
+        self.base.migrate_schema(schema_map, overwrite = overwrite, **kwargs)
+
+    async def amigrate_schema(self, schema_map: Dict[str, Any], overwrite: Optional[bool] = None, **kwargs) -> None:
+        """
+        Migrates the schema
+        """
+        await self.base.amigrate_schema(schema_map, overwrite = overwrite, **kwargs)

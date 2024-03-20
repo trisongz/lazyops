@@ -701,3 +701,18 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         """
         return await ThreadPooler.run_async(self.spop, key, **kwargs)
     
+    """
+    Schema Modification Methods
+    """
+
+    def migrate_schema(self, schema_map: Dict[str, Any], overwrite: Optional[bool] = None, **kwargs) -> None:
+        """
+        Migrates the schema
+        """
+        raise NotImplementedError
+    
+    async def amigrate_schema(self, schema_map: Dict[str, Any], overwrite: Optional[bool] = None, **kwargs) -> None:
+        """
+        Migrates the schema
+        """
+        await ThreadPooler.run_async(self.migrate_schema, schema_map, overwrite = overwrite, **kwargs)

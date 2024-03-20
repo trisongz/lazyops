@@ -525,6 +525,7 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         obj_in: SourceSchemaType, 
         index_elements: Optional[List[str]] = None,
         exclude_attrs: Optional[List[str]] = None,
+        no_commit: Optional[bool] = None,
         **kwargs,
     ) -> None:
         """
@@ -539,7 +540,7 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
             set_=values
         )
         await db.execute(stmt)
-        if self.auto_commit:
+        if self.auto_commit and not no_commit:
             await db.commit()
 
     

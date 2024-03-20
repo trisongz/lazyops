@@ -7,30 +7,31 @@ Hash Utilities
 import uuid
 import hashlib
 import base64
-from pydantic import ValidationError
-from lazyops.libs import lazyload
+# from pydantic import ValidationError
+# from lazyops.libs import lazyload
 from lazyops.libs.pooler import ThreadPooler
-from lazyops.utils.helpers import lazy_import
+# from lazyops.utils.helpers import lazy_import
+from lazyops.imports._pycryptodome import resolve_pycryptodome
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 from typing import Any, Optional, List, Dict
 
-if lazyload.TYPE_CHECKING:
-    import xxhash
-    import jose
-    from Cryptodome.Cipher import AES
-    from fastapi import Request
-    from fastapi.datastructures import Headers
-    from jose import jwt, JWTError
-    from ..configs import AuthZeroSettings
+# if lazyload.TYPE_CHECKING:
+#     import xxhash
+#     import jose
+#     # from Cryptodome.Cipher import AES
+#     from fastapi import Request
+#     # from fastapi.datastructures import Headers
+#     # from jose import jwt, JWTError
+#     from ..configs import AuthZeroSettings
 
-else:
-    xxhash = lazyload.LazyLoad("xxhash")
-    # jose = lazyload.LazyLoad('jose')
-    # jwt = jose.jwt
-    # JWTError = jose.JWTError
-    jwt = lazy_import('jose.jwt', is_module=True, allow_module=True)
-    JWTError = lazy_import('jose.exceptions.JWTError')
-    AES = lazy_import('Cryptodome.Cipher.AES', is_module=True, allow_module=True)
+# else:
+#     xxhash = lazyload.LazyLoad("xxhash")
+#     # jose = lazyload.LazyLoad('jose')
+#     # jwt = jose.jwt
+#     # JWTError = jose.JWTError
+#     jwt = lazy_import('jose.jwt', is_module=True, allow_module=True)
+#     JWTError = lazy_import('jose.exceptions.JWTError')
+    # AES = lazy_import('Cryptodome.Cipher.AES', is_module=True, allow_module=True)
     # AES = lazyload.LazyLoad("Cryptodome.Cipher.AES", package = 'pycryptodomex')
 
     # jwt = lazyload.LazyLoad('jose.jwt')
@@ -59,6 +60,9 @@ def encrypt_key(key: str, secret_key: str, access_key: str) -> str:
     """
     Encrypts the Key
     """
+    resolve_pycryptodome(True)
+    from Cryptodome.Cipher import AES
+
     cipher = AES.new(secret_key.encode(), AES.MODE_CBC, access_key.encode())
     string = cipher.encrypt(resize_key(key).encode())
     string = "".join("{:02x}".format(c) for c in string)
@@ -68,6 +72,9 @@ def decrypt_key(key: str, secret_key: str, access_key: str) -> str:
     """
     Decrypts the Key
     """
+    resolve_pycryptodome(True)
+    from Cryptodome.Cipher import AES
+
     cipher = AES.new(secret_key.encode(), AES.MODE_CBC, access_key.encode())
     string = cipher.decrypt(bytes.fromhex(key)).decode()
     return string.lstrip()
