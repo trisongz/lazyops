@@ -16,6 +16,7 @@ from .claims import UserJWTClaims, APIKeyJWTClaims
 from .auth import AuthObject
 from .security import Authorization, APIKey
 from .errors import (
+    AuthZeroException,
     InvalidTokenException, 
     NoTokenException, 
     InvalidAPIKeyException, 
@@ -774,6 +775,19 @@ class CurrentUser(BaseModel):
         await self.precall_hook(request)
         try:
             await self.run_validate(request, background_tasks = background_tasks, api_key = api_key, authorization = authorization)
+        except AuthZeroException as e:
+            if (
+                self.verbose
+                and 'No API Key or Token found' not in e.detail
+                and 'Invalid API Key Prefix' not in e.detail
+                and not e.log_error
+                and not e.log_devel
+            ):
+                if self.required:
+                    logger.trace('Error Validating User', e)
+                else:
+                    logger.error(f'Error Validating User: {e}')
+            if self.required: raise e
         except Exception as e:
             if self.verbose: 
                 if self.required:

@@ -130,7 +130,7 @@ class InvalidAPIKeyPrefixException(AuthZeroException):
     """
     base = "Invalid API Key Prefix. Your API Key may be deprecated. Please regenerate your API Key by logging in again"
     concat_detail = True
-    log_devel = True
+    log_devel = False
     default_status_code = 401
 
 class InvalidAPIKeySecretException(AuthZeroException):

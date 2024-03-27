@@ -39,13 +39,18 @@ class BaseGlobalClient(abc.ABC):
 
     cache_enabled: Optional[bool] = True
     cachify_ttl: Optional[int] = None
+    cachify_shared_global: Optional[bool] = False
     cachify_enabled: Optional[bool] = True
     
     serialization: Optional[str] = 'json'
     serialization_compression: Optional[str] = 'zstd'
     serialization_compression_level: Optional[int] = 19 # 6 for default (lz4, zlib) 19 for zstd
     data_expiration: Optional[int] = None
+    data_shared_global: Optional[bool] = False
+    
     cache_expiration: Optional[int] = 60 * 60 * 24 * 3 # 3 days
+    cache_shared_global: Optional[bool] = False
+
 
     _logger: Optional['Logger'] = None
     _null_logger: Optional['Logger'] = None
@@ -160,8 +165,12 @@ class BaseGlobalClient(abc.ABC):
                 'compression_level': self.serialization_compression_level,
                 'raise_errors': True,
             }
+            base_key = f'{self.settings.ctx.module_name}.{self.name}.data' if \
+                self.data_shared_global else \
+                f'{self.settings.ctx.module_name}.{self.settings.app_env.name}.{self.name}.data'
+        
             self._data = self.settings.ctx.get_persistent_dict(
-                base_key = f'{self.settings.ctx.module_name}.{self.name}.{self.settings.app_env.name}.data',
+                base_key = base_key,
                 expiration = self.data_expiration,
                 serializer = self.serialization,
                 serializer_kwargs = serializer_kwargs,
@@ -180,8 +189,11 @@ class BaseGlobalClient(abc.ABC):
                 'compression_level': self.serialization_compression_level,
                 'raise_errors': True,
             }
+            base_key = f'{self.settings.ctx.module_name}.{self.name}.cache' if \
+                self.cache_shared_global else \
+                f'{self.settings.ctx.module_name}.{self.settings.app_env.name}.{self.name}.cache'
             self._cache = self.settings.ctx.get_persistent_dict(
-                base_key = f'{self.settings.ctx.module_name}.{self.name}.{self.settings.app_env.name}.cache',
+                base_key = base_key,
                 expiration = self.cache_expiration,
                 serializer = self.serialization,
                 serializer_kwargs = serializer_kwargs,
@@ -278,9 +290,11 @@ class BaseGlobalClient(abc.ABC):
         Validates the cachify function
         """
         if not self.cachify_enabled: return None
-        from .utils import create_cachify_build_name_func        
+        from .utils import create_cachify_build_name_func
+        base_name = f'{self.settings.ctx.module_name}.{self.name}' if self.cachify_shared_global  else \
+            f'{self.settings.ctx.module_name}.{self.settings.app_env.name}.{self.name}'
         if 'name' not in kwargs: kwargs['name'] = create_cachify_build_name_func(
-            base_name = f'{self.settings.ctx.module_name}.{self.settings.app_env.name}.{self.name}',
+            base_name = base_name,
             **self.cachify_get_name_builder_kwargs(func, **kwargs),
         )
         if 'ttl' not in kwargs: kwargs['ttl'] = self.cachify_ttl
