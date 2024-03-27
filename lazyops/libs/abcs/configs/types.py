@@ -27,6 +27,17 @@ class AppEnv(str, Enum):
         raise ValueError(f"Invalid app environment: {env_value} ({type(env_value)})")
     
     @classmethod
+    def from_hostname(cls, hostname: str) -> "AppEnv":
+        """
+        Get the app environment from the hostname
+        """
+        hostname = hostname.lower()
+        if "dev" in hostname: return cls.DEVELOPMENT
+        if "staging" in hostname: return cls.STAGING
+        return cls.LOCAL if "local" in hostname else cls.PRODUCTION
+        
+    
+    @classmethod
     def from_module_name(cls, module_name: str) -> 'AppEnv':
         """
         Retrieves the app environment

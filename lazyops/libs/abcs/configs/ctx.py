@@ -47,6 +47,7 @@ class ApplicationContext(abc.ABC):
         Creates the app context
         """
         self.module_name = module_name
+        self.app_env_var_name = self.module_name.replace(".", "-").replace("_", "-").lower()
         self.env_var_name = self.module_name.replace(".", "_").upper()
         self.is_app_module = '__main__' not in self.module_name
         self.import_assets: Callable[..., Path] = None
@@ -200,15 +201,30 @@ class ApplicationContext(abc.ABC):
             if env_value := os.getenv(key):
                 return AppEnv.from_env(env_value)
 
+        # self.logger.info(f'Using: {self.app_env_var_name}')
+
         from lazyops.utils.system import is_in_kubernetes, get_host_name
         if is_in_kubernetes():
             # Name should be
             # scout-<service>-<index>
             # or 
             # scout-<service>-<env>-<index>
-            parts = get_host_name().split("-")
-            return AppEnv.from_env(parts[2]) if len(parts) > 3 else AppEnv.PRODUCTION
-        
+
+            # if the app name has a - in it, need to handle it differently
+            # my-app-server-<index>
+            # my-app-server-<env>-<index>
+            hn = get_host_name()
+            src_hn = hn.replace(self.app_env_var_name, '').strip()
+            # if hn.count('-') 
+            try:
+                parts = src_hn.split('-')
+                return AppEnv.from_env(parts[1]) if len(parts) > 2 else AppEnv.PRODUCTION
+            except Exception as e:
+                self.logger.error(f'Error getting app env from hostname: {e}')
+                return AppEnv.from_hostname(hn)
+                # parts = get_host_name().split("-")
+                # return AppEnv.from_env(parts[2]) if len(parts) > 3 else AppEnv.PRODUCTION
+
         return AppEnv.LOCAL
     
 
