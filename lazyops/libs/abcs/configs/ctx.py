@@ -220,7 +220,7 @@ class ApplicationContext(abc.ABC):
                 parts = src_hn.split('-')
                 return AppEnv.from_env(parts[1]) if len(parts) > 2 else AppEnv.PRODUCTION
             except Exception as e:
-                self.logger.error(f'Error getting app env from hostname: {e}')
+                # self.logger.error(f'Error getting app env from hostname: {e}')
                 return AppEnv.from_hostname(hn)
                 # parts = get_host_name().split("-")
                 # return AppEnv.from_env(parts[2]) if len(parts) > 3 else AppEnv.PRODUCTION

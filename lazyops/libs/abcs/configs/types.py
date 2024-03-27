@@ -54,8 +54,12 @@ class AppEnv(str, Enum):
 
         from lazyops.utils.system import is_in_kubernetes, get_host_name
         if is_in_kubernetes():
-            parts = get_host_name().split("-")
-            return cls.from_env(parts[2]) if len(parts) > 3 else cls.PRODUCTION
+            hn = get_host_name()
+            try:
+                parts = hn.split("-")
+                return cls.from_env(parts[2]) if len(parts) > 3 else cls.PRODUCTION
+            except Exception as e:
+                return cls.from_hostname(hn)
         
         return cls.LOCAL
     
@@ -113,7 +117,13 @@ def get_app_env(
         # scout-<service>-<index>
         # or 
         # scout-<service>-<env>-<index>
-        parts = get_host_name().split("-")
-        return AppEnv.from_env(parts[2]) if len(parts) > 3 else AppEnv.PRODUCTION
+        hn = get_host_name()
+        try:
+            parts = hn.split("-")
+            return AppEnv.from_env(parts[1]) if len(parts) > 2 else AppEnv.PRODUCTION
+        except Exception as e:
+            return AppEnv.from_hostname(hn)
+        # parts = get_host_name().split("-")
+        # return AppEnv.from_env(parts[2]) if len(parts) > 3 else AppEnv.PRODUCTION
     
     return AppEnv.LOCAL
