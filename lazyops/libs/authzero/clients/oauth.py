@@ -113,21 +113,21 @@ class AuthZeroOAuthClient(ABC):
         az_client.add_app_url(callback = callback_url, allowed_logout_url = logout_url, web_origin = ingress_url, verbose = verbose)
         
         if not az_client._needs_update:
-            if verbose: logger.info(f'Client: `{az_client.name}` is already authorized with `{ingress_url}`', colored = True, prefix = f'|g|{self.client_id}|e|')
+            if verbose: logger.info(f'Client: `{az_client.name}` is already authorized with `{ingress_url}`', colored = True, prefix = f'|g|{az_client.client_id}|e|')
             return az_client
 
-        response = await self.mtg_api.ahput(f'clients/{self.client_id}', json = az_client.get_app_patch_data())
+        response = await self.mtg_api.ahpatch(f'clients/{az_client.client_id}', json = az_client.get_app_patch_data())
         if response.status_code > 299:
-            logger.warning(f'[{response.status_code}] Error updating app: {response.text}')
+            logger.warning(f'[{response.status_code}] Error updating app: {response.text} for {az_client.client_id}')
             return az_client
         
-        resp = await response.json()
+        resp = response.json()
         if verbose: 
-            logger.info(f'Updated Client: `{az_client.name}`\n\n{resp}', colored = True, prefix = f'|g|{self.client_id}|e|')
+            logger.info(f'Updated Client: `{az_client.name}`\n\n{resp}', colored = True, prefix = f'|g|{az_client.client_id}|e|')
             new_counts = az_client.get_app_update_counts()
             for key, value in new_counts.items():
                 if value > source_counts[key]:
-                    logger.info(f'{key}: {value} -> {source_counts[key]} (+{value - source_counts[key]})', colored = True, prefix = f'|g|{self.client_id}|e|')
+                    logger.info(f'{key}: {value} -> {source_counts[key]} (+{value - source_counts[key]})', colored = True, prefix = f'|g|{az_client.client_id}|e|')
     
         return az_client
             

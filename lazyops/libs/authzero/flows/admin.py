@@ -122,6 +122,24 @@ class AZManagementAPI(ABC):
             return await self.asession.put(self.get_url(path), auth = self.auth, **kwargs)
         async with niquests.AsyncSession() as s:
             return await s.put(self.get_url(path), auth = self.auth, **kwargs)
+        
+    
+    def hpatch(self, path: str, **kwargs) -> 'Response':
+        """
+        Returns the Response
+        """
+        if not self.use_http_session:
+            return niquests.patch(self.get_url(path), auth = self.auth, **kwargs)
+        return self.session.patch(self.get_url(path), auth = self.auth, **kwargs)
+    
+    async def ahpatch(self, path: str, **kwargs) -> 'AsyncResponse':
+        """
+        Returns the Response
+        """
+        if self.use_http_session:
+            return await self.asession.patch(self.get_url(path), auth = self.auth, **kwargs)
+        async with niquests.AsyncSession() as s:
+            return await s.patch(self.get_url(path), auth = self.auth, **kwargs)
 
     def _validate_response(self, response: Union['Response', 'AsyncResponse']):
         """
