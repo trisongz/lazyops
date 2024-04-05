@@ -411,7 +411,7 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         limit: Optional[int] = None,
         load_children: List[str] = None,
         raise_for_not_found: bool = False
-    ) -> List[ResultObject]:
+    ) -> List[SourceSchemaType]:
         """
         Gets multiple objects with pagination and filters by ids
         """
@@ -533,6 +533,8 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         """
         index_elements = index_elements or ['id']
         values = self.prepare_encoded_object(obj_in, method = 'upsert', exclude = exclude_attrs, **kwargs)
+        if hasattr(self.model, 'updated_at'):
+            values['updated_at'] = datetime.datetime.now(datetime.timezone.utc)
         stmt = insert(self.model).values(
             **values
         ).on_conflict_do_update(

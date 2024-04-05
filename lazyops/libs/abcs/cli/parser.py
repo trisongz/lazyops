@@ -75,7 +75,6 @@ def parse_one(
     for pt in _parser_types.values():
         if field_type == Optional[pt]:
             field_type = pt
-
             break
 
     if field.is_required():

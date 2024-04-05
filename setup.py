@@ -48,7 +48,6 @@ extras = {
         'pycryptodomex',
         'pyjwt[crypto]',
         'python-jose',
-
     ]
 }
 args = {

@@ -154,6 +154,12 @@ class BaseGlobalClient(abc.ABC):
             self._kdb = self.settings.ctx.get_kdb_session(self.name)
         return self._kdb
     
+    def pdict_get_extra_serialization_kwargs(self, name: str, **kwargs) -> Dict[str, Any]:
+        """
+        Gets the extra serialization kwargs
+        """
+        return {}
+    
     @property
     def data(self) -> 'PersistentDict':
         """
@@ -164,6 +170,7 @@ class BaseGlobalClient(abc.ABC):
                 'compression': self.serialization_compression,
                 'compression_level': self.serialization_compression_level,
                 'raise_errors': True,
+                **self.pdict_get_extra_serialization_kwargs('data'),
             }
             base_key = f'{self.settings.ctx.module_name}.{self.name}.data' if \
                 self.data_shared_global else \
@@ -188,6 +195,7 @@ class BaseGlobalClient(abc.ABC):
                 'compression': self.serialization_compression,
                 'compression_level': self.serialization_compression_level,
                 'raise_errors': True,
+                **self.pdict_get_extra_serialization_kwargs('cache'),
             }
             base_key = f'{self.settings.ctx.module_name}.{self.name}.cache' if \
                 self.cache_shared_global else \
@@ -283,7 +291,19 @@ class BaseGlobalClient(abc.ABC):
         Gets the name builder kwargs
         """
         return {}
+    
+    def cachify_get_extra_serialization_kwargs(self, func: str, **kwargs) -> Dict[str, Any]:
+        """
+        Gets the extra serialization kwargs
+        """
+        return {}
 
+    def cachify_create_base_name(self, func: str, **kwargs) -> str:
+        """
+        Creates the base name
+        """
+        return f'{self.settings.ctx.module_name}.{self.name}' if self.cachify_shared_global  else \
+            f'{self.settings.ctx.module_name}.{self.settings.app_env.name}.{self.name}'
 
     def validate_cachify(self, func: str, **kwargs) -> Dict[str, Any]:
         """
@@ -291,8 +311,7 @@ class BaseGlobalClient(abc.ABC):
         """
         if not self.cachify_enabled: return None
         from .utils import create_cachify_build_name_func
-        base_name = f'{self.settings.ctx.module_name}.{self.name}' if self.cachify_shared_global  else \
-            f'{self.settings.ctx.module_name}.{self.settings.app_env.name}.{self.name}'
+        base_name = self.cachify_create_base_name(func, **kwargs)
         if 'name' not in kwargs: kwargs['name'] = create_cachify_build_name_func(
             base_name = base_name,
             **self.cachify_get_name_builder_kwargs(func, **kwargs),
@@ -304,6 +323,7 @@ class BaseGlobalClient(abc.ABC):
                 'compression': self.serialization_compression,
                 'compression_level': self.serialization_compression_level,
                 'raise_errors': True,
+                **self.cachify_get_extra_serialization_kwargs(func, **kwargs),
             }
         if 'verbosity' not in kwargs and self.settings.is_local_env: kwargs['verbosity'] = 2
         kwargs['disabled'] = self.cachify_validator_is_not_cachable

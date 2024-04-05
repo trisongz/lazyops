@@ -84,6 +84,9 @@ class BaseAPIClient(BaseGlobalClient):
             'retryable',
             'retry_limit',
             'validate_url',
+            'cachable',
+            'disable_cache',
+            'overwrite_cache',
         ]
     
     def configure_api_client(self, *args, **kwargs) -> aiohttpx.Client:
@@ -124,13 +127,13 @@ class BaseAPIClient(BaseGlobalClient):
         return self._api
     
 
-    async def areset_api(cls):
+    async def areset_api(self):
         """
         Resets the api client
         """
-        if cls._api:
-            await cls._api.aclose()
-            cls._api = None
+        if self._api:
+            await self._api.aclose()
+            self._api = None
 
     def wrap_retryable_method(
         self,
