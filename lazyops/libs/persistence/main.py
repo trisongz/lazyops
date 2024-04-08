@@ -15,7 +15,7 @@ from lazyops.utils.logs import logger, null_logger
 # from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
 from lazyops.utils.pooler import ThreadPooler
 
-from typing import Any, Dict, Optional, Union, Iterable, List, Type, Set, Callable, overload, TYPE_CHECKING
+from typing import Any, Dict, Optional, Union, Iterable, List, Type, Set, Callable, Mapping, MutableMapping, TypeVar, overload, TYPE_CHECKING
 from .backends import LocalStatefulBackend, RedisStatefulBackend, StatefulBackendT
 from .serializers import ObjectValue
 from .addons import (
@@ -70,7 +70,11 @@ RegisteredMetricTypes = {
     'nested_monetary': NestedMonetaryMetric,
 }
 
-class PersistentDict(collections.abc.MutableMapping):
+KT = TypeVar('KT')
+VT = TypeVar('VT')
+# https://stackoverflow.com/questions/61112684/how-to-subclass-a-dictionary-so-it-supports-generic-type-hints
+
+class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
     """
     Persistent Dictionary Interface
     """
@@ -119,12 +123,14 @@ class PersistentDict(collections.abc.MutableMapping):
             settings = self.settings,
             **self._kwargs,
         )
-        self._mutation_tracker: Dict[str, ObjectValue] = {}
+        # self._mutation_tracker: Dict[str, ObjectValue] = {}
+        self._mutation_tracker: Dict[KT, VT] = {}
         self._mutation_hashes: Dict[str, str] = {}
 
         # V2 Mutation Tracking with Context Manager
         self._in_context: bool = False
-        self._temporal_dict: Dict[str, ObjectValue] = {}
+        # self._temporal_dict: Dict[str, ObjectValue] = {}
+        self._temporal_dict: Dict[KT, VT] = {}
         self._metric_types: Dict[str, Type['MetricT']] = metric_types or {}
         if self._metric_types:
             for k, v in self._metric_types.items():
@@ -206,7 +212,7 @@ class PersistentDict(collections.abc.MutableMapping):
             base_kwargs['async_enabled'] = self.base.async_enabled
         return base_kwargs
 
-    def get_child(self, key: str, **kwargs) -> 'PersistentDict':
+    def get_child(self, key: KT, **kwargs) -> 'PersistentDict':
         """
         Gets a Child Persistent Dictionary
         """
@@ -215,27 +221,27 @@ class PersistentDict(collections.abc.MutableMapping):
         return self.__class__(base_key = base_key, parent_base_key = self.base_key, child_base_key = key, **base_kwargs)
 
 
-    def get(self, key: str, default: Optional[Any] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
+    def get(self, key: KT, default: Optional[VT] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[VT]:
         """
         Gets a Value from the DB
         """
         self._save_mutation_objects(key)
         return self.base.get(key, default = default, _raw = _raw, **kwargs)
     
-    def get_values(self, keys: Iterable[str], **kwargs) -> List[Any]:
+    def get_values(self, keys: Iterable[str], **kwargs) -> List[VT]:
         """
         Gets a Value from the DB
         """
         self._save_mutation_objects(*keys)
         return self.base.get_values(keys, **kwargs)
     
-    def fetch(self, key: str, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
+    def fetch(self, key: KT, _raw: Optional[bool] = None, **kwargs) -> Optional[VT]:
         """
         Gets a Value from the DB
         """
         return self.get(key, _raw = _raw, **kwargs) if self.contains(key) else None
     
-    def set(self, key: str, value: Any, ex: Optional[Union[float, int]] = None, _raw: Optional[bool] = None, **kwargs) -> None:
+    def set(self, key: KT, value: Any, ex: Optional[Union[float, int]] = None, _raw: Optional[bool] = None, **kwargs) -> None:
         """
         Saves a Value to the DB
         """
@@ -253,7 +259,7 @@ class PersistentDict(collections.abc.MutableMapping):
         else:
             self.base.set_batch(data, **kwargs)
 
-    def delete(self, key: str, **kwargs) -> None:
+    def delete(self, key: KT, **kwargs) -> None:
         """
         Deletes a Value from the DB
         """
@@ -262,7 +268,7 @@ class PersistentDict(collections.abc.MutableMapping):
         else:
             self.base.delete(key, **kwargs)
 
-    def contains(self, key: str, **kwargs) -> bool:
+    def contains(self, key: KT, **kwargs) -> bool:
         """
         Returns True if the Cache contains the Key
         """
@@ -277,45 +283,45 @@ class PersistentDict(collections.abc.MutableMapping):
         else:
             self.base.clear(*keys, **kwargs)
     
-    async def aget(self, key: str, default: Optional[Any] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
+    async def aget(self, key: KT, default: Optional[VT] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[VT]:
         """
         Gets a Value from the DB
         """
         await self._asave_mutation_objects(key)
         return await self.base.aget(key, default = default, _raw = _raw, **kwargs)
     
-    async def aget_values(self, keys: Iterable[str], **kwargs) -> List[Any]:
+    async def aget_values(self, keys: Iterable[KT], **kwargs) -> List[VT]:
         """
         Gets a Value from the DB
         """
         await self._asave_mutation_objects(*keys)
         return await self.base.aget_values(keys,  **kwargs)
     
-    async def afetch(self, key: str, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
+    async def afetch(self, key: KT, _raw: Optional[bool] = None, **kwargs) -> Optional[VT]:
         """
         Gets a Value from the DB
         """
         return await self.aget(key, _raw = _raw, **kwargs) if await self.acontains(key) else None
 
-    async def aset(self, key: str, value: Any, ex: Optional[Union[float, int]] = None, _raw: Optional[bool] = None, **kwargs) -> None:
+    async def aset(self, key: KT, value: VT, ex: Optional[Union[float, int]] = None, _raw: Optional[bool] = None, **kwargs) -> None:
         """
         Saves a Value to the DB
         """
         await self.base.aset(key, value, ex = ex, _raw = _raw, **kwargs)
 
-    async def aset_batch(self, data: Dict[str, Any], **kwargs) -> None:
+    async def aset_batch(self, data: Dict[KT, VT], **kwargs) -> None:
         """
         Saves a Value to the DB
         """
         await self.base.aset_batch(data, **kwargs)
 
-    async def adelete(self, key: str, **kwargs) -> None:
+    async def adelete(self, key: KT, **kwargs) -> None:
         """
         Deletes a Value from the DB
         """
         await self.base.adelete(key, **kwargs)
     
-    async def acontains(self, key: str, **kwargs) -> bool:
+    async def acontains(self, key: KT, **kwargs) -> bool:
         """
         Returns True if the Cache contains the Key
         """
@@ -327,99 +333,99 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         await self.base.aclear(*keys, **kwargs)
     
-    def get_all_data(self, **kwargs) -> Dict[str, Any]:
+    def get_all_data(self, **kwargs) -> Dict[KT, VT]:
         """
         Loads all the Data
         """
         self._save_mutation_objects()
         return self.base.get_all_data(**kwargs)
     
-    def get_all_keys(self, **kwargs) -> Iterable[str]:
+    def get_all_keys(self, **kwargs) -> Iterable[KT]:
         """
         Returns all the Keys
         """
         return self.base.get_all_keys(**kwargs)
     
-    def get_keys(self, pattern: str, exclude_base_key: Optional[bool] = None, **kwargs) -> List[str]:
+    def get_keys(self, pattern: str, exclude_base_key: Optional[bool] = None, **kwargs) -> List[KT]:
         """
         Returns all the Keys
         """
         return self.base.get_keys(pattern, exclude_base_key = exclude_base_key, **kwargs)
     
-    def get_all_values(self, **kwargs) -> Iterable[Any]:
+    def get_all_values(self, **kwargs) -> Iterable[VT]:
         """
         Returns all the Values
         """
         self._save_mutation_objects()
         return self.base.get_all_values(**kwargs)
     
-    async def aget_all_data(self, **kwargs) -> Dict[str, Any]:
+    async def aget_all_data(self, **kwargs) -> Dict[KT, VT]:
         """
         Loads all the Data
         """
         await self._asave_mutation_objects()
         return await self.base.aget_all_data(**kwargs)
     
-    async def aget_all_keys(self, **kwargs) -> Iterable[str]:
+    async def aget_all_keys(self, **kwargs) -> Iterable[KT]:
         """
         Returns all the Keys
         """
         return await self.base.aget_all_keys(**kwargs)
 
-    async def aget_keys(self, pattern: str, exclude_base_key: Optional[bool] = None, **kwargs) -> List[str]:
+    async def aget_keys(self, pattern: str, exclude_base_key: Optional[bool] = None, **kwargs) -> List[KT]:
         """
         Returns all the Keys
         """
         return await self.base.aget_keys(pattern, exclude_base_key = exclude_base_key, **kwargs)
     
-    async def aget_all_values(self, **kwargs) -> Iterable[Any]:
+    async def aget_all_values(self, **kwargs) -> Iterable[VT]:
         """
         Returns all the Values
         """
         await self._asave_mutation_objects()
         return await self.base.aget_all_values(**kwargs)
     
-    def keys(self, **kwargs) -> Iterable[Any]:
+    def keys(self, **kwargs) -> Iterable[KT]:
         """
         Returns the Keys
         """
         return self.base.keys(**kwargs)
     
-    def values(self, **kwargs) -> Iterable[Any]:
+    def values(self, **kwargs) -> Iterable[VT]:
         """
         Returns the Values
         """
         self._save_mutation_objects()
         return self.base.values(**kwargs)
     
-    def items(self, iterable: Optional[bool] = True, **kwargs) -> Dict[Any, Any]:
+    def items(self, iterable: Optional[bool] = True, **kwargs) -> Dict[KT, VT]:
         """
         Returns the Items
         """
         self._save_mutation_objects()
         return self.base.items(iterable = iterable, **kwargs)
     
-    async def akeys(self, **kwargs) -> Iterable[Any]:
+    async def akeys(self, **kwargs) -> Iterable[KT]:
         """
         Returns the Keys
         """
         return await self.base.akeys(**kwargs)
     
-    async def avalues(self, **kwargs) -> Iterable[Any]:
+    async def avalues(self, **kwargs) -> Iterable[VT]:
         """
         Returns the Values
         """
         await self._asave_mutation_objects()
         return await self.base.avalues(**kwargs)
     
-    async def aitems(self, iterable: Optional[bool] = True, **kwargs) -> Dict[Any, Any]:
+    async def aitems(self, iterable: Optional[bool] = True, **kwargs) -> Dict[KT, VT]:
         """
         Returns the Items
         """
         await self._asave_mutation_objects()
         return await self.base.aitems(iterable = iterable, **kwargs)
     
-    def expire(self, key: str, timeout: Optional[int] = None, expiration: Optional[int] = None, **kwargs) -> None:
+    def expire(self, key: KT, timeout: Optional[int] = None, expiration: Optional[int] = None, **kwargs) -> None:
         """
         Expires a Key
         """
@@ -427,7 +433,7 @@ class PersistentDict(collections.abc.MutableMapping):
         ex = expiration if expiration is not None else timeout
         self.base.expire(key, ex, **kwargs)
 
-    async def aexpire(self, key: str, timeout: Optional[int] = None, expiration: Optional[int] = None, **kwargs) -> None:
+    async def aexpire(self, key: KT, timeout: Optional[int] = None, expiration: Optional[int] = None, **kwargs) -> None:
         """
         Expires a Key
         """
@@ -435,7 +441,7 @@ class PersistentDict(collections.abc.MutableMapping):
         await self.base.aexpire(key, ex, **kwargs)
 
     @contextlib.contextmanager
-    def track_changes(self, key: str, func: str, *args, **kwargs):
+    def track_changes(self, key: KT, func: str, *args, **kwargs):
         """
         Tracks Changes
         """
@@ -465,7 +471,7 @@ class PersistentDict(collections.abc.MutableMapping):
 
     
     @contextlib.asynccontextmanager
-    async def atrack_changes(self, key: str, func: str, *args, **kwargs):
+    async def atrack_changes(self, key: KT, func: str, *args, **kwargs):
         """
         Tracks Changes
         """
@@ -492,14 +498,14 @@ class PersistentDict(collections.abc.MutableMapping):
                 autologger.info(f'tracked {func} {key} (post-changed). Saving')
                 await self._asave_mutation_objects(key)
 
-    def setdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False, enforce_type: Optional[bool] = False) -> Any:
+    def setdefault(self, key: KT, default: Any = None, update_values: Optional[bool] = False, enforce_type: Optional[bool] = False) -> Any:
         """
         Sets a Default Value
         """
         with self.track_changes(key, 'setdefault', default, update_values = update_values, enforce_type = enforce_type) as result:
             return result
     
-    async def asetdefault(self, key: str, default: Any = None, update_values: Optional[bool] = False, enforce_type: Optional[bool] = False) -> Any:
+    async def asetdefault(self, key: KT, default: Any = None, update_values: Optional[bool] = False, enforce_type: Optional[bool] = False) -> Any:
         """
         Sets a Default Value
         """
@@ -533,13 +539,13 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         return await self.base.apopitem(**kwargs)
     
-    def pop(self, key: str, default: Optional[Any] = None, **kwargs) -> Any:
+    def pop(self, key: KT, default: Optional[VT] = None, **kwargs) -> VT:
         """
         Pops an Item from the Cache
         """
         return self.base.pop(key, default, **kwargs)
     
-    async def apop(self, key: str, default: Optional[Any] = None, **kwargs) -> Any:
+    async def apop(self, key: KT, default: Optional[VT] = None, **kwargs) -> VT:
         """
         Pops an Item from the Cache
         """
@@ -557,7 +563,7 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         return f'{self.base_key}: {dict(self.items())}'
 
-    def _clear_from_mutation_tracker(self, key: str):
+    def _clear_from_mutation_tracker(self, key: KT):
         """
         Clears the Mutation Tracker
         """
@@ -673,7 +679,7 @@ class PersistentDict(collections.abc.MutableMapping):
         else:
             raise ContextError('Unable to acquire context due to concurrency')
 
-    def __getitem__(self, key: str) -> Union[ObjectValue, List, Dict[str, Union[List, Dict]]]:
+    def __getitem__(self, key: KT) -> Union[VT, List[VT], Dict[KT, Union[List[VT], Dict[KT, VT]]]]:
         """
         Gets an Item from the DB
         """
@@ -686,7 +692,7 @@ class PersistentDict(collections.abc.MutableMapping):
         with self.track_changes(key, '__getitem__') as result:
             return result
 
-    def __setitem__(self, key: str, value: ObjectValue):
+    def __setitem__(self, key: KT, value: VT):
         """
         Sets an Item in the Cache
         """
@@ -714,7 +720,7 @@ class PersistentDict(collections.abc.MutableMapping):
             self._clear_from_mutation_tracker(key)
         return self.base.__delitem__(key)
         
-    def __contains__(self, key: str):
+    def __contains__(self, key: KT):
         """
         Returns True if the Cache contains the Key
         """
@@ -865,25 +871,25 @@ class PersistentDict(collections.abc.MutableMapping):
     Math Related Methods
     """
 
-    def incr(self, key: str, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
+    def incr(self, key: KT, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
         """
         Increments the value of the key by the given amount
         """
         return self.base.incr(key, amount = amount, **kwargs)
     
-    async def aincr(self, key: str, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
+    async def aincr(self, key: KT, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
         """
         Increments the value of the key by the given amount
         """
         return await self.base.aincr(key, amount = amount, **kwargs)
     
-    def decr(self, key: str, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
+    def decr(self, key: KT, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
         """
         Decrements the value of the key by the given amount
         """
         return self.base.decr(key, amount = amount, **kwargs)
     
-    async def adecr(self, key: str, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
+    async def adecr(self, key: KT, amount: Union[int, float] = 1, **kwargs) -> Union[int, float]:
         """
         Decrements the value of the key by the given amount
         """
@@ -894,86 +900,86 @@ class PersistentDict(collections.abc.MutableMapping):
     Set Operations
     """
 
-    def sadd(self, key: str, *values: Any, **kwargs) -> int:
+    def sadd(self, key: KT, *values: Any, **kwargs) -> int:
         """
         Adds the value to the set
         """
         return self.base.sadd(key, *values, **kwargs)
     
-    async def asadd(self, key: str, *value: Any, **kwargs) -> int:
+    async def asadd(self, key: KT, *value: Any, **kwargs) -> int:
         """
         Adds the value to the set
         """
         return await self.base.asadd(key, *value, **kwargs)
     
-    def slength(self, key: str, **kwargs) -> int:
+    def slength(self, key: KT, **kwargs) -> int:
         """
         Returns the length of the set
         """
         return self.base.slength(key, **kwargs)
     
-    async def aslength(self, key: str, **kwargs) -> int:
+    async def aslength(self, key: KT, **kwargs) -> int:
         """
         Returns the length of the set
         """
         return await self.base.aslength(key, **kwargs)
     
     
-    def sismember(self, key: str, value: Any, **kwargs) -> bool:
+    def sismember(self, key: KT, value: Any, **kwargs) -> bool:
         """
         Returns whether the value is a member of the set
         """
         return self.base.sismember(key, value, **kwargs)
     
-    async def asismember(self, key: str, value: Any, **kwargs) -> bool:
+    async def asismember(self, key: KT, value: Any, **kwargs) -> bool:
         """
         Returns whether the value is a member of the set
         """
         return await self.base.asismember(key, value, **kwargs)
     
-    def smembers(self, key: str, **kwargs) -> List[Any]:
+    def smembers(self, key: KT, **kwargs) -> List[Any]:
         """
         Returns the members of the set
         """
         return self.base.smembers(key, **kwargs)
 
-    async def asembers(self, key: str, **kwargs) -> List[Any]:
+    async def asembers(self, key: KT, **kwargs) -> List[Any]:
         """
         Returns the members of the set
         """
         return await self.base.asembers(key, **kwargs)
     
-    def smismember(self, key: str, *values: Any, **kwargs) -> bool:
+    def smismember(self, key: KT, *values: Any, **kwargs) -> bool:
         """
         Returns whether the values are members of the set
         """
         return self.base.smismember(key, *values, **kwargs)
 
-    async def asmismember(self, key: str, *values: Any, **kwargs) -> bool:
+    async def asmismember(self, key: KT, *values: Any, **kwargs) -> bool:
         """
         Returns whether the values are members of the set
         """
         return await self.base.asmismember(key, *values, **kwargs)
 
-    def srem(self, key: str, *values: Any, **kwargs) -> int:
+    def srem(self, key: KT, *values: Any, **kwargs) -> int:
         """
         Removes the value from the set
         """
         return self.base.srem(key, *values, **kwargs)
     
-    async def asrem(self, key: str, *values: Any, **kwargs) -> int:
+    async def asrem(self, key: KT, *values: Any, **kwargs) -> int:
         """
         Removes the value from the set
         """
         return await self.base.asrem(key, *values, **kwargs)
     
-    def spop(self, key: str, **kwargs) -> Any:
+    def spop(self, key: KT, **kwargs) -> Any:
         """
         Removes and returns a random member of the set
         """
         return self.base.spop(key, **kwargs)
     
-    async def aspop(self, key: str, **kwargs) -> Any:
+    async def aspop(self, key: KT, **kwargs) -> Any:
         """
         Removes and returns a random member of the set
         """
@@ -988,7 +994,7 @@ class PersistentDict(collections.abc.MutableMapping):
         exclude: Optional[Set[str]] = None,
         exclude_none: Optional[bool] = False,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> Dict[KT, VT]:
         """
         Copies the current data and returns a Dict
         """
@@ -1002,7 +1008,7 @@ class PersistentDict(collections.abc.MutableMapping):
         exclude: Optional[Set[str]] = None,
         exclude_none: Optional[bool] = False,
         **kwargs
-    ) -> Dict[str, Any]:
+    ) -> Dict[KT, VT]:
         """
         Copies the current data and returns a Dict
         """

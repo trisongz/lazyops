@@ -711,6 +711,13 @@ class BaseNestedMetric(BaseModel):
         Representation of the object
         """
         return self.__repr__()
+
+    def __contains__(self, key: str) -> bool:
+        """
+        Checks if the key is in the data
+        """
+        return key in self.data
+    
     
     if TYPE_CHECKING:
         def __getattribute__(self, name: str) -> MetricModel:
