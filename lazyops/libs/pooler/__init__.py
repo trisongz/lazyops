@@ -12,3 +12,5 @@ from .main import (
     ThreadPooler,
     ensure_coro,
 )
+
+from .utils import is_in_async_loop

@@ -5,6 +5,8 @@ Base Persistence Backend
 """
 import contextlib
 import collections.abc
+from threading import Lock
+from asyncio import Lock as AsyncLock
 from pathlib import Path
 from pydantic import BaseModel
 from typing import TypeVar, Generic, Any, Dict, Optional, Union, Iterable, List, Type, ItemsView, TYPE_CHECKING
@@ -51,8 +53,11 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
             self.serializer_kwargs = serializer_kwargs
         if self.serializer is None:
             self.serializer = get_serializer(self.serializer_type, **self.serializer_kwargs)
+        self._lock: Optional[Lock] = None
+        self._alock: Optional[AsyncLock] = None
         self._kwargs = kwargs
-    
+
+
     def get_key(self, key: str) -> str:
         """
         Gets a Key
@@ -716,3 +721,114 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         Migrates the schema
         """
         await ThreadPooler.run_async(self.migrate_schema, schema_map, overwrite = overwrite, **kwargs)
+
+    """
+    Context Manager Locks
+    """
+    
+    def acquire_lock(self, timeout: Optional[float] = None, blocking: Optional[bool] = True, **kwargs) -> bool:
+        """
+        Acquires the lock
+        """
+        if self._lock is None: self._lock = Lock()
+        try:
+            return self._lock.acquire(timeout = timeout, blocking = blocking)
+        except Exception as e:
+            logger.error(f'Error acquiring lock: {e}')
+            return False
+    
+    def release_lock(self):
+        """
+        Releases the lock
+        """
+        if self._lock is not None:
+            try:
+                self._lock.release()
+            except Exception as e:
+                logger.error(f'Error releasing lock: {e}')
+
+    async def acquire_alock(self, timeout: Optional[float] = None, blocking: Optional[bool] = True, **kwargs) -> bool:
+        """
+        Acquires the lock
+        """
+        if self._alock is None: self._alock = AsyncLock()
+        try:
+            return await self._alock.acquire(timeout = timeout, blocking = blocking)
+        except Exception as e:
+            logger.error(f'Error acquiring lock: {e}')
+            return False
+        
+    async def release_alock(self):
+        """
+        Releases the lock
+        """
+        if self._alock is not None:
+            try:
+                await self._alock.release()
+            except Exception as e:
+                logger.error(f'Error releasing lock: {e}')
+
+    """
+    Cloning Methods
+    """
+
+    def clone(
+        self, 
+        target: Optional[Any], 
+        target_base_key: Optional[str] = None,
+        schema_map: Optional[Dict[str, str]] = None,
+        overwrite: Optional[bool] = False, 
+        **kwargs
+    ):
+        """
+        Clones the data from the current PersistentDict to a new PersistentDict
+        """
+        raise NotImplementedError
+
+    async def aclone(
+        self,
+        target: Optional[Any], 
+        target_base_key: Optional[str] = None,
+        schema_map: Optional[Dict[str, str]] = None,
+        overwrite: Optional[bool] = False, 
+        excluded: Optional[Union[str, List[str]]] = None,
+        **kwargs
+    ):  # sourcery skip: low-code-quality
+        """
+        Clones the data from the target PersistentDict to a current PersistentDict
+        """
+        raise NotImplementedError
+
+
+
+    def clone_from(
+        self,
+        target: Any, 
+        target_base_key: Optional[str] = None,
+        schema_map: Optional[Dict[str, str]] = None,
+        overwrite: Optional[bool] = False, 
+        excluded: Optional[Union[str, List[str]]] = None,
+        **kwargs
+    ): 
+        """
+        Clones the data from the target PersistentDict to a current PersistentDict
+        """
+        raise NotImplementedError
+
+
+    async def aclone_from(
+        self,
+        target: Any, 
+        target_base_key: Optional[str] = None,
+        schema_map: Optional[Dict[str, str]] = None,
+        overwrite: Optional[bool] = False, 
+        excluded: Optional[Union[str, List[str]]] = None,
+        **kwargs
+    ): 
+        """
+        Clones the data from the target PersistentDict to a current PersistentDict
+        """
+        raise NotImplemented
+
+
+

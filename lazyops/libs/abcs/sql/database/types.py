@@ -24,7 +24,7 @@ from sqlalchemy.orm import MappedAsDataclass
 from sqlalchemy.orm import Mapped
 from sqlalchemy import MetaData
 from sqlalchemy.orm import mapped_column
-from sqlalchemy import Text
+from sqlalchemy import Text, Table
 from sqlalchemy import func as sql_func
 # from sqlalchemy.orm import Mapped, Relationship, relationship
 from sqlalchemy.orm import defer
@@ -40,6 +40,7 @@ from typing import Optional, Type, TypeVar, Union, Set, Any, Tuple, List, Dict, 
 
 if TYPE_CHECKING:
     from lazyops.utils.logs import Logger
+    from lazyops.libs.pooler import ThreadPool
 
 mapper_registry = registry()
 
@@ -276,6 +277,7 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         self.auto_commit = auto_commit
         self._schema = schema
         self._logger: Optional['Logger'] = None
+        self._pooler: Optional['ThreadPool'] = None
         self._kwargs = kwargs
         self._post_init(**kwargs)
 
@@ -292,6 +294,23 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         Returns the table name
         """
         return self.model.__tablename__
+    
+    @property
+    def pooler(self) -> 'ThreadPool':
+        """
+        Returns the pooler
+        """
+        if self._pooler is None:
+            from lazyops.libs.pooler import ThreadPooler
+            self._pooler = ThreadPooler
+        return self._pooler
+    
+    @property
+    def table(self) -> Table:
+        """
+        Returns the table
+        """
+        return self.model.__table__
     
 
     @property
@@ -473,6 +492,40 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         Encodes the object
         """
         return jsonable_encoder(obj_in, **kwargs)
+    
+    async def prepare_encoded_object_one(
+        self,
+        obj_in: SourceSchemaType,
+        method: Optional[str] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Encodes the object
+        """
+        values = await self.pooler.arun(self.prepare_encoded_object, obj_in, method, **kwargs)
+        if method:
+            if method == 'upsert' and hasattr(self.model, 'updated_at'):
+                values['updated_at'] = datetime.datetime.now(datetime.timezone.utc)
+            elif method == 'create' and hasattr(self.model, 'created_at'):
+                values['created_at'] = datetime.datetime.now(datetime.timezone.utc)
+        return values
+
+
+    async def batch_prepare_encoded_objects(
+        self,
+        objs_in: List[SourceSchemaType],
+        method: str,
+        **kwargs,
+    ) -> List[Dict[str, Any]]:
+        """
+        Encodes the object
+        """
+        return await self.pooler.async_map(
+            self.prepare_encoded_object_one,
+            objs_in,
+            method = method,
+            **kwargs
+        )
 
     async def create(
         self, 
@@ -514,6 +567,21 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         await db.execute(stmt)
         if self.auto_commit:
             await db.commit()
+    
+    async def exists(
+        self,
+        db: AsyncSession,
+        id: Any,
+        key: Optional[str] = None,
+        **kwargs,
+    ) -> bool:
+        """
+        Checks if the object exists
+        """
+        key = key or self.table.primary_key.columns[0].name
+        stmt = select(self.model).where(getattr(self.model, key) == id)
+        return await db.scalar(stmt) is not None
+
     """
     Upsert Operations
     """
@@ -535,6 +603,8 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         values = self.prepare_encoded_object(obj_in, method = 'upsert', exclude = exclude_attrs, **kwargs)
         if hasattr(self.model, 'updated_at'):
             values['updated_at'] = datetime.datetime.now(datetime.timezone.utc)
+        # from lazyops.utils.logs import logger
+        # logger.info(f'Upserting: {values}', prefix = f'|g|{self.model.__name__}|e|', colored = True)
         stmt = insert(self.model).values(
             **values
         ).on_conflict_do_update(
@@ -544,7 +614,6 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         await db.execute(stmt)
         if self.auto_commit and not no_commit:
             await db.commit()
-
     
     async def upsert_many(
         self,
@@ -626,7 +695,78 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
             if completed: completed_idx += completed
             if failed: failed_idx += failed
         return (completed_idx, failed_idx)
+    
+    """
+    [v2] Upsert Operations
+    """
 
+    def get_update_columns(
+        self,
+        exclude_attrs: Optional[List[str]] = None,
+        **kwargs,
+    ) -> List[str]:
+        """
+        Returns the update columns
+        """
+        exclude_attrs = exclude_attrs or []
+        if hasattr(self.model, 'created_at'): exclude_attrs.append('created_at')
+        return [
+            c.name for c in self.table.c
+            if c not in list(self.table.primary_key.columns)
+            and c.name not in exclude_attrs
+        ]
+
+    async def _upsert(
+        self, 
+        db: AsyncSession, 
+        *, 
+        obj_in: SourceSchemaType, 
+        index_elements: Optional[List[str]] = None,
+        exclude_attrs: Optional[List[str]] = None,
+        no_commit: Optional[bool] = None,
+        **kwargs,
+    ) -> None:
+        """
+        [V2 Logic] Upserts an object
+        """
+        
+        index_elements = index_elements or self.table.primary_key.columns
+        update_cols = self.get_update_columns(exclude_attrs = exclude_attrs, **kwargs)
+        values = await self.prepare_encoded_object_one(obj_in, method = 'upsert', exclude = exclude_attrs, **kwargs)
+        stmt = insert(self.model).values(values)
+        on_conflict_stmt = stmt.on_conflict_do_update(
+            index_elements=index_elements,
+            set_ = {k: getattr(stmt.excluded, k) for k in update_cols},
+        )
+        await db.execute(on_conflict_stmt)
+        if self.auto_commit and not no_commit:
+            await db.commit()
+
+    async def _upsert_batch(
+        self, 
+        db: AsyncSession, 
+        *, 
+        objs_in: List[SourceSchemaType], 
+        index_elements: Optional[List[str]] = None,
+        exclude_attrs: Optional[List[str]] = None,
+        no_commit: Optional[bool] = None,
+        **kwargs,
+    ) -> None:
+        """
+        [V2 Logic] Upserts an object
+        """
+        index_elements = index_elements or self.table.primary_key.columns
+        update_cols = self.get_update_columns(exclude_attrs=exclude_attrs, **kwargs)
+        values = await self.batch_prepare_encoded_objects(objs_in, method = 'upsert', exclude = exclude_attrs, **kwargs)
+        stmt = insert(self.model).values(values)
+        on_conflict_stmt = stmt.on_conflict_do_update(
+            index_elements = index_elements,
+            set_ = {k: getattr(stmt.excluded, k) for k in update_cols},
+        )
+        await db.execute(on_conflict_stmt)
+        if self.auto_commit and not no_commit:
+            await db.commit()
+    
 
     """
     Update Operations

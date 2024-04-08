@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Persistence Types
 
@@ -13,15 +15,30 @@ from lazyops.utils.logs import logger, null_logger
 # from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
 from lazyops.utils.pooler import ThreadPooler
 
-from typing import Any, Dict, Optional, Union, Iterable, List, Type, TYPE_CHECKING
+from typing import Any, Dict, Optional, Union, Iterable, List, Type, Set, Callable, overload, TYPE_CHECKING
 from .backends import LocalStatefulBackend, RedisStatefulBackend, StatefulBackendT
 from .serializers import ObjectValue
+from .addons import (
+    NumericValuesContainer,
+    DurationMetric, 
+    CountMetric, 
+    MonetaryMetric, 
+    NestedDurationMetric, 
+    NestedMonetaryMetric, 
+    NestedCountMetric,
+    MetricT
+)
+from .debug import get_autologger
 
 if TYPE_CHECKING:
     from lazyops.types.models import BaseSettings
+    from kvdb.components.persistence import KVDBStatefulBackend
 
-_DEBUG_ENABLED = False
-autologger = logger if _DEBUG_ENABLED else null_logger
+    BackendT = Union[KVDBStatefulBackend, StatefulBackendT]
+
+
+
+autologger = get_autologger('main')
 
 
 RegisteredBackends = {
@@ -37,13 +54,29 @@ def is_in_async_loop() -> bool:
         return asyncio.get_event_loop().is_running()
     return False
 
+class ContextError(Exception):
+    """
+    Context Error
+    """
+    pass
+
+RegisteredMetricTypes = {
+    'numeric': NumericValuesContainer,
+    'count': CountMetric,
+    'duration': DurationMetric,
+    'monetary': MonetaryMetric,
+    'nested_count': NestedCountMetric,
+    'nested_duration': NestedDurationMetric,
+    'nested_monetary': NestedMonetaryMetric,
+}
+
 class PersistentDict(collections.abc.MutableMapping):
     """
     Persistent Dictionary Interface
     """
 
     backend_type: Optional[str] = 'auto'
-    base_class: Optional[Type[StatefulBackendT]] = None
+    base_class: Optional[Type['BackendT']] = None
 
     def __init__(
         self,
@@ -53,8 +86,9 @@ class PersistentDict(collections.abc.MutableMapping):
         base_key: Optional[str] = None,
         async_enabled: Optional[bool] = False,
         settings: Optional['BaseSettings'] = None,
-        backend: Optional[StatefulBackendT] = None,
+        backend: Optional['BackendT'] = None,
         backend_type: Optional[str] = None,
+        metric_types: Optional[Dict[str, Union[str, Type['MetricT']]]] = None,
         **kwargs,
     ):
         """
@@ -64,7 +98,7 @@ class PersistentDict(collections.abc.MutableMapping):
         if backend is not None:
             self.base_class = lazy_import(backend) if isinstance(backend, str) else backend
         if self.base_class is None:
-            self.base_class = self.get_backend_class()
+            self.base_class = self.get_backend_class(**kwargs)
         self.name = name
         self.base_key = base_key
         self.settings = settings
@@ -87,18 +121,29 @@ class PersistentDict(collections.abc.MutableMapping):
         )
         self._mutation_tracker: Dict[str, ObjectValue] = {}
         self._mutation_hashes: Dict[str, str] = {}
-        # logger.info(f'Initialized PersistentDict {self.name}/{self.base_key}/{self.base_class}')
+
+        # V2 Mutation Tracking with Context Manager
+        self._in_context: bool = False
+        self._temporal_dict: Dict[str, ObjectValue] = {}
+        self._metric_types: Dict[str, Type['MetricT']] = metric_types or {}
+        if self._metric_types:
+            for k, v in self._metric_types.items():
+                if isinstance(v, str): v = lazy_import(v)
+                self._metric_types[k] = v
+        
+        # self._metrics_dict: Dict[str, 'MetricT'] = {}
         atexit.register(self.flush)
     
     @classmethod
-    def register_backend(cls, name: str, backend: Union[str, Type[StatefulBackendT]]):
+    def register_backend(cls, name: str, backend: Union[str, Type['BackendT']]):
         """
         Registers a Backend
         """
         global RegisteredBackends
         RegisteredBackends[name] = backend
 
-    def get_backend_class(self, **kwargs) -> Type[StatefulBackendT]:
+    def get_backend_class(self, **kwargs) -> Type['BackendT']:
+        # sourcery skip: assign-if-exp, hoist-similar-statement-from-if, reintroduce-else, swap-nested-ifs
         """
         Returns the Backend Class
         """
@@ -110,10 +155,24 @@ class PersistentDict(collections.abc.MutableMapping):
         # elif self.backend_type == 'redis':
         #     return RedisStatefulBackend
         if self.backend_type == 'auto':
+            with contextlib.suppress(Exception):
+                import kvdb
+                if kvdb.is_available(url = kwargs.get('url')):
+                    from kvdb.components.persistence import KVDBStatefulBackend
+                    return KVDBStatefulBackend
+            
             if get_keydb_enabled():
                 return RedisStatefulBackend
+            logger.warning('Defaulting to Local Stateful Backend')
             return LocalStatefulBackend
         raise NotImplementedError(f'Backend Type {self.backend_type} is not implemented')
+    
+    def get_metric_class(self, kind: str, **kwargs) -> Type['MetricT']:
+        """
+        Metric Class
+        """
+        return self._metric_types.get(kind, RegisteredMetricTypes[kind])
+
     
     @property
     def compression_level(self) -> Optional[int]:
@@ -486,11 +545,17 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         return await self.base.apop(key, default, **kwargs)
     
+    # def __repr__(self):
+    #     """
+    #     Returns the Representation of the Cache
+    #     """
+    #     return repr(self.base)
+
     def __repr__(self):
         """
         Returns the Representation of the Cache
         """
-        return repr(self.base)
+        return f'{self.base_key}: {dict(self.items())}'
 
     def _clear_from_mutation_tracker(self, key: str):
         """
@@ -534,18 +599,102 @@ class PersistentDict(collections.abc.MutableMapping):
             self._mutation_hashes = {}
         gc.collect()
 
+    """
+    v2 Mutation Tracking
+    """
+    # TODO: deal with atomicity across multiple threads/processes/workers
+
+    def _enter_context(self, timeout: Optional[float] = None, blocking: Optional[bool] = True, **kwargs) -> bool:
+        """
+        Enters the context
+        """
+        if self.base.acquire_lock(timeout = timeout, blocking = blocking):
+            self._save_mutation_objects()
+            self._in_context = True
+            autologger.info(f'Entering Context: {self.name}/{self.base_key}')
+            return True
+        return False
+
+    def _exit_context(self):
+        """
+        Exits the context
+        """
+        autologger.info(f'Exiting Context: {self.name}/{self.base_key}')
+        autologger.info(self._temporal_dict, prefix = self.base_key, colored = True)
+        self.base.set_batch(self._temporal_dict)
+        self._temporal_dict.clear()
+        self.base.release_lock()
+        self._in_context = False
+
+    @contextlib.contextmanager
+    def acquire_context(self, timeout: Optional[float] = None, blocking: Optional[bool] = True, **kwargs):
+        """
+        Acquires the context
+        """
+        if self._enter_context(timeout = timeout, blocking = blocking, **kwargs):
+            try:
+                yield
+            finally:
+                self._exit_context()
+        else:
+            raise ContextError('Unable to acquire context due to concurrency')
+
+    async def _aenter_context(self, timeout: Optional[float] = None, blocking: Optional[bool] = True, **kwargs) -> bool:
+        """
+        Enters the context
+        """
+        if await self.base.acquire_alock(timeout = timeout, blocking = blocking, **kwargs):
+            await self._asave_mutation_objects()
+            self._in_context = True
+            autologger.info(f'Entering Context: {self.name}/{self.base_key}')
+            return True
+        return False
+
+    async def _aexit_context(self):
+        """
+        Exits the context
+        """
+        autologger.info(f'Exiting Context: {self.name}/{self.base_key}')
+        autologger.info(self._temporal_dict, prefix = self.base_key, colored = True)
+        await self.base.aset_batch(self._temporal_dict)
+        self._temporal_dict.clear()
+        await self.base.release_alock()
+        self._in_context = False
+
+    async def acquire_acontext(self, timeout: Optional[float] = None, blocking: Optional[bool] = True, **kwargs):
+        """
+        Acquires the context
+        """
+        if await self._aenter_context(timeout = timeout, blocking = blocking, **kwargs):
+            try:
+                yield
+            finally:
+                await self._aexit_context()
+        else:
+            raise ContextError('Unable to acquire context due to concurrency')
+
     def __getitem__(self, key: str) -> Union[ObjectValue, List, Dict[str, Union[List, Dict]]]:
         """
         Gets an Item from the DB
         """
+        if self._in_context:
+            if key not in self._temporal_dict:
+                autologger.info(f'Loading {key}', prefix = f'{self.name}/{self.base_key}', colored = True)
+                self._temporal_dict[key] = self.base.get(key)
+            return self._temporal_dict[key]
+
         with self.track_changes(key, '__getitem__') as result:
             return result
 
-    
     def __setitem__(self, key: str, value: ObjectValue):
         """
         Sets an Item in the Cache
         """
+        if self._in_context:
+            autologger.info(f'Setting {key}: {value}', prefix = self.base_key, colored = True)
+            self._temporal_dict[key] = value
+            return
+
         autologger.info(f'__setitem__ {key} {value}')
         if key in self._mutation_tracker:
             self._clear_from_mutation_tracker(key)
@@ -555,34 +704,71 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         Deletes an Item from the Cache
         """
+        if self._in_context:
+            autologger.info(f'Deleting {key}', prefix = self.base_key, colored = True)
+            del self._temporal_dict[key]
+            return
+
         autologger.info(f'__delitem__ {key}')
         if key in self._mutation_tracker:
             self._clear_from_mutation_tracker(key)
         return self.base.__delitem__(key)
         
+    def __contains__(self, key: str):
+        """
+        Returns True if the Cache contains the Key
+        """
+        if self._in_context:
+            return key in self._temporal_dict
+        return self.base.contains(key)
+    
     def __iter__(self):
         """
         Iterates over the Cache
         """
+        if self._in_context:
+            return iter(self._temporal_dict)
         return iter(self.base.keys())
     
     def __len__(self):
         """
         Returns the Length of the Cache
         """
-        return len(self.base)
-    
-    def __contains__(self, key: str):
-        """
-        Returns True if the Cache contains the Key
-        """
-        return self.base.contains(key)
+        return len(self._temporal_dict) if self._in_context else len(self.base)
     
     def __bool__(self):
         """
         Returns True if the Cache is not Empty
         """
         return bool(self.base.keys())
+
+    def __enter__(self):
+        """
+        Enters the context
+        """
+        if self._enter_context():
+            return self
+        raise ContextError('Unable to acquire context due to concurrency')
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exits the context
+        """
+        self._exit_context()
+
+    async def __aenter__(self):
+        """
+        Enters the context
+        """
+        if await self._aenter_context():
+            return self
+        raise ContextError('Unable to acquire context due to concurrency')
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """
+        Exits the context
+        """
+        await self._aexit_context()
     
     def length(self, **kwargs):
         """
@@ -794,6 +980,39 @@ class PersistentDict(collections.abc.MutableMapping):
         return await self.base.aspop(key, **kwargs) 
     
     """
+    Copy Methods
+    """
+
+    def copy(
+        self,
+        exclude: Optional[Set[str]] = None,
+        exclude_none: Optional[bool] = False,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Copies the current data and returns a Dict
+        """
+        data = self.items()
+        if exclude is not None: data = {k: v for k, v in data.items() if k not in exclude}
+        if exclude_none: data = {k: v for k, v in data.items() if v is not None}
+        return data
+    
+    async def acopy(
+        self,
+        exclude: Optional[Set[str]] = None,
+        exclude_none: Optional[bool] = False,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Copies the current data and returns a Dict
+        """
+        data = await self.aitems()
+        if exclude is not None: data = {k: v for k, v in data.items() if k not in exclude}
+        if exclude_none: data = {k: v for k, v in data.items() if v is not None}
+        return data
+
+    
+    """
     Schema Modification Methods
     """
 
@@ -803,8 +1022,140 @@ class PersistentDict(collections.abc.MutableMapping):
         """
         self.base.migrate_schema(schema_map, overwrite = overwrite, **kwargs)
 
+
     async def amigrate_schema(self, schema_map: Dict[str, Any], overwrite: Optional[bool] = None, **kwargs) -> None:
         """
         Migrates the schema
         """
         await self.base.amigrate_schema(schema_map, overwrite = overwrite, **kwargs)
+
+
+    def clone(
+        self, 
+        target: Optional[Any], 
+        target_base_key: Optional[str] = None,
+        schema_map: Optional[Dict[str, str]] = None,
+        overwrite: Optional[bool] = None, 
+        **kwargs
+    ):
+        """
+        Clones the data from the current PersistentDict to a new PersistentDict
+        """
+        return self.base.clone(target = target, target_base_key = target_base_key, schema_map = schema_map, overwrite = overwrite, **kwargs)
+
+    @overload
+    async def aclone(
+        self,
+        target: str, 
+        target_base_key: Optional[str] = None,
+        target_db_id: Optional[int] = None,
+        source_url: Optional[str] = None,
+        source_base_key: Optional[str] = None,
+        schema_map: Optional[Dict[str, str]] = None,
+        overwrite: Optional[bool] = None, 
+        excluded: Optional[Union[str, List[str]]] = None,
+        filter_function: Optional[Callable[[str], bool]] = None,
+        raise_errors: Optional[bool] = True,
+        verbose: Optional[bool] = True,
+        **kwargs
+    ) -> Dict[str, Union[List[str], int, float]]:
+        """
+        Clones the data from the current PersistentDict to a new PersistentDict
+        """
+        ...
+
+    async def aclone(
+        self,
+        target: Optional[Any], 
+        target_base_key: Optional[str] = None,
+        schema_map: Optional[Dict[str, str]] = None,
+        overwrite: Optional[bool] = None, 
+        **kwargs
+    ):
+        """
+        Clones the data from the current PersistentDict to a new PersistentDict
+        """
+        return await self.base.aclone(target = target, target_base_key = target_base_key, schema_map = schema_map, overwrite = overwrite, **kwargs)
+    
+    def clone_from(
+        self,
+        target: Any, 
+        target_base_key: Optional[str] = None,
+        schema_map: Optional[Dict[str, str]] = None,
+        overwrite: Optional[bool] = None, 
+        **kwargs
+    ):
+        """
+        Clones the data from the target PersistentDict to a current PersistentDict
+        """
+        return self.base.clone_from(target = target, target_base_key = target_base_key, schema_map = schema_map, overwrite = overwrite, **kwargs)
+
+    @overload
+    async def aclone_from(
+        self,
+        target: str, 
+        target_base_key: Optional[str] = None,
+        target_db_id: Optional[int] = None,
+        source_url: Optional[str] = None,
+        source_base_key: Optional[str] = None,
+        schema_map: Optional[Dict[str, str]] = None,
+        overwrite: Optional[bool] = None, 
+        excluded: Optional[Union[str, List[str]]] = None,
+        filter_function: Optional[Callable[[str], bool]] = None,
+        raise_errors: Optional[bool] = True,
+        verbose: Optional[bool] = True,
+        **kwargs
+    ) -> Dict[str, Union[List[str], int, float]]:
+        """
+        Clones the data from the target PersistentDict to a current PersistentDict
+        """
+        ...
+
+    async def aclone_from(
+        self,
+        target: Any, 
+        target_base_key: Optional[str] = None,
+        schema_map: Optional[Dict[str, str]] = None,
+        overwrite: Optional[bool] = None, 
+        **kwargs
+    ):
+        """
+        Clones the data from the target PersistentDict to a current PersistentDict
+        """
+        return await self.base.aclone_from(target = target, target_base_key = target_base_key, schema_map = schema_map, overwrite = overwrite, **kwargs)
+
+    
+    """
+    Metrics
+    """
+
+    def configure_metric(
+        self,
+        name: str,
+        kind: str,
+        reset: Optional[bool] = None,
+        metric_class: Optional[Union[Type['MetricT'], str]] = None,
+        verbose: Optional[bool] = False,
+        **kwargs,
+    ):
+        """
+        Configures a Metric
+        """
+        if 'metrics' not in self: self['metrics'] = {}
+        if reset or name not in self['metrics']:
+            if metric_class: metric_class = lazy_import(metric_class) if isinstance(metric_class, str) else metric_class
+            else: metric_class = self.get_metric_class(kind, **kwargs)
+            self['metrics'][name] = metric_class(name = name, **kwargs)
+        elif verbose:
+            autologger.info(f'Metric {kind} {name} already configured', prefix = self.name, colored = True)
+
+    
+    @property
+    def metrics(self) -> Dict[str, 'MetricT']:
+        """
+        Returns the Metrics
+        """
+        return self.__getitem__('metrics')
+    
+
+    
