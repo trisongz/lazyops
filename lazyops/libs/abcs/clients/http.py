@@ -752,6 +752,65 @@ class HTTPPoolClient(BaseAPIClient):
             )
         return self.get(url = self.google_csx_base_url, return_type = 'json', params = params, cachable = cachable, overwrite_cache = overwrite_cache, disable_cache = disable_cache)
 
+
+    async def _aget_csx(
+        self,
+        # url: str,
+        *args,
+        return_type: Optional[Union[ReturnType, ReturnModelT]] = 'json',
+        retryable: Optional[bool] = False,
+        retry_limit: Optional[int] = 3,
+        **kwargs
+    ) -> ReturnTypeT:
+        """
+        Creates a GET Request and returns a `ReturnTypeT` for Google CSX to handle rate limiting
+        """
+        get_func = self._aget_
+        url = self.google_csx_base_url
+        if retryable: get_func = http_retry_wrapper(max_tries = retry_limit + 1)(get_func)
+        response = await get_func(url, *args, **kwargs)
+        if response.status_code == 429:
+            self.logger.warning(f'[{response.status_code}] Rate Limit Exceeded. Retrying after a bit', colored = True, prefix = 'GoogleCSX')    
+            attempts = 1
+            while response.status_code == 429:
+                await asyncio.sleep(10.0 * attempts)
+                response = await get_func(url, *args, **kwargs)
+                if response.status_code != 429: 
+                    self.autologger.info(f'[{response.status_code}] Completed Retry after {attempts} Attempts', colored = True, prefix = 'GoogleCSX')
+                    break
+                attempts += 1
+        return self.handle_response(response, return_type = return_type)
+
+    @cachify.register()
+    async def acsx_request(
+        self, 
+        # url: str, 
+        *args,
+        cachable: Optional[bool] = True,
+        overwrite_cache: Optional[bool] = None,
+        disable_cache: Optional[bool] = None,
+        background: Optional[bool] = False,
+        callback: Optional[Callable[..., Any]] = None,
+        retryable: Optional[bool] = False,
+        retry_limit: Optional[int] = 3,
+        **kwargs
+    ) -> Dict[str, Union[List[Dict[str, Any]], Any]]:
+        """
+        Creates a CSX Request while handling rate limiting
+        """
+        if background:
+            return self.pooler.create_background(
+                self._aget_csx,
+                *args,
+                task_callback = callback,
+                retryable = retryable,
+                retry_limit = retry_limit,
+                **kwargs
+            )
+        return await self._aget_csx(*args, retryable = retryable, retry_limit = retry_limit,  **kwargs)
+    
+
+            
     async def aget_csx(
         self,
         query: str,
@@ -783,16 +842,15 @@ class HTTPPoolClient(BaseAPIClient):
         if kwargs: params.update(kwargs)
         if background:
             return self.pooler.create_background(
-                self.aget,
-                url = self.google_csx_base_url,
-                return_type = 'json',
+                self.acsx_request,
                 params = params,
                 task_callback = callback,
                 cachable = cachable,
                 overwrite_cache = overwrite_cache,
                 disable_cache = disable_cache,
             )
+        return await self.acsx_request(params = params, cachable = cachable, overwrite_cache = overwrite_cache, disable_cache = disable_cache)
         # return await self._aget(url = self.google_csx_base_url, return_type = 'json', params = params)
-        return await self.aget(url = self.google_csx_base_url, return_type = 'json', params = params, cachable = cachable, overwrite_cache = overwrite_cache, disable_cache = disable_cache)
+        # return await self.aget(url = self.google_csx_base_url, return_type = 'json', params = params, cachable = cachable, overwrite_cache = overwrite_cache, disable_cache = disable_cache)
     
         
