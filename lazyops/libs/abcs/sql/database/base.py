@@ -15,7 +15,7 @@ import contextlib
 from pathlib import Path
 from pydantic.networks import PostgresDsn
 from pydantic_settings import BaseSettings
-from pydantic import validator, model_validator, computed_field, BaseModel, Field
+from pydantic import validator, model_validator, computed_field, BaseModel, Field, PrivateAttr
 
 from sqlalchemy import text as sql_text, TextClause
 from sqlalchemy.pool import NullPool, AsyncAdaptedQueuePool
@@ -191,6 +191,62 @@ class PostgresConfig(BaseModel):
     model_config = {'extra': 'allow', 'arbitrary_types_allowed': True}
 
 
+class RemoteDatabaseConnection(PostgresConfig):
+    """
+    Remote Database
+    """
+
+    name: str
+    extra_kws: Optional[Dict[str, Any]] = Field(default_factory = dict)
+    _engine_rw: Optional[AsyncEngine] = PrivateAttr(None)
+    _engine_ro: Optional[AsyncEngine] = PrivateAttr(None)
+    _session_rw: Optional[async_sessionmaker[AsyncSession]] = PrivateAttr(None)
+    _session_ro: Optional[async_sessionmaker[AsyncSession]] = PrivateAttr(None)
+
+    @property
+    def engine(self) -> AsyncEngine:
+        """
+        Returns the engine
+        """
+        if self._engine_rw is None:
+            self._engine_rw = create_async_engine(**self.get_engine_kwargs(readonly = False, **self.extra_kws))
+        return self._engine_rw
+    
+    @property
+    def engine_ro(self) -> AsyncEngine:
+        """
+        Returns the readonly engine
+        """
+        if self._engine_ro is None:
+            self._engine_ro = create_async_engine(**self.get_engine_kwargs(readonly = True, **self.extra_kws))
+        return self._engine_ro
+    
+    @property
+    def session_rw(self) -> async_sessionmaker[AsyncSession]:
+        """
+        Returns the session
+        """
+        if self._session_rw is None:
+            self._session_rw = async_sessionmaker(
+                self.engine, 
+                class_ = AsyncSession, 
+                **self.get_session_kwargs(readonly = False, **self.extra_kws)
+            )
+        return self._session_rw
+
+    @property
+    def session_ro(self) -> async_sessionmaker[AsyncSession]:
+        """
+        Returns the readonly session
+        """
+        if self._session_ro is None:
+            self._session_ro = async_sessionmaker(
+                self.engine_ro, class_ = AsyncSession, **self.get_session_kwargs(readonly = True, **self.extra_kws)
+            )
+        return self._session_ro
+
+
+
 class DatabaseClientBase(abc.ABC):
 
     name: Optional[str] = 'database'
@@ -218,13 +274,15 @@ class DatabaseClientBase(abc.ABC):
         self._sql_template: Optional['SQLTemplates'] = None
         self._sql_template_kwargs: Optional[Dict[str, Any]] = {}
 
+        # Remote Configs to Connect
+        self.remote_connections: Dict[str, RemoteDatabaseConnection] = {}
+
         self.pre_init(**kwargs)
         if settings: self.config = PostgresConfig.from_settings(settings)
         elif config: self.config = config
         self.post_init(**kwargs)
         self._kwargs = kwargs
     
-
 
     def configure(
         self, 
@@ -258,6 +316,31 @@ class DatabaseClientBase(abc.ABC):
         if template_base_path: self._sql_template_kwargs['base_path'] = template_base_path
         if template_file_suffix: self._sql_template_kwargs['file_suffix'] = template_file_suffix
         if kwargs: self._kwargs = update_dict(self._kwargs, kwargs)
+
+    def configure_remote(
+        self,
+        url: str,
+        name: str,
+        readonly_url: Optional[str] = None,
+        superuser_url: Optional[str] = None,
+        overwrite: Optional[bool] = None,
+        **kwargs
+    ):
+        """
+        Configures the remote database
+        """
+        if name in self.remote_connections and not overwrite: raise ValueError(f'Remote Connection {name} already exists')
+        _config = {
+            'name': name,
+            'url': url,
+            'readonly_url': readonly_url,
+            'superuser_url': superuser_url,
+        }
+        _config = {k:v for k, v in _config.items() if v is not None}
+        _config['extra_kws'] = kwargs
+        self.remote_connections[name] = RemoteDatabaseConnection.model_validate(_config)
+
+
 
     def pre_init(self, **kwargs):
         """
@@ -300,6 +383,7 @@ class DatabaseClientBase(abc.ABC):
         Configures the SQL Templates
         """
         pass
+
 
     @property
     def sql_template(self) -> 'SQLTemplates':
@@ -502,6 +586,42 @@ class DatabaseClientBase(abc.ABC):
         finally:
             await sess.close()
             gc.collect()
+
+
+    @contextlib.asynccontextmanager
+    async def remote_session(
+        self, 
+        name: str,
+        readonly: Optional[bool] = None,
+        auto_commit: Optional[bool] = None,
+        raise_errors: Optional[bool] = None,
+        auto_rollback: Optional[bool] = True,
+    ) -> AsyncGenerator[AsyncSession, None]:
+        """
+        Context manager for the remote database session
+        """
+        if name not in self.remote_connections: raise ValueError(f'Remote Connection {name} does not exist')
+        remote_conn = self.remote_connections[name]
+        sess_type = remote_conn.session_ro if readonly else remote_conn.session_rw
+        sess: AsyncSession = None
+        try:
+            sess: AsyncSession = sess_type()
+            yield sess
+        except Exception as e:
+            logger.trace('Session error', e, depth = 5)
+            self.run_error_callbacks(e)
+            if auto_rollback: 
+                try:
+                    await sess.rollback()
+                    logger.info('Rolled back session')
+                except Exception as e:
+                    logger.trace('Rollback error', e)
+            if raise_errors: raise e
+        finally:
+            if auto_commit: await sess.commit()
+            await sess.close()
+            if readonly: gc.collect()
+
 
 
     @staticmethod

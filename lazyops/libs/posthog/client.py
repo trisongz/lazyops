@@ -88,23 +88,23 @@ class PostHogClient(abc.ABC):
         """
         # Reuse the existing client if it exists
         # which will prevent multiple clients from being created
-        if has_existing_posthog_client():
-            self = get_posthog_client(
-                endpoint = endpoint,
-                enabled = enabled,
-                api_key = api_key,
-                project_id = project_id,
-                client_timeout = client_timeout,
-                batch_size = batch_size,
-                batch_interval = batch_interval,
-                debug_enabled = debug_enabled,
-                default_retries = default_retries,
-                batched = batched,
-                num_workers = num_workers,
-                **kwargs
-            )
-            return
         self.settings = get_posthog_settings()
+        # if has_existing_posthog_client():
+        #     self = get_posthog_client(
+        #         endpoint = endpoint,
+        #         enabled = enabled,
+        #         api_key = api_key,
+        #         project_id = project_id,
+        #         client_timeout = client_timeout,
+        #         batch_size = batch_size,
+        #         batch_interval = batch_interval,
+        #         debug_enabled = debug_enabled,
+        #         default_retries = default_retries,
+        #         batched = batched,
+        #         num_workers = num_workers,
+        #         **kwargs
+        #     )
+        #     return
         self.upkeep_interval = upkeep_interval or 0.1
         self.dryrun = dryrun
         self._kwargs = kwargs
@@ -282,6 +282,7 @@ class PostHogClient(abc.ABC):
         """
         if not self.enabled: return
         if not self.started: self.start_task_queue()
+        
         self.task_queue.put_nowait((event, kwargs))
 
     async def send_events(
@@ -361,7 +362,7 @@ class PostHogClient(abc.ABC):
         for response in responses:
             if response.status_code != 200:
                 self.failed_events += 1
-                self.autologger.info(f'[{response.status_code}] Error Sending Event: |y|{response.text}|e|', prefix = f'PostHog Worker: {worker_n}', colored = True) 
+                self.autologger.info(f'[{response.status_code}] Error Sending Event: |y|{await response.text}|e|', prefix = f'PostHog Worker: {worker_n}', colored = True) 
             else: self.successful_events += 1
 
     async def upkeep(self, worker_n: Optional[int] = None):
@@ -515,3 +516,16 @@ class PostHogClient(abc.ABC):
         return decorator
             
 
+    def flush(self, force: Optional[bool] = True) -> None:
+        """
+        Flushes the events
+        """
+        self.tasks.add(
+            asyncio.create_task(self.send_events(force = force))
+        )
+
+    async def aflush(self, force: Optional[bool] = True) -> None:
+        """
+        Flushes the events
+        """
+        await self.send_events(force = force)

@@ -15,7 +15,7 @@ from lazyops.utils.logs import logger, null_logger
 # from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
 from lazyops.utils.pooler import ThreadPooler
 
-from typing import Any, Dict, Optional, Union, Iterable, List, Type, Set, Callable, Mapping, MutableMapping, TypeVar, overload, TYPE_CHECKING
+from typing import Any, Dict, Optional, Union, Iterable, List, Type, Set, Callable, Mapping, MutableMapping, Tuple, TypeVar, overload, TYPE_CHECKING
 from .backends import LocalStatefulBackend, RedisStatefulBackend, StatefulBackendT
 from .serializers import ObjectValue
 from .addons import (
@@ -418,6 +418,21 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         await self._asave_mutation_objects()
         return await self.base.avalues(**kwargs)
     
+    @overload
+    async def aitems(self, iterable: Optional[bool] = True, **kwargs) -> Iterable[Tuple[KT, VT]]:
+        """
+        Returns the Items
+        """
+        ...
+        
+    @overload
+    async def aitems(self, iterable: Optional[bool] = False, **kwargs) -> Dict[KT, VT]:
+        """
+        Returns the Items
+        """
+        ...
+    
+
     async def aitems(self, iterable: Optional[bool] = True, **kwargs) -> Dict[KT, VT]:
         """
         Returns the Items

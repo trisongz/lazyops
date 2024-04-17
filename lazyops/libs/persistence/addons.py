@@ -5,7 +5,7 @@ Persistent Dict Addons
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Optional, Union, Tuple, Dict, Iterator, Any, Type, Iterable, TYPE_CHECKING
+from typing import List, Optional, Union, Tuple, Dict, Iterator, Any, Type, Set, Iterable, TYPE_CHECKING
 from .debug import get_autologger
 
 autologger = get_autologger('addons')
@@ -455,9 +455,7 @@ class DurationMetric(NumericValuesContainer):
         Returns the median in seconds
         """
         return self.pformat_duration(self.median, short = 1, include_ms = False)
-    
 
-    
 
 class CountMetric(BaseModel):
     """
@@ -647,6 +645,13 @@ class CountMetric(BaseModel):
         Representation of the object
         """
         return f'{dict(self.items())}'
+
+    @property
+    def key_list(self) -> List[str]:
+        """
+        Returns the list of keys
+        """
+        return list(self.data.keys())
 
 
 MetricModel = Union[CountMetric, DurationMetric, MonetaryMetric, NumericValuesContainer, BaseModel]

@@ -279,6 +279,7 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         self._logger: Optional['Logger'] = None
         self._pooler: Optional['ThreadPool'] = None
         self._kwargs = kwargs
+        self._lazyattrs: Dict[str, Any] = {}
         self._post_init(**kwargs)
 
     def _post_init(self, **kwargs):
@@ -293,7 +294,33 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         """
         Returns the table name
         """
-        return self.model.__tablename__
+        if 'table_name' not in self._lazyattrs:
+            self._lazyattrs['table_name'] = self.model.__tablename__
+        return self._lazyattrs['table_name']
+    
+    @property
+    def table_schema_name(self) -> str:
+        """
+        Returns the table schema name
+        """
+        if 'table_schema_name' not in self._lazyattrs:
+            self._lazyattrs['table_schema_name'] = self.model.metadata.schema
+        return self._lazyattrs['table_schema_name']
+    
+    @property
+    def table_with_schema_name(self) -> str:
+        """
+        Returns the table with schema name
+
+        {table_schema_name}.{table_name}
+        """
+        if 'table_with_schema_name' not in self._lazyattrs:
+            if self.table_schema_name:
+                self._lazyattrs['table_with_schema_name'] = f'{self.table_schema_name}.{self.table_name}'
+            else:
+                self._lazyattrs['table_with_schema_name'] = self.table_name
+        return self._lazyattrs['table_with_schema_name']
+    
     
     @property
     def pooler(self) -> 'ThreadPool':
@@ -318,7 +345,9 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
         """
         Returns the object class name
         """
-        return self.model.__name__
+        if 'object_class_name' not in self._lazyattrs:
+            self._lazyattrs['object_class_name'] = self.model.__name__
+        return self._lazyattrs['object_class_name']
 
     @property
     def logger(self) -> 'Logger':

@@ -134,6 +134,12 @@ class AppSettings(BaseAppSettings):
         """
         return self.app_env in [AppEnv.DEVELOPMENT, AppEnv.LOCAL, AppEnv.CICD]
     
+    def set_app_env(self, env: AppEnv) -> None:
+        """
+        Sets the app environment
+        """
+        self.app_env = self.app_env.from_env(env)
+
     def get_assets(
         self, 
         *path_parts,

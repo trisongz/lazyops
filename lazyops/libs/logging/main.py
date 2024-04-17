@@ -729,6 +729,23 @@ class Logger(_Logger):
         for logger in loggers:
             logging.getLogger(logger).addFilter(_healthz_filter)
 
+    def mute_module(
+        self,
+        module: str,
+        **kwargs,
+    ):
+        """
+        Efectively mutes a module
+            
+            - `module`: The module to mute
+        """
+        def _mute_filter(record: logging.LogRecord) -> bool:
+        
+            return record.module == module
+        
+        logging.getLogger(module).addFilter(_mute_filter)
+    
+
 class InterceptHandler(logging.Handler):
     loglevel_mapping = LOGLEVEL_MAPPING
 
