@@ -132,7 +132,7 @@ class AppSettings(BaseAppSettings):
         """
         Returns whether the environment is development
         """
-        return self.app_env in [AppEnv.DEVELOPMENT, AppEnv.LOCAL, AppEnv.CICD]
+        return self.app_env in [AppEnv.DEVELOPMENT, AppEnv.LOCAL, AppEnv.CICD, AppEnv.STAGING, AppEnv.TEST]
     
     def set_app_env(self, env: AppEnv) -> None:
         """

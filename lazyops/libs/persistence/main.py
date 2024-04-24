@@ -419,22 +419,21 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         return await self.base.avalues(**kwargs)
     
     @overload
-    async def aitems(self, iterable: Optional[bool] = False, **kwargs) -> Dict[KT, VT]:
+    async def aitems(self, iterable: None = None, **kwargs) -> Iterable[Tuple[KT, VT]]:
         """
         Returns the Items
         """
         ...
-    
     
     @overload
-    async def aitems(self, **kwargs) -> Iterable[Tuple[KT, VT]]:
+    async def aitems(self, iterable: bool = False, **kwargs) -> Dict[KT, VT]:
         """
         Returns the Items
         """
         ...
-        
 
-    async def aitems(self, iterable: Optional[bool] = True, **kwargs) -> Dict[KT, VT]:
+
+    async def aitems(self, iterable: Optional[bool] = True, **kwargs) -> Union[Iterable[Tuple[KT, VT]], Dict[KT, VT]]:
         """
         Returns the Items
         """
