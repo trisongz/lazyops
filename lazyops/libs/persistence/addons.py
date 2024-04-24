@@ -538,6 +538,7 @@ class CountMetric(BaseModel):
         """
         Checks if the key is in the values
         """
+        # print(f'[{self.name}] Checking if {key} is in {self.data} = {key in self.data}')
         return key in self.data
     
     def __len__(self) -> int:
@@ -640,6 +641,13 @@ class CountMetric(BaseModel):
         if sort: return dict(sorted(self.data.items(), key = lambda x: x[1], reverse = True)[:n])
         return dict(list(self.data.items())[:n])
     
+    def sum_keys(self, *keys: str) -> int:
+        """
+        Sums the values of the keys
+        """
+        keys = [key for key in keys if key]
+        return sum(self.data.get(key, 0) for key in keys)
+    
     def __repr__(self) -> str:
         """
         Representation of the object
@@ -722,6 +730,7 @@ class BaseNestedMetric(BaseModel):
         Checks if the key is in the data
         """
         return key in self.data
+    
     
     
     if TYPE_CHECKING:
