@@ -64,7 +64,7 @@ _parser_types: Dict[str, Type] = {
 def parse_one(
     name: str,
     field: FieldInfo,
-) -> Tuple[Set, Dict]:
+) -> Tuple[Set, Dict]:  # sourcery skip: low-code-quality
     """
     Parse a single field into the args and kwargs for the add_argument method
     """
@@ -80,7 +80,9 @@ def parse_one(
     if field.is_required():
         args.add(name)
     else:
-        args.add(f'--{name}')
+        if not field.json_schema_extra or not field.json_schema_extra.get('exclude_name', False):
+            args.add(f'--{name}')
+        
         if field.json_schema_extra and field.json_schema_extra.get('alt'):
             alt = field.json_schema_extra['alt']
             if isinstance(alt, str): alt = [alt]

@@ -283,7 +283,7 @@ class Timer(abc.ABC, dict):
         """
         Returns the average duration of the timer as a string
         """
-        return self.pformat(self.total_average(count))
+        return self.pformat(self.total_average(count or 1))
     
     def total_average_iter(self, count: int) -> float:
         """
@@ -397,6 +397,20 @@ class Timer(abc.ABC, dict):
         Returns the duration at the given index
         """
         return self.durations[index] if self.durations else self.elapsed
+    
+    def __iadd__(self, other: Union[float, int]) -> 'Timer':
+        """
+        Adds the other to the values
+        """
+        self.durations.append(other)
+        return self
+    
+    def __isub__(self, other: Union[float, int]) -> 'Timer':
+        """
+        Subtracts the other from the values
+        """
+        self.durations.append(-other)
+        return self
 
     @property
     def data_dict(self) -> Dict[str, Any]:

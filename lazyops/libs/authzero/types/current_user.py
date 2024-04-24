@@ -509,9 +509,9 @@ class CurrentUser(BaseModel):
             if self.role is None: self.role = UserRole.SERVICE
             self.user_type = 'service'
         if self.role is None: 
-            if self.user_data and self.user_data.user_metadata.get('role'):
+            if self.user_data and self.user_data.user_metadata and self.user_data.user_metadata.get('role'):
                 self.role = UserRole.parse_role(self.user_data.user_metadata['role'])
-            elif self.user_data and self.user_data.app_metadata.get('role'):
+            elif self.user_data and self.user_data.app_metadata and self.user_data.app_metadata.get('role'):
                 self.role = UserRole.parse_role(self.user_data.app_metadata['role'])
             else:
                 self.role = UserRole.USER
@@ -656,9 +656,9 @@ class CurrentUser(BaseModel):
             self.validate_permissions() if scopes is None else self.validate_scopes(scopes)
             if self.validation_method is None: self.validation_method = 'api_key'
             if self.role is None: 
-                if self.user_data and self.user_data.user_metadata.get('role'):
+                if self.user_data and self.user_data.user_metadata and self.user_data.user_metadata.get('role'):
                     self.role = UserRole.parse_role(self.user_data.user_metadata['role'])
-                elif self.user_data and self.user_data.app_metadata.get('role'):
+                elif self.user_data and self.user_data.app_metadata and self.user_data.app_metadata.get('role'):
                     self.role = UserRole.parse_role(self.user_data.app_metadata['role'])
                 elif '@clients' in self.claims.sub:
                     self.role = UserRole.SERVICE

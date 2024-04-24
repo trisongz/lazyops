@@ -86,14 +86,36 @@ def patch_openapi_schema(
     replace_key_start: Optional[str] = KEY_START,
     replace_key_end: Optional[str] = KEY_END,
     replace_sep_char: Optional[str] = KEY_SEP,
+    openapi_spec_map: Optional[Dict[str, Union[str, Tuple[str, int]]]] = None,
+
+    # Extra Schemas
+    enable_description_path_patch: Optional[bool] = None,
     **kwargs
-) -> Dict[str, Any]:
+) -> Dict[str, Any]:  # sourcery skip: low-code-quality
     """
     Patch the openapi schema
+
+    Operations:
+
+    1. If `openapi_spec_map` is provided, it will be used to replace the values in the openapi schema
+      This operation uses JSON to repalce the string values by dumping/loading
+    2. If `schemas_patches` is provided, it will be used to patch the openapi schema
+    3. If `replace_patches` is provided, it will be used to replace the values in the openapi schema
+    4. If `enable_description_path_patch` is provided, it will be used to patch the openapi schema
+      This operation replaces any `CURRENT_OPENAPI_PATH` with the current path
     """
     global _openapi_schemas
     if module_name not in _openapi_schemas or overwrite:
         if verbose: logger.info(f"[|g|{module_name}|e|] Patching OpenAPI Schema", colored = True)
+        if openapi_spec_map:
+            _spec = json.dumps(openapi_schema)
+            for key, value in openapi_spec_map.items():
+                if isinstance(value, tuple):
+                    _spec = _spec.replace(key, value[0], value[1])
+                else:
+                    _spec = _spec.replace(key, value)
+            openapi_schema = json.loads(_spec)
+
         for path, patch in schemas_patches.items():
             with contextlib.suppress(Exception):
                 patch_source = openapi_schema['components']['schemas'].pop(patch['source'], None)
@@ -105,6 +127,15 @@ def patch_openapi_schema(
                 # Handle Paths
                 openapi_schema['paths'][path]['post']['requestBody']['content']['multipart/form-data']['schema']['$ref'] = f'#/components/schemas/{patch["schema"]}'
         
+        if enable_description_path_patch:
+            with contextlib.suppress(Exception):
+                for path in openapi_schema['paths']:
+                    for method in openapi_schema['paths'][path]:
+                        if 'description' in openapi_schema['paths'][path][method] and 'CURRENT_OPENAPI_PATH' in openapi_schema['paths'][path][method]['description']:
+                            # logger.info(f"Patching Description Path: {path}", prefix = '|g|OpenAPI|e|', colored = True)
+                            openapi_schema['paths'][path][method]['description'] = openapi_schema['paths'][path][method]['description'].replace('CURRENT_OPENAPI_PATH', path)
+
+
         if not excluded_schemas: excluded_schemas = []
         for exclude in excluded_schemas:
             _ = openapi_schema['components']['schemas'].pop(exclude, None)
@@ -139,6 +170,8 @@ def create_openapi_schema_patch(
     replace_key_end: Optional[str] = KEY_END,
     replace_sep_char: Optional[str] = KEY_SEP,
     replace_domain_key: Optional[str] = DOMAIN_KEY,
+    openapi_spec_map: Optional[Dict[str, Union[str, Tuple[str, int]]]] = None,
+    enable_description_path_patch: Optional[bool] = None,
 
 ) -> Callable[[Dict[str, Any]], Dict[str, Any]]:
     """
@@ -164,6 +197,8 @@ def create_openapi_schema_patch(
             replace_key_start = replace_key_start,
             replace_key_end = replace_key_end,
             replace_sep_char = replace_sep_char,
+            openapi_spec_map = openapi_spec_map,
+            enable_description_path_patch = enable_description_path_patch,
         )
     return patch_openapi_schema_wrapper
 

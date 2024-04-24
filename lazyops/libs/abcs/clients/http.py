@@ -34,6 +34,8 @@ class BaseAPIClient(BaseGlobalClient):
     name: Optional[str] = 'api'
     verbose_errors: Optional[bool] = True
     http_timeout: Optional[float] = None
+    http_errors_verbose: Optional[bool] = True
+    http_errors_truncate_length: Optional[int] = 1000
 
     _endpoint: Optional[str] = None
     _headers: Optional[Dict[str, Any]] = None
@@ -509,12 +511,21 @@ class BaseAPIClient(BaseGlobalClient):
             else:
                 raise ValueError(f'Invalid return type: {return_type}')
         except aiohttpx.HTTPStatusError as e:
-            if self.settings.is_production_env:
+            if not self.http_errors_verbose or self.settings.is_production_env:
                 self.logger.warning(f'[{response.status_code} - {e.request.url}]')
             else:
-                self.logger.error(f'[{response.status_code} - {e.request.url}] {response.text}')
+                response_text = response.text
+                if self.http_errors_truncate_length:
+                    response_text = response_text[:self.http_errors_truncate_length]
+                self.logger.error(f'[{response.status_code} - {e.request.url}] {response_text}')
         except Exception as e:
-            self.logger.trace(f'Error in response: {response.text}', e)
+            if not self.http_errors_verbose:
+                self.logger.error(f'[{type(e)}] {str(e)}')
+            else:
+                response_text = response.text
+                if self.http_errors_truncate_length:
+                    response_text = response_text[:self.http_errors_truncate_length]
+                self.logger.trace(f'Error in response: {response_text}', e)
             raise e
     
 

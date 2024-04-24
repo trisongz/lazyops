@@ -14,7 +14,7 @@ from ..utils.lazy import get_az_settings, get_az_mtg_api, get_az_resource_schema
 from ..utils.helpers import get_hashed_key, create_code_challenge, parse_scopes, encode_params_to_url
 
 
-from typing import Optional, List, Dict, Any, Union, Type
+from typing import Optional, List, Dict, Any, Union, Type, Tuple
 
 if lazyload.TYPE_CHECKING:
     import niquests
@@ -239,7 +239,7 @@ class AuthZeroOAuthClient(ABC):
                     self.docs_schema_index[doc_name] = schema['paths'][path][method]['operationId']
 
 
-    def create_openapi_source_spec(self, spec: Dict[str, Any], spec_map: Optional[Dict[str, Any]] = None):
+    def create_openapi_source_spec(self, spec: Dict[str, Any], spec_map: Optional[Dict[str, Union[str, Tuple[str, int]]]] = None,):
         """
         Creates the Source Spec
 
@@ -251,7 +251,10 @@ class AuthZeroOAuthClient(ABC):
         if not spec_map: return
         _spec = json.dumps(spec)
         for key, value in spec_map.items():
-            _spec = _spec.replace(key, value)
+            if isinstance(value, tuple):
+                _spec = _spec.replace(key, value[0], value[1])
+            else:
+                _spec = _spec.replace(key, value)
         self.source_openapi_schema = json.loads(_spec)
 
 

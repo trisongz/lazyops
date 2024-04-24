@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 from pydantic import model_validator
 from lazyops.types import BaseModel, Field
 from typing import Optional, Dict, Any, Union, List
@@ -23,6 +24,14 @@ class SlackContext(BaseModel):
         Lookup ID
         """
         return self.uids.get(name, self.users.get(name, self.channels.get(name)))
+    
+
+def create_slack_timestamp() -> int:
+    """
+    Creates a Slack Timestamp
+    """
+    return int(datetime.datetime.now().timestamp())
+
 
 class SlackPayload(BaseModel):
     token: Optional[str] = None
@@ -42,6 +51,8 @@ class SlackPayload(BaseModel):
 
     ccommand: Optional[str] = None # A mutable copy of the command
     ctext: Optional[str] = None # A mutable copy of the text
+
+    timestamp: Optional[int] = Field(default_factory = create_slack_timestamp)
     
     @model_validator(mode = 'after')
     def set_mutable_context(self):
@@ -51,5 +62,13 @@ class SlackPayload(BaseModel):
         if self.text is not None: self.ctext = self.text
         if self.command is not None: self.ccommand = self.command
         return self
-
-        
+    
+    def from_repeat(self, payload: SlackPayload) -> 'SlackPayload':
+        """
+        Sets the existing payload from a previous payload
+        """
+        self.text = payload.text
+        self.command = payload.command
+        self.ctext = payload.ctext
+        self.ccommand = payload.ccommand
+        return self
