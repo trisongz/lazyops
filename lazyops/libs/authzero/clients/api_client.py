@@ -16,8 +16,10 @@ from ..utils.lazy import get_az_settings, logger, get_az_flow, get_az_resource
 from typing import Optional, List, Dict, Any, Union
 
 if lazyload.TYPE_CHECKING:
+    import aiohttpx
     import niquests
     import tldextract
+    from aiohttpx import Client
     from niquests import Session, AsyncSession, Response, AsyncResponse
     from ..configs import AuthZeroSettings
     from ..flows.tokens import APIClientCredentialsFlow
@@ -26,6 +28,7 @@ if lazyload.TYPE_CHECKING:
 else:
     niquests = lazyload.LazyLoad("niquests")
     tldextract = lazyload.LazyLoad("tldextract")
+    aiohttpx = lazyload.LazyLoad("aiohttpx")
     from ..types.tokens import AccessToken
 
 
@@ -65,6 +68,7 @@ class AuthZeroAPIClient(ABC):
     session_enabled: Optional[bool] = True
     default_timeout: Optional[float] = 600.0
     default_retries: Optional[int] = 3
+    use_httpx: Optional[bool] = False
 
     def __init__(
         self, 
@@ -79,6 +83,7 @@ class AuthZeroAPIClient(ABC):
         client_secret: Optional[str] = None,
         session_enabled: Optional[bool] = None,
         verbose: Optional[bool] = False,
+        use_httpx: Optional[bool] = None,
         **kwargs,
     ):
         if endpoint is not None: 
@@ -97,6 +102,7 @@ class AuthZeroAPIClient(ABC):
         if session_enabled is not None: self.session_enabled = session_enabled
         assert self.audience is not None, "Audience must be set"
         self.verbose = verbose
+        if use_httpx is not None: self.use_httpx = use_httpx
 
         
         self._kwargs = kwargs
@@ -104,6 +110,8 @@ class AuthZeroAPIClient(ABC):
         self._token_flow: Optional['APIClientCredentialsFlow'] = None
         self._auth: Optional['AuthZeroTokenAuth'] = None
         self._identity: Optional[str] = None
+
+        self._client: Optional['Client'] = None
 
         self._session: Optional['Session'] = None
         self._asession: Optional['AsyncSession'] = None
@@ -225,6 +233,7 @@ class AuthZeroAPIClient(ABC):
             self._asession = niquests.AsyncSession(**self.get_session_kwargs(is_async=True))
         return self._asession
     
+    
     def reset_session(self):
         """
         Resets the session
@@ -240,6 +249,62 @@ class AuthZeroAPIClient(ABC):
         self._asession = None
         if self._session is not None:  self._session.close()
         self._session = None
+
+    """
+    Implement HTTPX Client
+    """
+
+    def get_client_kwargs(self, **kwargs) -> Dict[str, Any]:
+        """
+        Returns the client kwargs
+        """
+        return {
+            'base_url': self.endpoint,
+            'auth': self.auth,
+            'timeout': self._kwargs.get('timeout', self.default_timeout),
+            'limits': aiohttpx.Limits(
+                max_connections = self._kwargs.get('max_connections', 100),
+                max_keepalive_connections = self._kwargs.get('max_keepalive_connections', 20),
+                keepalive_expiry = self._kwargs.get('keepalive_expiry', 60),
+            ),    
+            **kwargs,
+        }
+
+    @property
+    def client(self) -> 'Client':
+        """
+        Returns the Client
+        """
+        if self._client is None:
+            self._client = aiohttpx.Client(**self.get_client_kwargs())
+        return self._client
+
+    def reset_client(self):
+        """
+        Resets the client
+        """
+        if self._client is not None: self._client.close()
+        self._client = None
+    
+    async def areset_client(self):
+        """
+        Resets the async client
+        """
+        if self._client is not None: await self._client.close()
+        self._client = None
+
+    
+    def reset(self):
+        """
+        Resets the client
+        """
+        return self.reset_client() if self.use_httpx else self.reset_session()
+
+    async def areset(self):
+        """
+        Resets the async client
+        """
+        return await self.areset_client() if self.use_httpx else await self.areset_session()
     
     @timed_cache(600, cache_if_result = True)
     def check_available(self) -> bool:
@@ -285,9 +350,12 @@ class AuthZeroAPIClient(ABC):
         """
         if self._authorized: return
         try:
-            response = self.session.get(self.get_url('/authorize'), timeout = 2.5, auth = self.auth)
+            if self.use_httpx:
+                response = self.client.get('/authorize', timeout = 2.5)
+            else:
+                response = self.session.get(self.get_url('/authorize'), timeout = 2.5, auth = self.auth)
             response.raise_for_status()
-        except niquests.HTTPError as e:
+        except (niquests.HTTPError, aiohttpx.HTTPError) as e:
             logger.error(f'Error Authorizing Client: {e}')
             return
         
@@ -307,9 +375,12 @@ class AuthZeroAPIClient(ABC):
         """
         if self._authorized: return
         try:
-            response = await self.asession.get(self.get_url('/authorize'), timeout = 2.5, auth = self.auth)
+            if self.use_httpx:
+                response = await self.client.async_get('/authorize', timeout = 2.5)
+            else:
+                response = await self.asession.get(self.get_url('/authorize'), timeout = 2.5, auth = self.auth)
             response.raise_for_status()
-        except niquests.HTTPError as e:
+        except (niquests.HTTPError, aiohttpx.HTTPError) as e:
             logger.error(f'Error Authorizing Client: {e}')
             return
         
@@ -343,6 +414,9 @@ class AuthZeroAPIClient(ABC):
         """
         Returns the request kwargs
         """
+        if self.use_httpx:
+            if timeout is not None: kwargs['timeout'] = timeout
+            return kwargs
         auth = kwargs.get('auth', self.auth)
         return {
             'timeout': timeout if timeout is not None else self.default_timeout,
@@ -356,6 +430,7 @@ class AuthZeroAPIClient(ABC):
         """
         await self.apreflight_check()
         kwargs = self.get_request_kwargs(timeout = timeout, **kwargs)
+        if self.use_httpx: return await self.client.async_get(url, *args, **kwargs)
         return await self.asession.get(self.get_url(url), *args, **kwargs)
 
     async def aput(self, url: str, *args, timeout: Optional[float] = None, **kwargs) -> 'AsyncResponse':
@@ -364,6 +439,7 @@ class AuthZeroAPIClient(ABC):
         """
         await self.apreflight_check()
         kwargs = self.get_request_kwargs(timeout = timeout, **kwargs)
+        if self.use_httpx: return await self.client.async_put(url, *args, **kwargs)
         return await self.asession.put(self.get_url(url), *args, **kwargs)
     
     async def apost(self, url: str, *args, timeout: Optional[float] = None, **kwargs) -> 'AsyncResponse':
@@ -372,6 +448,7 @@ class AuthZeroAPIClient(ABC):
         """
         await self.apreflight_check()
         kwargs = self.get_request_kwargs(timeout = timeout, **kwargs)
+        if self.use_httpx: return await self.client.async_post(url, *args, **kwargs)
         return await self.asession.post(self.get_url(url), *args, **kwargs)
     
     async def adelete(self, url: str, *args, timeout: Optional[float] = None, **kwargs) -> 'AsyncResponse':
@@ -380,6 +457,7 @@ class AuthZeroAPIClient(ABC):
         """
         await self.apreflight_check()
         kwargs = self.get_request_kwargs(timeout = timeout, **kwargs)
+        if self.use_httpx: return await self.client.async_delete(url, *args, **kwargs)
         return await self.asession.delete(self.get_url(url), *args, **kwargs)
     
     async def apatch(self, url: str, *args, timeout: Optional[float] = None, **kwargs) -> 'AsyncResponse':
@@ -388,6 +466,7 @@ class AuthZeroAPIClient(ABC):
         """
         await self.apreflight_check()
         kwargs = self.get_request_kwargs(timeout = timeout, **kwargs)
+        if self.use_httpx: return await self.client.async_patch(url, *args, **kwargs)
         return await self.asession.patch(self.get_url(url), *args, **kwargs)
     
     def get(self, url: str, *args, timeout: Optional[float] = None,  **kwargs) -> 'Response':
@@ -396,6 +475,7 @@ class AuthZeroAPIClient(ABC):
         """
         self.preflight_check()
         kwargs = self.get_request_kwargs(timeout = timeout, **kwargs)
+        if self.use_httpx: return self.client.get(url, *args, **kwargs)
         return self.session.get(self.get_url(url), *args, **kwargs)
     
     def put(self, url: str, *args, timeout: Optional[float] = None,  **kwargs) -> 'Response':
@@ -404,6 +484,7 @@ class AuthZeroAPIClient(ABC):
         """
         self.preflight_check()
         kwargs = self.get_request_kwargs(timeout = timeout, **kwargs)
+        if self.use_httpx: return self.client.put(url, *args, **kwargs)
         return self.session.put(self.get_url(url), *args, **kwargs)
     
     def post(self, url: str, *args, timeout: Optional[float] = None, **kwargs) -> 'Response':
@@ -412,6 +493,7 @@ class AuthZeroAPIClient(ABC):
         """
         self.preflight_check()
         kwargs = self.get_request_kwargs(timeout = timeout, **kwargs)
+        if self.use_httpx: return self.client.post(url, *args, **kwargs)
         return self.session.post(self.get_url(url), *args, **kwargs)
     
     def delete(self, url: str, *args, timeout: Optional[float] = None, **kwargs) -> 'Response':
@@ -420,6 +502,7 @@ class AuthZeroAPIClient(ABC):
         """
         self.preflight_check()
         kwargs = self.get_request_kwargs(timeout = timeout, **kwargs)
+        if self.use_httpx: return self.client.delete(url, *args, **kwargs)
         return self.session.delete(self.get_url(url), *args, **kwargs)
     
     def patch(self, url: str, *args, timeout: Optional[float] = None, **kwargs) -> 'Response':
@@ -428,5 +511,6 @@ class AuthZeroAPIClient(ABC):
         """
         self.preflight_check()
         kwargs = self.get_request_kwargs(timeout = timeout, **kwargs)
+        if self.use_httpx: return self.client.patch(url, *args, **kwargs)
         return self.session.patch(self.get_url(url), *args, **kwargs)
     

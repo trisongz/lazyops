@@ -12,12 +12,13 @@ import functools
 import contextlib
 from pathlib import Path
 from lazyops.libs.proxyobj.wraps import proxied
+from lazyops.libs.proxyobj import ProxyObject
 from lazyops.libs.logging import logger
 from typing import Optional, Dict, TYPE_CHECKING
 from .context import KubernetesContext
     
-@proxied
-class Kubernetes(abc.ABC):
+# @proxied
+class KubernetesClient(abc.ABC):
     """
     The Kubernetes Client
     """
@@ -109,3 +110,6 @@ class Kubernetes(abc.ABC):
         return self._ctxs[name]
     
 
+Kubernetes: KubernetesClient = ProxyObject(
+    obj_cls = KubernetesClient,
+)
