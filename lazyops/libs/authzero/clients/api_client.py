@@ -290,7 +290,7 @@ class AuthZeroAPIClient(ABC):
         """
         Resets the async client
         """
-        if self._client is not None: await self._client.close()
+        if self._client is not None: await self._client.aclose()
         self._client = None
 
     

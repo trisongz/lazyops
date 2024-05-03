@@ -4,12 +4,16 @@ import collections.abc
 from typing import Dict, Optional, Any
 
 
-def update_dict(d: Dict, u: Dict, exclude_none: Optional[bool] = False) -> Dict:
+def update_dict(d: Dict, u: Dict, exclude_none: Optional[bool] = False, unset_value: Optional[str] = 'UNSET') -> Dict:
     """
     Recursively update a dictionary
     """
+    unset_keys = []
     for k, v in u.items():
         if exclude_none and v is None:
+            continue
+        if isinstance(v, str) and v == unset_value:
+            unset_keys.append(k)
             continue
         if isinstance(v, collections.abc.Mapping):
             d[k] = update_dict(d.get(k, {}), v)
@@ -17,6 +21,8 @@ def update_dict(d: Dict, u: Dict, exclude_none: Optional[bool] = False) -> Dict:
             d[k] = d.get(k, []) + v
         else:
             d[k] = v
+    for k in unset_keys:
+        d.pop(k, None)
     return d
 
 
