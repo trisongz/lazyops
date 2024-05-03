@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from lazyops.utils.logs import Logger
     from ..configs.base import AppSettings
     from lazyops.types.models import BaseSettings
-    from lazyops.libs.fastapi_utils.types.state import AppState
+    from lazyops.libs.abcs.types.state import AppState
 
     from kvdb import TaskFunction, CronJob, TaskWorker, TaskQueue
 
@@ -115,7 +115,7 @@ class GlobalContext(abc.ABC):
         Returns the state
         """
         if self._state is None:
-            from lazyops.libs.fastapi_utils.types.state import AppState
+            from lazyops.libs.abcs.types.state import AppState
             self._state = AppState()
             self._state.bind_settings(self.settings)
         return self._state

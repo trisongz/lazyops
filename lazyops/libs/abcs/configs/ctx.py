@@ -18,8 +18,8 @@ if TYPE_CHECKING:
     from kvdb import KVDBSession, PersistentDict
     from kvdb.tasks.base import BaseTaskWorker, TaskWorkerT
     from lazyops.utils.logs import Logger
-    from lazyops.libs.fastapi_utils.types.persistence import TemporaryData
-    from lazyops.libs.fastapi_utils.types.state import AppState
+    from lazyops.libs.abcs.types.persistence import TemporaryData
+    from lazyops.libs.abcs.types.state import AppState
     from .base import AppSettings
     from ..clients import ClientTypes
     from ..sql.database.types import ObjectCRUD
@@ -123,7 +123,7 @@ class ApplicationContext(abc.ABC):
         Retrieves the temporary data
         """
         if self._temp_data is None:
-            from lazyops.libs.fastapi_utils.types.persistence import TemporaryData
+            from lazyops.libs.abcs.types.persistence import TemporaryData
             self._temp_data = TemporaryData.from_module(self.module_name)
         return self._temp_data
     
@@ -143,7 +143,7 @@ class ApplicationContext(abc.ABC):
         Returns the state
         """
         if self._state is None:
-            from lazyops.libs.fastapi_utils.types.state import AppState
+            from lazyops.libs.abcs.types.state import AppState
             self._state = AppState()
             self._state.bind_settings(self.settings)
         return self._state
@@ -265,6 +265,7 @@ class ApplicationContext(abc.ABC):
             AppEnv.LOCAL,
             AppEnv.DEVELOPMENT,
             AppEnv.CICD,
+            AppEnv.TEST,
         ] or os.environ.get('DISABLE_ENFORCE_ENV', 'false').lower() == 'true'
         configs_path = configs_path or self.config_path
         envs_path = configs_path.joinpath('envs')
@@ -368,7 +369,7 @@ class ApplicationContext(abc.ABC):
         """
         Updates the client registry
         """
-        from lazyops.libs.fastapi_utils.state.registry import update_client_registry_mapping
+        from lazyops.libs.abcs.state.registry import update_client_registry_mapping
         include_kind = include_kind if include_kind is not None else self.include_kind_in_client_name
         if include_kind:
             prefix = f'{self.module_name}.{kind}' if kind else self.module_name
@@ -402,7 +403,7 @@ class ApplicationContext(abc.ABC):
         """
         Registers a client
         """
-        from lazyops.libs.fastapi_utils.state.registry import register_client
+        from lazyops.libs.abcs.state.registry import register_client
         include_kind = include_kind if include_kind is not None else self.include_kind_in_client_name
         if include_kind:
             kind = kind or getattr(client, 'kind', 'client')
@@ -427,7 +428,7 @@ class ApplicationContext(abc.ABC):
         if state is None:
             state = 'global' if name in self._global_clients else 'local'
         
-        from lazyops.libs.fastapi_utils.state.registry import (
+        from lazyops.libs.abcs.state.registry import (
             get_client as _get_client, 
             get_global_client as _get_global_client, 
         )
@@ -463,7 +464,7 @@ class ApplicationContext(abc.ABC):
         """
         Updates the component client registry
         """
-        from lazyops.libs.fastapi_utils.state.registry import update_client_registry_mapping
+        from lazyops.libs.abcs.state.registry import update_client_registry_mapping
         from lazyops.libs.abcs.utils.helpers import flatten_dict_value 
         include_kind = include_kind if include_kind is not None else self.include_kind_in_component_name
         if include_kind:
@@ -485,7 +486,7 @@ class ApplicationContext(abc.ABC):
         """
         Gets a component client
         """
-        from lazyops.libs.fastapi_utils.state.registry import get_client
+        from lazyops.libs.abcs.state.registry import get_client
         include_kind = include_kind if include_kind is not None else self.include_kind_in_component_name
         if include_kind: client_name = f'{self.module_name}.{kind}' if kind else self.module_name
         else: client_name = self.module_name
@@ -505,7 +506,7 @@ class ApplicationContext(abc.ABC):
         """
         Registers a component client
         """
-        from lazyops.libs.fastapi_utils.state.registry import register_client
+        from lazyops.libs.abcs.state.registry import register_client
         include_kind = include_kind if include_kind is not None else self.include_kind_in_component_name
         kind = kind or getattr(client, 'kind', None)
         if include_kind: prefix = f'{self.module_name}.{kind}' if kind else self.module_name

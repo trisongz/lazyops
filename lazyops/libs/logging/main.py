@@ -71,6 +71,8 @@ QUEUE_STATUS_COLORS = {
     'sweep': '<fg #B5E48C>',
     'stats': '<fg #B5E48C>',
     'dequeue': '<fg #168AAD>',
+
+    'stuck': '<fg #DC2F02>',
 }
 
 STATUS_COLOR = QUEUE_STATUS_COLORS

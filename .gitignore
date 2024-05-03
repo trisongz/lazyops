@@ -33,3 +33,4 @@ tests/local.lock
 tests/libs/abcs/private_test_wrapper.py
 tests/**/private**
 tests/libs/abcs/k8s.py
+lazyops/libs/abcs/sql/database/types_v2.py

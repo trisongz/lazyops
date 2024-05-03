@@ -4,13 +4,14 @@ import contextlib
 from lazyops.types import BaseModel, Field, root_validator
 from lazyops.types.models import ConfigDict, schema_extra
 
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import HTTPException
 from kvdb.types.jobs import Job, JobStatus
 from lazyops.libs.logging import logger
 from typing import Any, Dict, List, Optional, Type, TypeVar, Literal, Union, Set, TYPE_CHECKING
 
 if TYPE_CHECKING:
+
+    from fastapi.responses import JSONResponse
+    from fastapi.exceptions import HTTPException
     from lazyops.libs.abcs.configs.base import AppSettings
     from lazyops.libs.abcs.types.errors import APIException
 
@@ -77,10 +78,11 @@ class BaseSchema(BaseModel):
         exclude.update(self._excluded_fields)
         return exclude
     
-    def json_response(self, exclude_none: bool = True, exclude: Optional[Set[str]] = None, indent: Optional[int] = 2, **kwargs) -> JSONResponse:
+    def json_response(self, exclude_none: bool = True, exclude: Optional[Set[str]] = None, indent: Optional[int] = 2, **kwargs) -> 'JSONResponse':
         """
         Returns the JSON response
         """
+        from fastapi.responses import JSONResponse
         return JSONResponse(
             content = self.dict(
                 exclude = self.get_excluded_fields(exclude), 
@@ -110,6 +112,7 @@ class BaseSchema(BaseModel):
         """
         Raises an HTTPException
         """
+        from fastapi.exceptions import HTTPException
         raise HTTPException(
             status_code = status_code,
             detail = message,
