@@ -80,6 +80,7 @@ def create_hash_from_kwargs(
     """
     return create_hash_from_key(create_string_for_kwargs(*args, **kwargs))
 
+
 def create_hash_from_object(
     obj: Union['BaseModel', Dict[str, Any], List[Any], Any],
     mode: Optional[str] = 'json',
@@ -101,3 +102,4 @@ def create_hash_from_object(
             key += item
     key = ':'.join(str(k) for k in key)
     return create_hash_from_key(key)
+

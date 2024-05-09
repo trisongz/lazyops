@@ -485,6 +485,7 @@ class Logger(_Logger):
         colored: Optional[bool] = False, 
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
+        hook: Optional[Callable] = None,
         **kwargs
     ):  # noqa: N805
         """
@@ -496,6 +497,7 @@ class Logger(_Logger):
         except TypeError:
             # Compatibility with < 0.6.0
             self._log("INFO", 20, False, self._get_opts(colored = colored), message, args, kwargs)
+        if hook: hook(message)
 
     def success(
         self, 

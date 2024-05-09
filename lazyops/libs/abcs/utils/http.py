@@ -181,7 +181,7 @@ def validate_website_with_socket(
     """
     Validates a website
     """
-    url = normalize_url(url)
+    url = extract_clean_domain(url)
     with contextlib.suppress(Exception):
         socket.gethostbyname(url)
         return True

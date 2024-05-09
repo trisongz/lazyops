@@ -696,7 +696,7 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
                     await self.upsert(db, obj_in = obj_in, no_commit = True)
                     completed_idx.append(start_idx + n)
                 except Exception as e:
-                    self.logger.info(obj_in, colored = True, prefix = f'|r|[{start_idx + n}] Error in upserting data|e|')
+                    self.logger.info(obj_in, colored = True, prefix = f'|r|[{start_idx + n}] Error in upserting data|e|', max_length = 1000)
                     self.logger.trace('Error in upserting data', e)
                     if raise_errors: raise e
                     failed_idx.append(start_idx + n)

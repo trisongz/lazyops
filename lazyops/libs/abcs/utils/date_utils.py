@@ -191,6 +191,7 @@ def extract_datetime(
         Optional[Union[datetime.datetime, List[datetime.datetime]]]: The extracted datetime
     """
     if not dt: return None
+    if isinstance(dt, datetime.datetime): return dt
     if isinstance(dt, list):
         return [extract_datetime(d, timezone, timeaware, prefer) for d in dt]
     
@@ -208,8 +209,14 @@ def extract_datetime(
         return dv
 
     dp = get_dtparser(timezone = timezone, timeaware = timeaware, prefer = prefer)
-    result =  dp.get_date_data(dt, _dtformats)
-    return result['date_obj'] if result else None
+    try:
+        result =  dp.get_date_data(dt, _dtformats)
+        return result['date_obj'] if result else None
+    except Exception as e:
+        from lazyops.utils.logs import logger
+        logger.error(f'[{type(dt).__name__}] Error Extracting Date: {e}')
+        raise e
+        # return None
 
 def parse_datetime_from_timestamp(
     timestamp: Optional[int],
