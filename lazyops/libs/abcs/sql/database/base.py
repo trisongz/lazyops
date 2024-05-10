@@ -20,7 +20,7 @@ from pydantic import validator, model_validator, computed_field, BaseModel, Fiel
 from sqlalchemy import text as sql_text, TextClause
 from sqlalchemy.pool import NullPool, AsyncAdaptedQueuePool
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import async_sessionmaker, async_scoped_session
 from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine
 
 from lazyops.utils.logs import logger, Logger
@@ -267,6 +267,8 @@ class DatabaseClientBase(abc.ABC):
         self._engine_ro: Optional[AsyncEngine] = None
         self._session_rw: Optional[async_sessionmaker[AsyncSession]] = None
         self._session_ro: Optional[async_sessionmaker[AsyncSession]] = None
+        self._session_scoped_rw: Optional[async_scoped_session[AsyncSession]] = None
+        self._session_scoped_ro: Optional[async_scoped_session[AsyncSession]] = None
 
         self._on_failure_callbacks: List[Callable] = []
         self._settings: Optional['AppSettings'] = None
@@ -483,6 +485,42 @@ class DatabaseClientBase(abc.ABC):
                 )
             )
         return self._session_ro
+
+    @property
+    def session_scoped_rw(self) -> async_scoped_session[AsyncSession]:
+        """
+        Returns the scoped session
+        """
+        if self._session_scoped_rw is None:
+            self._session_scoped_rw = async_scoped_session(
+                self.session_rw, 
+                scopefunc = self._kwargs.get('scopefunc', asyncio.current_task),
+            )
+        return self._session_scoped_rw
+
+    @property
+    def session_scoped_ro(self) -> async_scoped_session[AsyncSession]:
+        """
+        Returns the scoped session
+        """
+        if self._session_scoped_ro is None:
+            self._session_scoped_ro = async_scoped_session(
+                self.session_ro, 
+                scopefunc = self._kwargs.get('scopefunc', asyncio.current_task),
+            )
+        return self._session_scoped_ro
+    
+    def _get_session_type(
+        self,
+        readonly: Optional[bool] = None,
+        scoped: Optional[bool] = None,
+    ) -> Union[async_sessionmaker[AsyncSession], async_scoped_session[AsyncSession]]:
+        """
+        Returns the session type
+        """
+        # if scoped is not None: return self.session_scoped_rw if scoped else self.session_scoped_ro
+        if readonly: return self.session_scoped_ro if scoped else self.session_ro
+        return self.session_scoped_rw if scoped else self.session_rw
     
     def run_error_callbacks(self, e: Exception):
         """

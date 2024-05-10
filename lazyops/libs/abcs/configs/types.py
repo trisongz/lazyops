@@ -60,10 +60,25 @@ class AppEnv(str, Enum):
             hn = get_host_name()
             try:
                 parts = hn.split("-")
-                return cls.from_env(parts[2]) if len(parts) > 3 else cls.PRODUCTION
+                for p in parts:
+                    if all(
+                        e not in p.lower()
+                        for e in {'development', 'test', 'staging', 'local', 'dev', 'prod', 'production'}
+                    ):
+                        parts.remove(p)
+                # for e in {'dev', 'test', 'staging', 'local'}:
+                # parts = [p for p in parts if any({
+                #     p.lower() in {'dev', 'development', 'test', 'staging', 'local'}
+                # }
+                #     p.lower()
+                # ]
+                # if parts:
+                return cls.from_env(parts[0]) if len(parts) > 0 else cls.PRODUCTION
+                # return cls.PRODUCTION
+                # return cls.from_env(parts[2]) if len(parts) > 3 else cls.PRODUCTION
             except Exception as e:
                 return cls.from_hostname(hn)
-        
+
         return cls.LOCAL
     
     def __eq__(self, other: Any) -> bool:
