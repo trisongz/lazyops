@@ -109,6 +109,13 @@ class AppEnv(str, Enum):
         """
         return self.value.lower()
 
+    @property
+    def short_name(self) -> str:
+        """
+        Returns the short name in lower
+        """
+        if self == self.DEVELOPMENT: return 'dev'
+        return 'prod' if self == self.PRODUCTION else self.name
 
     
 
