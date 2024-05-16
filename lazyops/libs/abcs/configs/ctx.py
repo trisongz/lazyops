@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from lazyops.utils.logs import Logger
     from lazyops.libs.abcs.types.persistence import TemporaryData
     from lazyops.libs.abcs.types.state import AppState
+    from lazyops.libs.abcs.state.metrics import AppStateMetrics
     from .base import AppSettings
     from ..clients import ClientTypes
     from ..sql.database.types import ObjectCRUD
@@ -102,6 +103,9 @@ class ApplicationContext(abc.ABC):
         # Temp State
         self.temp_state: Dict[str, Any] = {}
 
+        self._extra: Dict[str, Any] = {}
+
+
     @property
     def disable_enforce_env(self) -> bool:
         """
@@ -116,7 +120,26 @@ class ApplicationContext(abc.ABC):
         """
         if self._app_env is None: self._app_env = self.get_app_env()
         return self._app_env
+
+    @app_env.setter
+    def app_env(self, value: AppEnv):
+        """
+        Sets the app environment
+        """
+        self._app_env = value
     
+    @property
+    def state_metrics(self) -> 'AppStateMetrics':
+        """
+        Retrieves the state metrics
+        """
+        if 'state_metrics' not in self._extra:
+            from lazyops.libs.abcs.state.metrics import AppStateMetrics
+            self._extra['state_metrics'] = AppStateMetrics(
+                in_k8s = self.settings.in_k8s,
+            )
+        return self._extra['state_metrics']
+
     @property
     def temp_data(self) -> 'TemporaryData':
         """
@@ -254,12 +277,16 @@ class ApplicationContext(abc.ABC):
         required: Optional[bool] = False, 
         allow_default: Optional[bool] = True,
         configs_path: Optional[Path] = None,
+        env_var: Optional[str] = None,
     ) -> Optional[Path]:
         """
         Retrieves the app environment file
 
         Only valid for local/dev environments
         """
+        if env_var is not None and (env_val := os.getenv(env_var)):
+            env_path = Path(env_val)
+            if env_path.exists(): return env_path
         app_env = self.get_app_env()
         is_local_env = app_env in [
             AppEnv.LOCAL,
@@ -288,12 +315,16 @@ class ApplicationContext(abc.ABC):
         required: Optional[bool] = False, 
         suffix: Optional[str] = None,
         configs_path: Optional[Path] = None,
+        env_var: Optional[str] = None,
     ) -> Optional[Path]:
         """
         Retrieves the app environment file
 
         Only valid for local/dev environments
         """
+        if env_var is not None and (env_val := os.getenv(env_var)):
+            env_path = Path(env_val)
+            if env_path.exists(): return env_path
         app_env = self.get_app_env()
         configs_path = configs_path or self.config_path
         defaults_path = configs_path.joinpath('defaults')

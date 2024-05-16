@@ -574,4 +574,12 @@ def patch_env(
 
     
 
-    
+@timed_cache(secs = 60, cache_if_result = True)
+def is_in_async_loop(*args, **kwargs) -> bool:
+    """
+    Returns whether the app is in an async loop
+    """
+    with contextlib.suppress(RuntimeError):
+        asyncio.get_running_loop()
+        return True
+    return False

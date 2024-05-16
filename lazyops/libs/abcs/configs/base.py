@@ -138,6 +138,7 @@ class AppSettings(BaseAppSettings):
         Sets the app environment
         """
         self.app_env = self.app_env.from_env(env)
+        self.ctx._app_env = self.app_env
 
     def get_assets(
         self, 
