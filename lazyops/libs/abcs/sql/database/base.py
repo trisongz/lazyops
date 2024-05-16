@@ -127,6 +127,7 @@ class PostgresConfig(BaseModel):
                 try:
                     from kvdb.io.serializers import get_serializer
                     serializer = get_serializer('json')
+                    serializer.ensure_string_value = True
                     self.engine_json_serializer = serializer.dumps
                 except ImportError:
                     from lazyops.utils.serialization import Json
