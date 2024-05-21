@@ -11,9 +11,13 @@ if lazyload.TYPE_CHECKING:
     import aiocsv
     import aiohttpx
     from pydantic import BaseModel
+else:
+    aiocsv = lazyload.LazyLoad("aiocsv")
+    aiohttpx = lazyload.LazyLoad("aiohttpx")
 
 if TYPE_CHECKING:
     from fileio import File
+
 
 class HTTPStreamReader:
     """

@@ -64,6 +64,7 @@ def display_top(
     Displays the top lines of a tracemalloc snapshot
     """
     snapshot = snapshot.filter_traces((
+        tracemalloc.Filter(False, "<frozen importlib._bootstrap_external>"),
         tracemalloc.Filter(False, "<frozen importlib._bootstrap>"),
         tracemalloc.Filter(False, "<unknown>"),
     ))
