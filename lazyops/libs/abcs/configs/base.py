@@ -183,13 +183,20 @@ class AppSettings(BaseAppSettings):
         required: Optional[bool] = False, 
         allow_default: Optional[bool] = True,
         configs_path: Optional[Path] = None,
+        env_var: Optional[str] = None,
     ) -> Optional[Path]:
         """
         Retrieves the app environment file
 
         Only valid for local/dev environments
         """
-        return self.ctx.get_app_env_file(name = name, required = required, allow_default = allow_default, configs_path = configs_path)
+        return self.ctx.get_app_env_file(
+            name = name, 
+            required = required, 
+            allow_default = allow_default, 
+            configs_path = configs_path,
+            env_var = env_var,
+        )
     
 
     def get_app_default_file(
@@ -198,13 +205,20 @@ class AppSettings(BaseAppSettings):
         required: Optional[bool] = False, 
         suffix: Optional[str] = None,
         configs_path: Optional[Path] = None,
+        env_var: Optional[str] = None,
     ) -> Optional[Path]:
         """
         Retrieves the app environment file
 
         Only valid for local/dev environments
         """
-        return self.ctx.get_app_default_file(name = name, required = required, suffix = suffix, configs_path = configs_path)
+        return self.ctx.get_app_default_file(
+            name = name, 
+            required = required, 
+            suffix = suffix, 
+            configs_path = configs_path,
+            env_var = env_var,
+        )
 
         
     def get_app_ingress(

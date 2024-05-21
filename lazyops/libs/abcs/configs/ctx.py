@@ -214,7 +214,7 @@ class ApplicationContext(abc.ABC):
         """
         Retrieves the app environment
         """
-        module_name = module_name or self.env_var_name
+        module_name = (module_name or self.env_var_name).upper()
         for key in {
             "SERVER_ENV",
             f"{module_name}_ENV",
