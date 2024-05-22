@@ -37,7 +37,7 @@ class ApplicationContext(abc.ABC):
     def __init__(
         self,
         module_name: str,
-        ingress_domain: str,
+        ingress_domain: Optional[str] = None,
         ingress_base: Optional[str] = None,
         config_path: Optional[Path] = None,
         assets_dir: Optional[str] = 'assets',
@@ -259,7 +259,7 @@ class ApplicationContext(abc.ABC):
         """
         Retrieves the app ingress
         """
-        if self.app_env.is_local:
+        if self.app_env.is_local or not self.ingress_domain:
             app_host = app_host or "localhost"
             app_port = app_port or 8080
             return f"http://{app_host}:{app_port}"
