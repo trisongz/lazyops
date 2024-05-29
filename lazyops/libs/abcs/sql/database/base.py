@@ -9,6 +9,7 @@ Requires `sqlalchemy` and `psycopg2` to be installed.
 """
 import gc
 import abc
+import copy
 import asyncio
 import datetime
 import contextlib
@@ -16,12 +17,12 @@ from pathlib import Path
 from pydantic.networks import PostgresDsn
 from pydantic_settings import BaseSettings
 from pydantic import validator, model_validator, computed_field, BaseModel, Field, PrivateAttr
-
+from sqlalchemy import create_engine, Connection, Engine
 from sqlalchemy import text as sql_text, TextClause
 from sqlalchemy.pool import NullPool, AsyncAdaptedQueuePool
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.ext.asyncio import async_sessionmaker, async_scoped_session
-from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncSession, AsyncEngine, AsyncConnection
 
 from lazyops.utils.logs import logger, Logger
 from lazyops.utils.lazy import lazy_import
@@ -37,6 +38,11 @@ if TYPE_CHECKING:
     from .types import ModelType
 
 
+_default_pool_classes: Dict[str, str] = {
+    'default': 'sqlalchemy.pool.AsyncAdaptedQueuePool',
+    'pooled': 'sqlalchemy.pool.NullPool',
+}
+
 class PostgresConfig(BaseModel):
 
     """
@@ -46,8 +52,9 @@ class PostgresConfig(BaseModel):
     readonly_url: Optional[PostgresDsn] = None
     superuser_url: Optional[PostgresDsn] = None
 
-    engine_poolclass: Optional[Union[Type[Union[NullPool, AsyncAdaptedQueuePool]], str]] = 'sqlalchemy.pool.AsyncAdaptedQueuePool'
+    engine_poolclass: Optional[Union[Type[Union[NullPool, AsyncAdaptedQueuePool]], str]] = None
     engine_json_serializer: Optional[Union[Callable, str]] = 'json'
+    engine_json_deserializer: Optional[Union[Callable, str]] = 'json'
 
     engine_kwargs: Optional[Dict[str, Any]] = Field(default_factory = dict)
     engine_rw_kwargs: Optional[Dict[str, Any]] = Field(default_factory = dict)
@@ -56,6 +63,10 @@ class PostgresConfig(BaseModel):
     session_kwargs: Optional[Dict[str, Any]] = Field(default_factory = dict)
     session_ro_kwargs: Optional[Dict[str, Any]] = Field(default_factory = dict)
     session_rw_kwargs: Optional[Dict[str, Any]] = Field(default_factory = dict)
+
+    scoped_sessions_enabled: Optional[bool] = None
+
+    _extra: Dict[str, Any] = PrivateAttr(default_factory = dict)
 
     @computed_field
     @property
@@ -96,6 +107,33 @@ class PostgresConfig(BaseModel):
         if not self.superuser_url: return None
         return str(self.superuser_url).replace(self.superuser_url_password, '********') if self.superuser_url_password else str(self.superuser_url)
     
+    @property
+    def has_diff_readonly_url(self) -> bool:
+        """
+        Checks if the url is different
+        """
+        if 'diff_readonly_url' not in self._extra: 
+            self._extra['diff_readonly_url'] = self.readonly_url and str(self.url) != str(self.readonly_url)
+        return self._extra['diff_readonly_url']
+
+    @property
+    def has_pooler_in_url(self) -> bool:
+        """
+        Checks if the url has a pooler in it
+        """
+        if 'has_pooler_in_url' not in self._extra: 
+            self._extra['has_pooler_in_url'] = 'pooler' in str(self.url)
+        return self._extra['has_pooler_in_url']
+    
+    @property
+    def in_cluster(self) -> bool:
+        """
+        Checks if the url is in a cluster
+        """
+        if 'in_cluster' not in self._extra: 
+            self._extra['in_cluster'] = 'svc.cluster.local' in str(self.url)
+        return self._extra['in_cluster']
+
 
     def log_db_url(self, verbose: Optional[bool] = False):
         """
@@ -113,6 +151,60 @@ class PostgresConfig(BaseModel):
             safe_url = self.safe_url
             logger.info(f'|y|Readonly URL not set|e|, using default URL: {safe_url}', colored = True, prefix = 'PostgresDB')
 
+    def configure_engine_serializers(
+        self,
+        engine_json_serializer: Optional[Union[Callable, str]] = None,
+        engine_json_deserializer: Optional[Union[Callable, str]] = None,
+    ):
+        """
+        Configures the engine serializers
+        """
+        valid_ser, valid_deser = True, True
+        if engine_json_serializer is not None:
+            if isinstance(engine_json_serializer, str) and engine_json_serializer == 'json':
+                try:
+                    from kvdb.io.serializers import get_serializer
+                    serializer = get_serializer('json')
+                    serializer.ensure_string_value = True
+                    engine_json_serializer = serializer.dumps
+                    if engine_json_deserializer is None or engine_json_deserializer == 'json':
+                        engine_json_deserializer = serializer.loads
+                except ImportError:
+                    from lazyops.utils.serialization import Json
+                    engine_json_serializer = Json.dumps
+                    if engine_json_deserializer is None or engine_json_deserializer == 'json':
+                        engine_json_deserializer = Json.loads
+            else:
+                try:
+                    engine_json_serializer = lazy_import(engine_json_serializer)
+                    if not callable(engine_json_serializer) and hasattr(engine_json_serializer, 'dumps'):
+                        engine_json_serializer = getattr(engine_json_serializer, 'dumps')
+                except Exception as e:
+                    valid_ser = False
+                    logger.error(f'Failed to import the JSON Serializer: {e}')
+        
+        if engine_json_deserializer is not None and isinstance(engine_json_deserializer, str):
+            if engine_json_deserializer == 'json':
+                try:
+                    from kvdb.io.serializers import get_serializer
+                    serializer = get_serializer('json')
+                    serializer.ensure_string_value = True
+                    engine_json_deserializer = serializer.loads
+                except ImportError:
+                    from lazyops.utils.serialization import Json
+                    engine_json_deserializer = Json.loads
+            else:
+                try:
+                    engine_json_deserializer = lazy_import(engine_json_deserializer)
+                    if not callable(engine_json_deserializer) and hasattr(engine_json_deserializer, 'loads'):
+                        engine_json_deserializer = getattr(engine_json_deserializer, 'loads')
+                except Exception as e:
+                    logger.error(f'Failed to import the JSON Deserializer: {e}')
+                    valid_deser = False
+        
+        if valid_ser: self.engine_json_serializer = engine_json_serializer
+        if valid_deser: self.engine_json_deserializer = engine_json_deserializer
+    
 
     @model_validator(mode = 'after')
     def post_init_validate(self):
@@ -120,23 +212,17 @@ class PostgresConfig(BaseModel):
         Validate after init
         """
         if not self.superuser_url: self.superuser_url = self.url
+        if self.engine_poolclass is None:
+            self.engine_poolclass = _default_pool_classes['pooled'] if \
+                self.has_pooler_in_url else _default_pool_classes['default']
         if isinstance(self.engine_poolclass, str):
+            if self.engine_poolclass in _default_pool_classes:
+                self.engine_poolclass = _default_pool_classes[self.engine_poolclass]
             self.engine_poolclass = lazy_import(self.engine_poolclass)
-        if isinstance(self.engine_json_serializer, str):
-            if self.engine_json_serializer == 'json':
-                try:
-                    from kvdb.io.serializers import get_serializer
-                    serializer = get_serializer('json')
-                    serializer.ensure_string_value = True
-                    self.engine_json_serializer = serializer.dumps
-                except ImportError:
-                    from lazyops.utils.serialization import Json
-                    self.engine_json_serializer = Json.dumps
-            else:
-                try:
-                    self.engine_json_serializer = lazy_import(self.engine_json_serializer)
-                except Exception as e:
-                    logger.error(f'Failed to import the JSON Serializer: {e}')
+        self.configure_engine_serializers(
+            engine_json_serializer = self.engine_json_serializer,
+            engine_json_deserializer = self.engine_json_deserializer,
+        )
         if not self.engine_kwargs:
             self.engine_kwargs['pool_pre_ping'] = True
         if not self.session_rw_kwargs:
@@ -154,11 +240,18 @@ class PostgresConfig(BaseModel):
         return cls.model_validate(settings, from_attributes = True)
     
 
-    def get_engine_kwargs(self, readonly: Optional[bool] = False, verbose: Optional[bool] = False, **engine_kwargs) -> Dict[str, Any]:
+    def get_engine_kwargs(
+        self, 
+        readonly: Optional[bool] = False, 
+        verbose: Optional[bool] = False, 
+        superuser: Optional[bool] = None,
+        driver: Optional[str] = None,
+        **engine_kwargs
+    ) -> Dict[str, Any]:
         """
         Get the Engine KWargs
         """
-        kwargs = self.engine_kwargs or {}
+        kwargs = copy.deepcopy(self.engine_kwargs) if self.engine_kwargs else {}
         if engine_kwargs: kwargs = update_dict(kwargs, engine_kwargs)
         kwargs = (
             update_dict(kwargs, self.engine_ro_kwargs)
@@ -166,10 +259,18 @@ class PostgresConfig(BaseModel):
             else update_dict(kwargs, self.engine_rw_kwargs)
         )
         self.log_readonly_warning(verbose) if readonly else self.log_db_url(verbose)
-        kwargs['url'] = str((self.readonly_url or self.url) if readonly else self.url)
-        if self.engine_json_serializer:
+        if not kwargs.get('url'):
+            if superuser and self.superuser_url:
+                kwargs['url'] = str(self.superuser_url)
+            else:
+                kwargs['url'] = str((self.readonly_url or self.url) if readonly else self.url)
+        if driver is not None and driver not in kwargs['url']:
+            kwargs['url'] = f'postgresql+{driver}://' + kwargs['url'].split('://', 1)[-1]
+        if self.engine_json_serializer and 'json_serializer' not in kwargs:
             kwargs['json_serializer'] = self.engine_json_serializer
-        if self.engine_poolclass:
+        if self.engine_json_deserializer and 'json_deserializer' not in kwargs:
+            kwargs['json_deserializer'] = self.engine_json_deserializer
+        if self.engine_poolclass and 'poolclass' not in kwargs:
             kwargs['poolclass'] = self.engine_poolclass
         # logger.info(kwargs, prefix = 'Engine KWargs')
         return kwargs
@@ -343,8 +444,6 @@ class DatabaseClientBase(abc.ABC):
         _config['extra_kws'] = kwargs
         self.remote_connections[name] = RemoteDatabaseConnection.model_validate(_config)
 
-
-
     def pre_init(self, **kwargs):
         """
         Pre-Init
@@ -420,6 +519,19 @@ class DatabaseClientBase(abc.ABC):
         if self.settings:
             return not self.settings.ctx.temp_data.has_logged(method)
         return True
+    
+    @property
+    def default_scoped_session(self) -> Optional[bool]:
+        """
+        Checks if the default scoped sessions are enabled
+        """
+        return self.config.scoped_sessions_enabled
+
+    def set_default_scoped_session(self, enabled: bool):
+        """
+        Sets the default scoped session
+        """
+        self.config.scoped_sessions_enabled = enabled
     
     @property
     def engine(self) -> AsyncEngine:
@@ -519,6 +631,7 @@ class DatabaseClientBase(abc.ABC):
         """
         Returns the session type
         """
+        if scoped is None: scoped = self.default_scoped_session
         # if scoped is not None: return self.session_scoped_rw if scoped else self.session_scoped_ro
         if readonly: return self.session_scoped_ro if scoped else self.session_ro
         return self.session_scoped_rw if scoped else self.session_rw
@@ -583,11 +696,14 @@ class DatabaseClientBase(abc.ABC):
         auto_commit: Optional[bool] = None,
         raise_errors: Optional[bool] = None,
         auto_rollback: Optional[bool] = True,
+        scoped: Optional[bool] = None,
     ) -> AsyncGenerator[AsyncSession, None]:
         """
         Context manager for the database session
         """
-        sess_type = self.session_ro if readonly else self.session_rw
+        # sess_type = self.session_ro if readonly else self.session_rw
+        if scoped is None: scoped = self.default_scoped_session
+        sess_type = self._get_session_type(readonly = readonly, scoped = scoped)
         sess: AsyncSession = None
         try:
             sess: AsyncSession = sess_type()
@@ -598,14 +714,21 @@ class DatabaseClientBase(abc.ABC):
             if auto_rollback: 
                 try:
                     await sess.rollback()
-                    logger.info('Rolled back session')
+                    logger.info('session Rolled Back ')
                 except Exception as e:
-                    logger.trace('Rollback error', e)
+                    logger.trace('Session Rollback Error', e)
             if raise_errors: raise e
         finally:
-            if auto_commit: await sess.commit()
-            await sess.close()
-            if readonly: gc.collect()
+            if auto_commit:
+                if scoped: await sess_type.commit()
+                else: await sess.commit()
+            if scoped: 
+                sess_type.expire_all()
+                await sess_type.close()
+                await sess_type.remove()
+            else:
+                await sess.close()
+            # if readonly: gc.collect()
 
     @contextlib.asynccontextmanager
     async def session_readonly(
@@ -624,7 +747,7 @@ class DatabaseClientBase(abc.ABC):
             if raise_errors: raise e
         finally:
             await sess.close()
-            gc.collect()
+            # gc.collect()
 
 
     @contextlib.asynccontextmanager
@@ -659,9 +782,150 @@ class DatabaseClientBase(abc.ABC):
         finally:
             if auto_commit: await sess.commit()
             await sess.close()
-            if readonly: gc.collect()
+            # if readonly: gc.collect()
 
+    """
+    Direct Engine Connections
+    """
 
+    def get_engine(
+        self,
+        url: Optional[str] = None,
+        readonly: Optional[bool] = None,
+        superuser: Optional[bool] = None,
+        execution_options: Optional[Dict[str, Any]] = None,
+        driver: Optional[str] = 'psycopg2',
+        **kwargs,
+    ) -> Engine:
+        """
+        Creates an Engine. This is unmanaged
+        """
+        engine_kwargs = self.config.get_engine_kwargs(readonly = readonly, superuser = superuser, url = url, driver = driver, **kwargs)
+        if execution_options: engine_kwargs['execution_options'] = execution_options
+        return create_engine(**engine_kwargs)
+    
+    def get_aengine(
+        self,
+        url: Optional[str] = None,
+        readonly: Optional[bool] = None,
+        superuser: Optional[bool] = None,
+        execution_options: Optional[Dict[str, Any]] = None,
+        driver: Optional[str] = 'asyncpg',
+        **kwargs,
+    ) -> AsyncEngine:
+        """
+        Creates an Async Engine. This is unmanaged
+        """
+        engine_kwargs = self.config.get_engine_kwargs(readonly = readonly, superuser = superuser, url = url, driver = driver,**kwargs)
+        if execution_options: engine_kwargs['execution_options'] = execution_options
+        return create_async_engine(**engine_kwargs)
+    
+
+    def _get_engine_type(
+        self,
+        readonly: Optional[bool] = None,
+    ) -> AsyncEngine:
+        """
+        Returns the session type
+        """
+        return self.engine_ro if readonly else self.engine
+    
+    @contextlib.asynccontextmanager
+    async def connection(
+        self,
+        readonly: Optional[bool] = None,
+        raise_errors: Optional[bool] = None,
+        auto_rollback: Optional[bool] = True,
+        auto_commit: Optional[bool] = None,
+        superuser: Optional[bool] = None,
+        execution_options: Optional[Dict[str, Any]] = None,
+        url: Optional[str] = None,
+        **kwargs,
+    ) -> AsyncGenerator[AsyncConnection, None]:
+        """
+        Context Manager for the connection
+        """
+        if any(
+            url is not None,
+            execution_options is not None,
+            superuser is not None,
+        ):
+            engine = self.get_aengine(
+                url = url,
+                readonly = readonly,
+                superuser = superuser,
+                execution_options = execution_options,
+                **kwargs,
+            )
+        else:
+            engine = self._get_engine_type(readonly = readonly)
+        conn: AsyncConnection = None
+        try:
+            conn = await engine.connect()
+            await conn.start()
+            yield conn
+        except Exception as e:
+            logger.trace('Engine error', e, depth = 5)
+            self.run_error_callbacks(e)
+            if auto_rollback: 
+                try:
+                    await conn.rollback()
+                    logger.info('Connection Rolled Back')
+                except Exception as e:
+                    logger.trace('Connection Rollback Error', e)
+            if raise_errors: raise e
+        finally:
+            if auto_commit: await conn.commit()
+            await conn.aclose()
+            # if readonly: gc.collect()
+
+    @contextlib.contextmanager
+    def sconnection(
+        self,
+        readonly: Optional[bool] = None,
+        raise_errors: Optional[bool] = None,
+        auto_rollback: Optional[bool] = True,
+        auto_commit: Optional[bool] = None,
+        superuser: Optional[bool] = None,
+        execution_options: Optional[Dict[str, Any]] = None,
+        url: Optional[str] = None,
+        **kwargs,
+    ) -> Generator[Connection, None, None]:
+        """
+        Context Manager for the connection
+        """
+        engine = self.get_engine(
+            url = url,
+            readonly = readonly,
+            superuser = superuser,
+            execution_options = execution_options,
+            **kwargs,
+        )
+        conn: Connection = None
+        try:
+            with engine.connect() as conn:
+                yield conn
+        except Exception as e:
+            logger.trace('Engine error', e, depth = 5)
+            self.run_error_callbacks(e)
+            if auto_rollback: 
+                try:
+                    conn.rollback()
+                    logger.info('Connection Rolled Back')
+                except Exception as e:
+                    logger.trace('Connection Rollback Error', e)
+            if raise_errors: raise e
+        finally:
+            if conn is not None:
+                if auto_commit: conn.commit()
+                conn.close()
+            # if readonly: gc.collect()
+            
+
+    
+    """
+    Utility Methods
+    """
 
     @staticmethod
     def text(sql: str) -> TextClause:
@@ -669,10 +933,6 @@ class DatabaseClientBase(abc.ABC):
         Returns the text
         """
         return sql_text(sql)
-    
-    """
-    Utility Methods
-    """
 
     async def wait_for_ready(
         self,
@@ -875,4 +1135,64 @@ class DatabaseClientBase(abc.ABC):
             output = result.scalar_one()
             logger.info(f'Database Exists: {output}')
             return output
-        
+    
+    def get_table_names(
+        self,
+        schema: Optional[str] = None,
+    ) -> List[str]:
+        """
+        Returns the table names
+        """
+        from sqlalchemy.engine.reflection import Inspector
+        inspector = Inspector.from_engine(self.engine)
+        return inspector.get_table_names(schema = schema)
+    
+
+    def get_table_column_size(
+        self,
+        table: str,
+        column: str,
+        schema: Optional[str] = None,
+        verbose: Optional[bool] = False,
+    ) -> Dict[str, Union[str, float]]:
+        """
+        Displays the table column size
+        """
+        table_name = f'{schema}.{table}' if schema else table
+        with self.sconnection() as conn:
+            result = conn.execute(
+                self.text(f'''
+                select
+                    pg_size_pretty(sum(pg_column_size({column}))) as total_size,
+                    pg_size_pretty(avg(pg_column_size({column}))) as average_size,
+                    sum(pg_column_size({column})) * 100.0 / pg_total_relation_size('{table_name}') as percentage
+                from {table_name};
+                '''
+            ))
+        row = result.fetchone()
+        if verbose: logger.info(f'Total Size: |g|{row[0]}|e|, Avg Size: |g|{row[1]}|e|, Percentage: |y|{row[2]:.2f}%|e|', prefix = f'{table_name}.{column}', colored = True)
+        return {
+            'total_size': row[0],
+            'average_size': row[1],
+            'percentage': row[2],
+        }
+    
+    def get_table_column_names(
+        self,
+        table: str,
+        schema: Optional[str] = None,
+    ) -> List[str]:
+        """
+        Returns the table column names
+        """
+        table_name = f'{schema}.{table}' if schema else table
+        with self.sconnection() as conn:
+            result = conn.execute(
+                self.text(f'''
+                select column_name
+                from information_schema.columns
+                where table_name = '{table_name}';
+                '''
+            ))
+        return [row[0] for row in result.fetchall()]
+
