@@ -112,7 +112,9 @@ COLORED_MESSAGE_MAP = {
     '|lm|': '<light-magenta>',
     '|lc|': '<light-cyan>',
     '|lw|': '<light-white>',
-    '|gr|': '<gray>',
+    # '|gr|': '<gray>',
+    # '|gr|': "\033[90m",
+    '|gr|': '<fg #808080>',
     '|lk|': '<light-black>',
     '|br|': "\x1b[31;1m", # Bold Red
     '|k|': '<black>',
