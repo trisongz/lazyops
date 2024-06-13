@@ -465,6 +465,7 @@ class Logger(_Logger):
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
         colored: Optional[bool] = False,
+        hook: Optional[Callable] = None,
         **kwargs
     ):  # noqa: N805
         """
@@ -479,6 +480,7 @@ class Logger(_Logger):
             # level_id, static_level_no, from_decorator, options, message, args, kwargs
             static_log_no = REVERSE_LOGLEVEL_MAPPING.get(level, 20)
             self._log(level, static_log_no, False, self._get_opts(colored = colored), message, args, kwargs)
+        if hook: hook(message)
 
     def info(
         self, 
@@ -508,6 +510,7 @@ class Logger(_Logger):
         colored: Optional[bool] = False, 
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
+        hook: Optional[Callable] = None,
         **kwargs
     ):  # noqa: N805
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'SUCCESS'``."""
@@ -517,7 +520,7 @@ class Logger(_Logger):
         except TypeError:
             # Compatibility with < 0.6.0
             self._log("SUCCESS", 20, False, self._get_opts(colored = colored), message, args, kwargs)
-    
+        if hook: hook(message)
 
     def warning(
         self, 
@@ -538,6 +541,25 @@ class Logger(_Logger):
             self._log("WARNING", 30, False, self._get_opts(colored = colored), message, args, kwargs)
         if hook: hook(message)
 
+    def error(
+        self,
+        message: Any,
+        *args,
+        prefix: Optional[str] = None,
+        max_length: Optional[int] = None,
+        colored: Optional[bool] = False,
+        hook: Optional[Callable] = None,
+        **kwargs
+    ) -> None:
+        """
+        Log ``message.format(*args, **kwargs)`` with severity ``'ERROR'``.
+        """
+        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored, level = 'ERROR')
+        try:
+            self._log("ERROR", False, self._get_opts(colored = colored), message, args, kwargs)
+        except TypeError:
+            self._log("ERROR", 40, False, self._get_opts(colored = colored), message, args, kwargs)
+        if hook: hook(message)
 
     def trace(
         self, 
@@ -549,6 +571,7 @@ class Logger(_Logger):
         colored: Optional[bool] = False,
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
+        hook: Optional[Callable] = None,
         **kwargs,
     ) -> None:
         """
@@ -567,6 +590,7 @@ class Logger(_Logger):
         except TypeError:
             static_log_no = REVERSE_LOGLEVEL_MAPPING.get(level, 40)
             self._log(level, static_log_no, False, self._get_opts(colored = colored), _msg, (), {})
+        if hook: hook(_msg)
 
     def exception(
         self,
@@ -575,6 +599,7 @@ class Logger(_Logger):
         colored: Optional[bool] = False,
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
+        hook: Optional[Callable] = None,
         **kwargs
     ):
         """
@@ -582,6 +607,7 @@ class Logger(_Logger):
         """
         message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored, level = 'ERROR')
         super().exception(message, *args, **kwargs)
+        if hook: hook(message)
 
     
     def __call__(self, message: Any, *args, level: str = 'info', **kwargs):

@@ -47,6 +47,8 @@ class GlobalContext(abc.ABC):
     server_processes: List['multiprocessing.Process'] = []
     # worker_processes: Dict[str, Dict[str, List['multiprocessing.Process']]] = {}
 
+    asyncio_tasks: List[asyncio.Task] = []
+
     on_close_funcs: List[Callable] = []
 
     settings_func: Optional[Union[Callable, str]] = None # type: ignore
@@ -333,6 +335,42 @@ class GlobalContext(abc.ABC):
                     proc.close()
             curr_proc += 1
         # if verbose: self.logger.info(f"Stopped all {curr_proc} server processes")
+
+    def start_asyncio_task(
+        self,
+        func: Callable,
+        *args,
+        **kwargs,
+    ):
+        """
+        Starts an asyncio task
+        """
+        self.asyncio_tasks.append(
+            asyncio.create_task(func(*args, **kwargs))
+        )
+    
+    def add_asyncio_task(
+        self,
+        task: asyncio.Task,
+    ) -> None:
+        """
+        Adds an asyncio task
+        """
+        self.asyncio_tasks.append(task)
+
+    def stop_all_asyncio_tasks(
+        self,
+        verbose: Optional[bool] = None,
+    ):
+        """
+        Stops all asyncio tasks
+        """
+        if not self.asyncio_tasks: return
+        for task in self.asyncio_tasks:
+            if task.done(): continue
+            if verbose: self.logger.info(f"Stopping Asyncio Task: {task}", colored = True)
+            task.cancel()
+        self.asyncio_tasks = []
     
     def end_all_processes(self, verbose: bool = True, timeout: float = 5.0):
         """
@@ -343,6 +381,7 @@ class GlobalContext(abc.ABC):
         #         self.stop_worker_processes(name = name, verbose = verbose, timeout = timeout, kind = kind)
         self.stop_task_workers(timeout = timeout, verbose = verbose)
         self.stop_server_processes(verbose = verbose, timeout = timeout)
+        self.stop_all_asyncio_tasks(verbose = verbose)
         # self.logger.info("Terminated all processes")
 
     def register_on_close(self, func: Callable, *args, **kwargs):

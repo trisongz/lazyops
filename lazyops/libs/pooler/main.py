@@ -15,6 +15,7 @@ import asyncio
 import functools
 import subprocess
 import contextvars
+import contextlib
 import anyio.from_thread
 from concurrent import futures
 from anyio._core._eventloop import threadlocals
@@ -244,9 +245,12 @@ class ThreadPool(abc.ABC):
         Cleans up the ThreadPoolExecutor and Tasks
         """
         for task in self.tasks:
-            task.cancel()
-        if self._pool is not None: self._pool.shutdown(wait = self.allow_task_completion, cancel_futures = not self.allow_task_completion)
-        if self._ppool is not None: self._ppool.shutdown(wait = self.allow_task_completion, cancel_futures = not self.allow_task_completion)
+            with contextlib.suppress(Exception):
+                task.cancel()
+        with contextlib.suppress(Exception):
+            if self._pool is not None: self._pool.shutdown(wait = self.allow_task_completion, cancel_futures = not self.allow_task_completion)
+        with contextlib.suppress(Exception):
+            if self._ppool is not None: self._ppool.shutdown(wait = self.allow_task_completion, cancel_futures = not self.allow_task_completion)
 
     """
     Core
