@@ -154,10 +154,13 @@ def extract_module_name(name: str) -> str:
     """
     return name.split('.')[0]
 
-class NullLogger(logging.Logger):
+
+
+class NullLoggerV1(logging.Logger):
     """
-    A logger that does nothing
+    A logger that does nothing except pass through the log calls to hooks
     """
+
     def info(self, *args, **kwargs): pass
     def debug(self, *args, **kwargs): pass
     def warning(self, *args, **kwargs): pass
@@ -167,6 +170,184 @@ class NullLogger(logging.Logger):
     def log(self, *args, **kwargs): pass
     def trace(self, *args, **kwargs): pass
     def success(self, *args, **kwargs): pass
+
+
+
+class NullLogger(logging.Logger):
+    """
+    A logger that does nothing except pass through the log calls to hooks
+    """
+
+    def _format_item(
+        self,
+        msg: Any,
+        max_length: Optional[int] = None,
+        colored: Optional[bool] = False,
+        level: Optional[str] = None,
+        _is_part: Optional[bool] = False,
+    ) -> str:  # sourcery skip: extract-duplicate-method, low-code-quality, split-or-ifs
+        """
+        Formats an item
+        """
+        # Primitive Types
+        if isinstance(msg, str): return msg[:max_length] if max_length else msg
+        if isinstance(msg, (float, int, bool, type(None))): return str(msg)[:max_length] if max_length else str(msg)
+        if isinstance(msg, (list, set)):
+            _msg = str(msg) if _is_part else "\n" + "".join(f'- {item}\n' for item in msg)
+            return _msg[:max_length] if max_length else _msg
+        
+        prefix, suffix = '', ''
+        if colored:
+            prefix = '|g|'
+            if level:
+                level = level.lower()
+                prefix = DEFAULT_STATUS_COLORS.get(level, '|g|')
+            suffix = '|e|'
+
+        if isinstance(msg, dict):
+            _msg = "\n"
+            for key, value in msg.items():
+                _value = f'{value}'
+                if max_length and len(_value) > max_length:
+                    _value = f'{_value[:max_length]}...'
+                _msg += f'- {prefix}{key}{suffix}: {_value}\n'
+            return _msg.rstrip()
+        
+        if isinstance(msg, tuple):
+            _msg = "".join(f'- {prefix}{key}{suffix}: {self._format_item(value, max_length = max_length, colored = colored, level = level,  _is_part = True)}\n' for key, value in zip(msg[0], msg[1]))
+            return _msg[:max_length] if max_length else _msg
+
+        # Complex Types
+        if (hasattr(msg, 'dict') and hasattr(msg, 'Config')) or hasattr(msg, 'fields'):
+            # Likely Pydantic Model
+            _msg = f'{prefix}[{msg.__class__.__name__}]{suffix}'
+            fields = msg.fields.keys() if hasattr(msg, 'fields') else msg.__fields__.keys()
+            for field in fields:
+                field_str = f'{prefix}{field}{suffix}'
+                val_s = f'\n  {field_str}: {getattr(msg, field)!r}'
+                if max_length is not None and len(val_s) > max_length:
+                    val_s = f'{val_s[:max_length]}...'
+                _msg += val_s
+            return _msg
+            # return self._format_item(msg.dict(), max_length = max_length, colored = colored, _is_part = _is_part)
+        
+        if hasattr(msg, 'model_dump'):
+            return self._format_item(msg.model_dump(mode = 'json'), max_length = max_length, colored = colored, level = level, _is_part = _is_part)
+
+        if hasattr(msg, 'dict'):
+            return self._format_item(msg.dict(), max_length = max_length, colored = colored, level = level, _is_part = _is_part)
+
+        if hasattr(msg, 'json'):
+            return self._format_item(msg.json(), max_length = max_length, colored = colored, level = level, _is_part = _is_part)
+
+        if hasattr(msg, '__dict__'):
+            return self._format_item(msg.__dict__, max_length = max_length, colored = colored, level = level, _is_part = _is_part)
+        
+        return str(msg)[:max_length] if max_length else str(msg)
+
+
+    def _format_message(
+        self, 
+        message: Any, 
+        *args,
+        prefix: Optional[str] = None,
+        max_length: Optional[int] = None,
+        level: Optional[str] = None,
+        colored: Optional[bool] = False,
+    ) -> str:
+        """
+        Formats the message
+
+        "example |b|msg|e|"
+        -> "example <blue>msg</><reset>"
+        """
+        _message = ""
+        if prefix: 
+            if colored and '|' not in prefix: 
+                base_color = '|g|'
+                if level:
+                    level = level.lower()
+                    base_color = DEFAULT_STATUS_COLORS.get(level, '|g|')
+                prefix = f'{base_color}{prefix}|e|'
+            _message += f'[{prefix}] '
+        _message += self._format_item(message, max_length = max_length, colored = colored, level = level)
+        if args:
+            for arg in args:
+                _message += "\n"
+                _message += self._format_item(arg, max_length = max_length, colored = colored, level = level)
+        if colored:
+            # Add escape characters to prevent errors
+            _message = _message.replace("<fg", ">|fg")
+            _message = _message.replace("<", "\</")
+            _message = find_and_format_seps(_message)
+            # print(_message)
+            for key, value in COLORED_MESSAGE_MAP.items():
+                _message = _message.replace(key, value)
+            _message = _message.replace(">|fg", "<fg")
+            _message = _message.replace("\</", "\<")
+            _message += RESET_COLOR
+        return _message
+    
+    def _get_level(self, level: Union[str, int]) -> str:
+        """
+        Returns the log level
+        """
+        if isinstance(level, str): level = level.upper()
+        elif isinstance(level, int): level = LOGLEVEL_MAPPING.get(level, 'INFO')
+        return level
+    
+    def log(
+        self, 
+        level: Union[str, int], 
+        message: Any, 
+        *args, 
+        prefix: Optional[str] = None,
+        max_length: Optional[int] = None,
+        colored: Optional[bool] = False,
+        hook: Optional[Callable] = None,
+        **kwargs
+    ):  # noqa: N805
+        """
+        Log ``message.format(*args, **kwargs)`` with severity ``level``.
+        """
+        if not hook: return
+        level = self._get_level(level)
+        message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored, level = level)
+        hook(message)
+
+    def info(self, *args, **kwargs):
+        return self.log('INFO', *args, **kwargs)
+    
+    def debug(self, *args, **kwargs):
+        return self.log('DEBUG', *args, **kwargs)
+    
+    def warning(self, *args, **kwargs):
+        return self.log('WARNING', *args, **kwargs)
+    
+    def error(self, *args, **kwargs):
+        return self.log('ERROR', *args, **kwargs)
+    
+    def trace(self, msg: Union[str, Any], error: Optional[Type[Exception]] = None, level: str = "ERROR", limit: Optional[int] = None, chain: Optional[bool] = True, colored: Optional[bool] = False, prefix: Optional[str] = None, max_length: Optional[int] = None, hook: Optional[Callable] = None, **kwargs):
+        """
+        This method logs the traceback of an exception.
+
+        :param error: The exception to log.
+        """
+        if not hook: return
+        _depth = kwargs.pop('depth', None)
+        if _depth is not None: limit = _depth
+        _msg = msg if isinstance(msg, str) else self._format_message(msg, colored = True, prefix = prefix, max_length = max_length)
+        # pprint.pformat(msg)
+        _msg += f"\n{traceback.format_exc(chain = chain, limit = limit)}"
+        if error: _msg += f" - {error}"
+        hook(_msg)
+
+    def exception(self, *args, **kwargs):
+        return self.log('ERROR', *args, **kwargs)
+    
+    def success(self, *args, **kwargs):
+        return self.log('SUCCESS', *args, **kwargs)
+
 
 
 # Setup Default Logger
