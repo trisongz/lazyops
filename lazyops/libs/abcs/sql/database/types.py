@@ -321,6 +321,14 @@ class ObjectCRUD(Generic[ModelTypeBasePydantic, SourceSchemaType]):
                 self._lazyattrs['table_with_schema_name'] = self.table_name
         return self._lazyattrs['table_with_schema_name']
     
+    @property
+    def table_columns(self) -> List[str]:
+        """
+        Returns the table columns
+        """
+        if 'table_columns' not in self._lazyattrs:
+            self._lazyattrs['table_columns'] = [c.name for c in self.table.columns]
+        return self._lazyattrs['table_columns']
     
     @property
     def pooler(self) -> 'ThreadPool':
