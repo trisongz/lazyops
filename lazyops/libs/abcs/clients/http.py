@@ -89,6 +89,7 @@ class BaseAPIClient(BaseGlobalClient):
             'cachable',
             'disable_cache',
             'overwrite_cache',
+            'verify',
         ]
     
     def configure_api_client(self, *args, **kwargs) -> aiohttpx.Client:

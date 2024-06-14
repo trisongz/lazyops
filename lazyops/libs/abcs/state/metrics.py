@@ -113,7 +113,7 @@ class AppStateMetrics:
         self, 
         in_k8s: Optional[bool] = None, 
         colored: Optional[bool] = True,
-        run_gc: Optional[bool] = True,
+        run_gc: Optional[bool] = False,
         verbose: Optional[bool] = True,
         **kwargs
     ):

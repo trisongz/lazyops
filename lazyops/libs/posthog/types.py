@@ -203,7 +203,7 @@ class EventQueue(BaseModel):
         """
         self.capture_events.clear()
         self.identify_events.clear()
-        gc.collect()
+        # gc.collect()
     
     def prepare_events(
         self, 
@@ -219,7 +219,7 @@ class EventQueue(BaseModel):
         if kind == 'capture': 
             events = [e.prepare_request(exclude_none = exclude_none, batched = batched, **kwargs) for e in self.capture_events]
             if clear_after: self.capture_events.clear()
-            gc.collect()
+            # gc.collect()
             return events
             
     def __bool__(self):
