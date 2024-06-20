@@ -10,6 +10,12 @@ from enum import Enum
 
 try:
     import numpy as np
+    np_version = np.__version__
+    if np_version.startswith("2."):
+        np_float_types = (np.float16, np.float32, np.float64)
+    else:
+        np_float_types = (np.float_, np.float16, np.float32, np.float64)
+    np_int_types = (np.int_, np.intc, np.intp, np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64)
     
 except ImportError:
     np = None
@@ -152,10 +158,12 @@ def object_serializer(obj: typing.Any) -> typing.Any:
         return obj.value
 
     if np is not None:
-        if isinstance(obj, (np.int_, np.intc, np.intp, np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64)):
+        # if isinstance(obj, (np.int_, np.intc, np.intp, np.int8, np.int16, np.int32, np.int64, np.uint8, np.uint16, np.uint32, np.uint64)):
+        if isinstance(obj, np_int_types):
             return int(obj)
         
-        if isinstance(obj, (np.float_, np.float16, np.float32, np.float64)):
+        # if isinstance(obj, (np.float_, np.float16, np.float32, np.float64)):
+        if isinstance(obj, np_float_types):
             return float(obj)
 
     if isinstance(obj, object):
