@@ -9,7 +9,7 @@ import contextlib
 from enum import Enum
 from pathlib import Path
 
-from pydantic import model_validator
+from pydantic import model_validator, PrivateAttr
 from lazyops.utils.logs import Logger, null_logger
 from lazyops.imports._pydantic import BaseAppSettings, BaseModel
 from lazyops.libs.abcs.state import GlobalContext
@@ -31,6 +31,8 @@ class AppSettings(BaseAppSettings):
     ingress_domain: Optional[str] = None
     debug_enabled: Optional[bool] = False
     app_env: Optional[AppEnv] = None
+
+    # _extra: Dict[str, Any] = PrivateAttr(default_factory=dict)
 
     if TYPE_CHECKING:
         ctx: ApplicationContext
@@ -55,6 +57,21 @@ class AppSettings(BaseAppSettings):
             register_module_settings(self.__module__, self)
         return self
     
+    # @property
+    # def ctx(self) -> 'ApplicationContext':
+    #     """
+    #     Returns the application context
+    #     """
+    #     return self._extra.get('ctx')
+
+    # @ctx.setter
+    # def ctx(self, value: 'ApplicationContext'):
+    #     """
+    #     Sets the application context
+    #     """
+    #     self._extra['ctx'] = value
+
+
     @property
     def logger(self) -> 'Logger':
         """
