@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block body %}
+  {% block header %}
+  <header>
+    <nav class="nav container">
+      {%- if settings.logo_url -%}
+      <a href="{{ settings.app_endpoint }}"><img src="{{ settings.logo_url }}" alt="{{ settings.app_name }}" class="logo"></a>
+      {%- else -%}
+      <h1 class="text-display-3">
+      {{ settings.app_name }} Auth
+      {%- endif -%}
+      </h1>
+      <div class="profile-blob">
+        <div class="avatar">
+          {{ user.given_name[0] }}{{ user.family_name[0] }}
+        </div>
+        <div>
+          <p class="text-heading-2">
+            {{ user.given_name }} {{ user.family_name }}
+          </p>
+          <a class="text-subtle" href="{{ client.app.url_path_for('logout') }}">
+            Sign out
+          </a>
+        </div>
+      </div>
+      
+    </nav>
+  </header>
+  {% endblock %}
+
+  {% block main %} {% endblock %}
+
+  {% block footer %}
+  <footer class="footer">
+    <div class="container">
+      <strong class="text-heading-2">
+        {{ settings.app_name }} Auth
+      </strong>
+      <p class="footer-tagline text-body-3">
+        Visit our <a class="link" href="{{ settings.docs_path }}">help center</a>
+      </p>
+      <small class="text-subtle">© {{ settings.current_year }} {{ settings.company_name }}. All rights reserved
+      </small>
+    </div>
+  </footer>
+  {% endblock %}
+{% endblock %}

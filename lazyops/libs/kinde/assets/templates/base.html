@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    {%- if settings.favicon_url -%}
+    <link rel="shortcut icon" href="{{ settings.favicon_url }}">
+    {%- endif -%}
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ settings.app_name }}</title>
+    <link rel="stylesheet" type="text/css" href= "{{ url_for('kstatic', path = 'css/global.css') }}">
+</head>
+<body>
+{% block body %} {% endblock %}
+</body>
+</html>

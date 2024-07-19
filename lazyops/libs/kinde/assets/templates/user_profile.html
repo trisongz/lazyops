@@ -1,0 +1,33 @@
+{% extends "logged_in.html" %}
+
+{% block main %}
+<main>
+  <div class="container">
+    <div class="card start-hero-small">
+      <p class="text-body-2">
+        Your User Profile
+      </p>
+    </div>
+    <p class="text-body-2 next-steps-section">
+      <h4>Given name:</h4>
+      <input class="code text-body-3" size="70" value="{{ user.given_name }}" disabled>
+
+      <h4>Family name:</h4>
+      <input class="code text-body-3" size="70" value="{{ user.family_name }}" disabled>
+
+      <h4>Email:</h4>
+      <input class="code text-body-3" size="70" value="{{ user.email }}" disabled>
+
+      <h4>API Key:</h4>
+      <pre class="code text-body-3">{{ request.session.x_api_key }}</pre>
+      
+      <h4>Access Token:</h4>
+      <pre class="code text-body-3">{{ api_client.configuration.access_token }}</pre>
+
+    </p>
+    <div class="center">
+      <a class="btn btn-primary m-1" href="{{ settings.docs_path }}">View Documentation</a>
+    </div>
+  </div>
+</main>
+{% endblock %}

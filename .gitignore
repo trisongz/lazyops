@@ -33,4 +33,7 @@ tests/local.lock
 tests/libs/abcs/private_test_wrapper.py
 tests/**/private**
 tests/libs/abcs/k8s.py
-lazyops/libs/hatchet*
+# lazyops/libs/hatchet*
+lazyops/libs/kinde/data
+lazyops/libs/hatchet_v1
+lazyops/libs/hatchet/cache

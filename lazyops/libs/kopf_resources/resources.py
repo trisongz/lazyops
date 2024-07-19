@@ -1,8 +1,9 @@
 import functools
 import inspect
 import typing
+import pathlib
 from pydantic import BaseModel, Field
-from typing import Any, Dict, List, Mapping, Type, Literal
+from typing import Any, Dict, List, Union, Mapping, Type, Literal
 
 import kopf
 
@@ -238,3 +239,24 @@ class Resource(BaseModel, DecoratorMixin):
     def __str__(self):
         _str = super().__str__()
         return f'<Resource {_str}>'
+    
+
+    @classmethod
+    def from_body(cls, body: Union[Dict[str, Any], kopf.Body]) -> 'Resource':
+        """
+        Parses the body into a resource
+        """
+        from lazyops.libs.kopf_resources import from_dict
+        return from_dict(body)
+
+    @classmethod
+    def write_crds_to_file(cls, file: Union[str, pathlib.Path]) -> None:
+        """
+        Writes the CRDs to a file
+        """
+        import yaml
+        from lazyops.libs.kopf_resources import all_crds
+        file = pathlib.Path(file)
+        file.write_text(yaml.dump_all(all_crds(), sort_keys=False))
+
+

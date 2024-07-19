@@ -1,3 +1,13 @@
+## v0.2.85 - Last Updated: Feb 23, 2023
+
+- Added New Library: `hatchet`
+  
+  Builds on top of `hatchet_sdk` to make building workflows easier.
+
+- Added New Library: `kinde`
+
+  Builds on top of `kinde_sdk` to make integration with fastapi easier.
+
 
 ## v0.2.24 - Last Updated: Feb 23, 2023
 - Resolve Async issues with `timed_cache` to resolve properly.

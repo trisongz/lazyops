@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block body %}
+<header>
+  <nav class="nav container">
+    {%- if settings.logo_url -%}
+    <a href="{{ settings.app_endpoint }}"><img src="{{ settings.logo_url }}" alt="{{ settings.app_name }}" class="logo"></a>
+    {%- else -%}
+    <h1 class="text-display-3">
+    {{ settings.app_name }} Auth
+    {%- endif -%}
+    </h1>
+    <div>
+
+      <a class="btn btn-ghost sign-in-btn" href="{{ settings.docs_path }}">
+        Docs
+      </a>
+      <a class="btn btn-ghost sign-in-btn" href="{{ url_for('login') }}">
+        Sign in
+      </a>
+       <a class="btn btn-dark" href="{{ url_for('kinde_register') }}">
+        Sign up
+      </a>
+    </div>
+  </nav>
+</header>
+<main>
+  <div class="container">
+    <div class="card hero">
+      <p class="text-display-1 hero-title">
+        Get Started with {{ settings.app_name }}
+      </p>
+      <div>
+      <a target="_blank" rel="noreferrer" class="btn btn-light btn-big" href="{{ url_for('login') }}">
+        Sign In
+      </a>
+      <a rel="noreferrer" class="btn btn-light btn-big" href="{{ settings.docs_path }}">
+        Go to docs
+      </a>
+      </div>
+    </div>
+
+    
+  </div>
+</main>
+<footer class="footer">
+  <div class="container">
+    <strong class="text-heading-2">
+      {{ settings.app_name }} Auth
+    </strong>
+    <p class="footer-tagline text-body-3">
+      Visit our <a class="link" href="/docs">help center</a>
+    </p>
+    <small class="text-subtle">© {{ settings.current_year }} {{ settings.company_name }}. All rights reserved
+    </small>
+  </div>
+</footer>
+{% endblock %}
