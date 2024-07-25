@@ -275,8 +275,8 @@ def parse_memory_metric_to_bs(data: Union[int, float, str]) -> 'ByteSize':
     """
     Parses memory to ByteSize
     """
+    from pydantic.types import ByteSize
     if isinstance(data, (int, float)): 
-        from pydantic.types import ByteSize
         return ByteSize(data)
     data = parse_memory_metric(f'{data} MiB')
     return ByteSize(data)
@@ -365,7 +365,7 @@ def get_gpu_data() -> Union[List[Dict[str, Any]], Dict[str, Union[str, int, floa
     if len(gpu_data) == 1: gpu_data = gpu_data[0]
     return gpu_data
 
-
+    
 def get_ulimits():
     import resource
     soft_limit, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
