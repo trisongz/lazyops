@@ -40,11 +40,12 @@ if TYPE_CHECKING:
     from kvdb import PersistentDict
     from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-def create_session_key(user_id: str) -> str:
+def create_session_key(*keys: str) -> str:
     """
     Creates a session key
     """
-    return hash_func(user_id)
+    joined_keys = ':'.join(keys)
+    return hash_func(joined_keys)
 
 def get_pdict(
     base_key: str,
@@ -172,8 +173,8 @@ class PersistentSessionMiddleware:
                 if scope['session']:
                     if not session_key:
                         if scope['session'].get('user_id'):
-                            session_key = create_session_key(scope['session']['user_id'])
-                        else: session_key = create_session_key(str(uuid4()))
+                            session_key = create_session_key(scope['session']['user_id'], self.secret_key)
+                        else: session_key = create_session_key(str(uuid4()), self.secret_key)
                     await self.pdict.aset(session_key, scope['session'])
                     headers = MutableHeaders(scope=message)
                     header_value = "{session_cookie}={session_key}; path={path}; {max_age}{security_flags}".format(  # noqa E501
