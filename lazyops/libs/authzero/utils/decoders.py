@@ -47,7 +47,7 @@ def decode_token(
             err = e
     if jwt_claim is None:
         from ..types.errors import InvalidTokenException
-        raise InvalidTokenException(error = e) from err
+        raise InvalidTokenException(error = err) from err
     return get_az_resource('user_jwt_claims', **jwt_claim)
     # return UserJWTClaims(**jwt_claim)
 

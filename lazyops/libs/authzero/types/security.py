@@ -13,7 +13,7 @@ from . import errors
 
 APIKeyScheme = APIKeyHeader(
     name = "x-api-key",
-    scheme_name = "API Key",
+    scheme_name = "APIKey",
     description = "API Key Authentication",
     auto_error = False,
 )

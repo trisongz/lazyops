@@ -12,6 +12,7 @@ from starlette.datastructures import MutableHeaders, Secret
 from starlette.requests import HTTPConnection
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from typing import Any, Dict, List, Optional, Union, Type, TYPE_CHECKING
+from lazyops.utils import logger
 
 if sys.version_info >= (3, 8):  # pragma: no cover
     from typing import Literal
@@ -125,9 +126,9 @@ class PersistentSessionMiddleware:
         self.https_only = https_only
         self.session_cookie = session_cookie
         self.max_age = max_age
-        self.security_flags = f"httponly; samesite={same_site}"
+        self.security_flags = f"HttpOnly; SameSite={same_site}"
         if https_only:  # Secure flag can be used with HTTPS only
-            self.security_flags += "; secure"
+            self.security_flags += "; Secure"
         self._pdict: Optional['PersistentDict'] = None
         if base_key is None: base_key = session_cookie
         self._pdict_kwargs: Dict[str, Any] = {
@@ -147,7 +148,32 @@ class PersistentSessionMiddleware:
         """
         if self._pdict is None: self._pdict = get_pdict(**self._pdict_kwargs)
         return self._pdict
-        
+    
+
+    async def get_cookie_header_value(
+        self,
+        scope: 'Scope',
+        session_key: Optional[str] = None, # If no session key is provided, it assumes the session should be deleted
+        **kwargs,
+    ) -> str:
+        """
+        Returns the cookie header value
+        """
+        if not session_key:
+            return "{session_cookie}={data}; path={path}; {expires}{security_flags}".format(  # noqa E501
+                session_cookie=self.session_cookie,
+                data = "null",
+                path = self.path,
+                expires = "expires=Thu, 01 Jan 1970 00:00:00 GMT; ",
+                security_flags = self.security_flags,
+            )
+        return "{session_cookie}={session_key}; path={path}; {max_age}{security_flags}".format(  # noqa E501
+            session_cookie = self.session_cookie,
+            session_key = session_key,
+            path = self.path,
+            max_age=f"Max-Age={self.max_age}; " if self.max_age else "",
+            security_flags=self.security_flags,
+        )
 
     async def __call__(self, scope: 'Scope', receive: 'Receive', send: 'Send') -> None:
         
@@ -166,36 +192,27 @@ class PersistentSessionMiddleware:
                 initial_session_key = session_key
             else: scope["session"] = {}
         else: scope["session"] = {}
+        # logger.info(scope)
 
         async def send_wrapper(message: 'Message') -> None:
             if message["type"] == "http.response.start":
                 session_key = initial_session_key
                 if scope['session']:
                     if not session_key:
-                        if scope['session'].get('user_id'):
+                        if scope['session'].get('session_id'):
+                            session_key = scope['session']['session_id']
+                        elif scope['session'].get('user_id'):
                             session_key = create_session_key(scope['session']['user_id'], self.secret_key)
                         else: session_key = create_session_key(str(uuid4()), self.secret_key)
                     await self.pdict.aset(session_key, scope['session'])
                     headers = MutableHeaders(scope=message)
-                    header_value = "{session_cookie}={session_key}; path={path}; {max_age}{security_flags}".format(  # noqa E501
-                        session_cookie = self.session_cookie,
-                        session_key = session_key,
-                        path=self.path,
-                        max_age=f"Max-Age={self.max_age}; " if self.max_age else "",
-                        security_flags=self.security_flags,
-                    )
+                    header_value = await self.get_cookie_header_value(scope, session_key)
                     headers.append("Set-Cookie", header_value)
                 
                 elif not initial_session_was_empty:
                     # The session has been cleared.
                     headers = MutableHeaders(scope=message)
-                    header_value = "{session_cookie}={data}; path={path}; {expires}{security_flags}".format(  # noqa E501
-                        session_cookie=self.session_cookie,
-                        data = "null",
-                        path = self.path,
-                        expires = "expires=Thu, 01 Jan 1970 00:00:00 GMT; ",
-                        security_flags = self.security_flags,
-                    )
+                    header_value = await self.get_cookie_header_value(scope)
                     headers.append("Set-Cookie", header_value)
                     if session_key: await self.pdict.adelete(session_key)
             await send(message)
