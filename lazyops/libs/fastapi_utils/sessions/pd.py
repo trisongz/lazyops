@@ -109,6 +109,7 @@ class PersistentSessionMiddleware:
         max_age: typing.Optional[int] = 14 * 24 * 60 * 60,  # 14 days, in seconds
         path: str = "/",
         same_site: Literal["lax", "strict", "none"] = "lax",
+        http_only: bool = True,
         https_only: bool = False,
         # Persistent Dict
         redis_url: Optional[str] = None,
@@ -126,7 +127,8 @@ class PersistentSessionMiddleware:
         self.https_only = https_only
         self.session_cookie = session_cookie
         self.max_age = max_age
-        self.security_flags = f"HttpOnly; SameSite={same_site}"
+        self.security_flags = f"SameSite={same_site}"
+        if http_only: self.security_flags += "; HttpOnly"
         if https_only:  # Secure flag can be used with HTTPS only
             self.security_flags += "; Secure"
         self._pdict: Optional['PersistentDict'] = None
@@ -140,6 +142,7 @@ class PersistentSessionMiddleware:
             'expiration': expiration or max_age - 10,
             **kwargs,
         }
+        self._extra: Dict[str, Any] = {}
     
     @property
     def pdict(self) -> 'PersistentDict':
@@ -198,13 +201,16 @@ class PersistentSessionMiddleware:
             if message["type"] == "http.response.start":
                 session_key = initial_session_key
                 if scope['session']:
+                    if scope['session'].get('session_id'):
+                        if session_key and session_key != scope['session']['session_id']:
+                            await self.pdict.aexpire(session_key, 60)
+                        session_key = scope['session']['session_id']
                     if not session_key:
-                        if scope['session'].get('session_id'):
-                            session_key = scope['session']['session_id']
-                        elif scope['session'].get('user_id'):
+                        if scope['session'].get('user_id'):
                             session_key = create_session_key(scope['session']['user_id'], self.secret_key)
                         else: session_key = create_session_key(str(uuid4()), self.secret_key)
                     await self.pdict.aset(session_key, scope['session'])
+                    # logger.info(f'Session Key: {session_key}')
                     headers = MutableHeaders(scope=message)
                     header_value = await self.get_cookie_header_value(scope, session_key)
                     headers.append("Set-Cookie", header_value)
