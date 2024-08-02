@@ -5,12 +5,13 @@ A FastAPI Exception Helper to register errors
 """
 
 import traceback
-from fastapi.exceptions import HTTPException
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import HTTPException, RequestValidationError
+from fastapi.encoders import jsonable_encoder
+from .responses import JSONResponse, PrettyJSONResponse
 from typing import Optional, Dict, Any, Union, Type, List, Callable, TYPE_CHECKING
 from lazyops.utils.logs import logger
 
-if TYPE_CHECKING:
-    from fastapi import FastAPI
 
 FASTAPI_ERRORS: Dict[str, List[Type['FastAPIException']]] = {}
 
@@ -22,25 +23,7 @@ def register_error(error: Type['FastAPIException']):
     if error.module not in FASTAPI_ERRORS: FASTAPI_ERRORS[error.module] = []
     FASTAPI_ERRORS[error.module].append(error)
 
-def add_exception_handlers_to_app(
-    app: 'FastAPI',
-    func: Callable,
-    module: Optional[str] = 'default',
-    verbose: Optional[bool] = False,
-    detailed: Optional[bool] = False,
-):
-    """
-    Adds the exception handlers to the app
-    """
-    seen = set()
-    for error in FASTAPI_ERRORS.get(module, []):
-        if error.__name__ in seen: continue
-        if verbose and detailed: logger.info(f'Adding Exception Handler: {error.__name__}')
-        app.add_exception_handler(error, func)
-        seen.add(error.__name__)
-    if verbose: logger.info(f'Added {len(seen)} Exception Handlers to {module}')
-
-
+    
 class FastAPIException(HTTPException):
     """
     AuthZ Exception
@@ -115,5 +98,71 @@ class FastAPIException(HTTPException):
             'detail': self.detail,
             'error': self.__class__.__name__,
         }
+
+
+
+def add_exception_handlers_to_app(
+    app: 'FastAPI',
+    func: Callable,
+    module: Optional[str] = 'default',
+    verbose: Optional[bool] = False,
+    detailed: Optional[bool] = False,
+):
+    """
+    Adds the exception handlers to the app
+    """
+    seen = set()
+    for error in FASTAPI_ERRORS.get(module, []):
+        if error.__name__ in seen: continue
+        if verbose and detailed: logger.info(f'Adding Exception Handler: {error.__name__}')
+        app.add_exception_handler(error, func)
+        seen.add(error.__name__)
+    if verbose: logger.info(f'Added {len(seen)} Exception Handlers to {module}')
+
+
+async def default_validation_exception_handler(request: Request, exc: RequestValidationError):
+    """
+    Handle validation errors
+    """
+    errors = exc.errors()
+    log_errors = jsonable_encoder(errors)
+    logger.error(f"Validation error for request {request.url}: {log_errors}")
+    return JSONResponse(
+        status_code = status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content = jsonable_encoder({"detail": errors}),
+    )
+
+
+async def default_exception_handler(request: Request, exc: FastAPIException):
+    """
+    Default Exception Handler
+    """
+    logger.error(f"Error: {exc}")
+    return PrettyJSONResponse(
+        status_code = exc.status_code,
+        content = exc.json_data(),
+    )
+
+
+def add_default_exception_handlers_to_app(
+    app: 'FastAPI',
+    module: Optional[str] = 'default',
+    func: Optional[Callable] = None,
+    add_validation_handler: Optional[bool] = True,
+    verbose: Optional[bool] = False,
+    detailed: Optional[bool] = False,
+):
+    """
+    Adds the exception handlers to the app
+    """
+    seen = set()
+    if func is None: func = default_exception_handler
+    for error in FASTAPI_ERRORS.get(module, []):
+        if error.__name__ in seen: continue
+        if verbose and detailed: logger.info(f'Adding Exception Handler: {error.__name__}')
+        app.add_exception_handler(error, func)
+        seen.add(error.__name__)
+    if add_validation_handler: app.add_exception_handler(RequestValidationError, default_validation_exception_handler)
+    if verbose: logger.info(f'Added {len(seen)} Exception Handlers to {module}')
 
 

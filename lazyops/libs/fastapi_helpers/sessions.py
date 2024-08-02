@@ -11,7 +11,7 @@ from pathlib import Path
 from starlette.datastructures import MutableHeaders, Secret
 from starlette.requests import HTTPConnection
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
-from typing import Any, Dict, List, Optional, Union, Type, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Union, Type, TYPE_CHECKING, Callable, Awaitable
 from lazyops.libs.logging import logger
 
 if sys.version_info >= (3, 8):  # pragma: no cover
@@ -40,6 +40,7 @@ except ImportError:
 if TYPE_CHECKING:
     from kvdb import PersistentDict
     from starlette.types import ASGIApp, Message, Receive, Scope, Send
+    from lazyops.libs.pooler import ThreadPool
 
 def create_session_key(*keys: str) -> str:
     """
@@ -101,6 +102,15 @@ def get_pdict(
 
 
 class PersistentSessionMiddleware:
+
+    """
+    Persistent Session Middleware
+    """
+
+    prehooks: List[Callable[..., Awaitable[None]]] = []
+    presend_hooks: List[Callable[..., Awaitable[None]]] = []
+    posthooks: List[Callable[..., Awaitable[None]]] = []
+
     def __init__(
         self,
         app: 'ASGIApp',
@@ -123,6 +133,11 @@ class PersistentSessionMiddleware:
         # Extra Configuration
         excluded_session_url_paths: Optional[List[str]] = None,
         inject_app_endpoint: Optional[bool] = True,
+
+        # Hooks
+        prehooks: Optional[List[Callable[..., Awaitable[None]]]] = None,
+        presend_hooks: Optional[List[Callable[..., Awaitable[None]]]] = None,
+        posthooks: Optional[List[Callable[..., Awaitable[None]]]] = None,
 
         **kwargs,
     ) -> None:
@@ -155,6 +170,9 @@ class PersistentSessionMiddleware:
             'expiration': expiration or max_age - 10,
             **kwargs,
         }
+        if prehooks: self.prehooks.extend(prehooks)
+        if presend_hooks: self.presend_hooks.extend(presend_hooks)
+        if posthooks: self.posthooks.extend(posthooks)
         self._extra: Dict[str, Any] = {}
     
     @property
@@ -174,6 +192,16 @@ class PersistentSessionMiddleware:
             from lazyops.utils.system import is_in_kubernetes
             self._extra['in_k8s'] = is_in_kubernetes()
         return self._extra['in_k8s']
+    
+    @property
+    def pooler(self) -> 'ThreadPool':
+        """
+        Returns the ThreadPool
+        """
+        if 'pooler' not in self._extra:
+            from lazyops.libs.pooler import ThreadPooler
+            self._extra['pooler'] = ThreadPooler
+        return self._extra['pooler']
 
     def get_app_domain_from_scope(self, scope: 'Scope') -> Optional[str]:
         """
@@ -224,6 +252,44 @@ class PersistentSessionMiddleware:
             security_flags=self.security_flags,
         )
 
+    async def run_prehooks(self, scope: 'Scope', connection: 'HTTPConnection', receive: 'Receive', send: 'Send'):
+        """
+        Runs the prehooks
+        """
+        if not self.prehooks: return
+        for prehook in self.prehooks:
+            await self.pooler.asyncish(prehook, self, scope = scope, connection = connection, receive = receive, send = send)
+    
+    async def run_presend_hooks(self, scope: 'Scope', message: 'Message'):
+        """
+        Runs the presend hooks
+        """
+        if not self.presend_hooks: return
+        for presend_hook in self.presend_hooks:
+            await self.pooler.asyncish(presend_hook, self, scope = scope, message = message)
+    
+    async def run_posthooks(self, scope: 'Scope', message: 'Message'):
+        """
+        Runs the posthooks
+        """
+        if not self.posthooks: return
+        for posthook in self.posthooks:
+            await self.pooler.asyncish(posthook, self, scope = scope, message = message)
+
+    async def run_mw_hooks(self, stage: Literal['pre', 'presend', 'post'], scope: 'Scope', connection: 'HTTPConnection', receive: 'Receive', send: 'Send'):
+        """
+        Runs the class middleware hooks.
+
+        This can be used to customize the behavior of a subclassed middleware.
+        """
+        pass
+
+    async def modify_headers(self, headers: MutableHeaders, scope: 'Scope', **kwargs):
+        """
+        A hook that can be used to modify the headers
+        """
+        pass
+
     async def __call__(self, scope: 'Scope', receive: 'Receive', send: 'Send') -> None:
         
         if scope["type"] not in ("http", "websocket"):  # pragma: no cover
@@ -248,8 +314,13 @@ class PersistentSessionMiddleware:
         if self._app_endpoint_enabled:
             scope["session"]["app_endpoint"] = self.get_app_domain_from_scope(scope)
         
+        await self.run_prehooks(scope, connection, receive, send)
+        await self.run_mw_hooks('pre', scope, connection, receive, send)
+
         async def send_wrapper(message: 'Message') -> None:
             if message["type"] == "http.response.start":
+                await self.run_presend_hooks(scope, message)
+                await self.run_mw_hooks('presend', scope, connection, receive, send)
                 session_key = initial_session_key
                 if scope['session']:
                     if scope['session'].get('session_id'):
@@ -272,5 +343,44 @@ class PersistentSessionMiddleware:
                     header_value = await self.get_cookie_header_value(scope)
                     headers.append("Set-Cookie", header_value)
                     if session_key: await self.pdict.adelete(session_key)
+                await self.modify_headers(headers, scope, session_key = session_key)
+            await self.run_posthooks(scope, message)
+            await self.run_mw_hooks('post', scope, connection, receive, send)
             await send(message)
+        
         await self.app(scope, receive, send_wrapper)
+
+
+    @classmethod
+    def register_prehook(
+        cls,
+        prehook: Union[Callable[..., Awaitable[None]], List[Callable[..., Awaitable[None]]]],
+    ):
+        """
+        Registers a prehook
+        """
+        if isinstance(prehook, list): cls.prehooks.extend(prehook)
+        else: cls.prehooks.append(prehook)
+
+    @classmethod
+    def register_presend_hook(
+        cls,
+        prehook: Union[Callable[..., Awaitable[None]], List[Callable[..., Awaitable[None]]]],
+    ):
+        """
+        Registers a presend hook
+        """
+        if isinstance(prehook, list): cls.prehooks.extend(prehook)
+        else: cls.prehooks.append(prehook)
+
+
+    @classmethod
+    def register_posthook(
+        cls,
+        posthook: Union[Callable[..., Awaitable[None]], List[Callable[..., Awaitable[None]]]],
+    ):
+        """
+        Registers a posthook
+        """
+        if isinstance(posthook, list): cls.posthooks.extend(posthook)
+        else: cls.posthooks.append(posthook)

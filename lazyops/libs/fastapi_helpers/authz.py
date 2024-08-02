@@ -11,13 +11,96 @@ import xxhash
 import aiohttpx
 from fastapi import Request, FastAPI
 from urllib.parse import urlencode, urljoin, urlparse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, PrivateAttr
+from pydantic_settings import BaseSettings
 from lazyops.utils.logs import logger, null_logger
 from lazyops.libs.abcs.types.security import Authorization, APIKey
 from lazyops.utils.helpers import create_unique_id
 from lazyops.utils.system import is_in_kubernetes
+from lazyops.libs.abcs.configs.types import AppEnv
 from typing import Optional, List, Dict, Any, Union, Callable, TYPE_CHECKING, Awaitable
 
+
+class AuthZClientSettings(BaseSettings):
+    """
+    AuthZ Client Settings
+    """
+
+    endpoint: Optional[str] = None
+    x_key: Optional[str] = None
+    session_auth_key: Optional[str] = None
+    session_secret_key: Optional[str] = None
+    session_cookie_name: Optional[str] = 'authz-cookie'
+    provider: Optional[str] = None
+    debug_enabled: bool = False
+
+    _extra: Dict[str, Any] = PrivateAttr(default_factory = dict)
+
+    @property
+    def in_k8s(self) -> bool:
+        """
+        Returns if the app is running in kubernetes
+        """
+        if 'in_k8s' not in self._extra: self._extra['in_k8s'] = is_in_kubernetes()
+        return self._extra['in_k8s']
+
+    @property
+    def module_name(self) -> Optional[str]:
+        """
+        Returns the module name
+        """
+        return self._extra.get('module_name')
+
+    @module_name.setter
+    def module_name(self, value: str):
+        """
+        Sets the module name
+        """
+        self._extra['module_name'] = value
+        self._extra['app_env'] = AppEnv.from_module_name(value)
+    
+
+    @property
+    def app_env(self) -> AppEnv:
+        """
+        Returns the app env
+        """
+        if 'app_env' not in self._extra: 
+            self._extra['app_env'] = AppEnv.from_module_name(self.module_name) if \
+                self.module_name else AppEnv.from_module_name('authz')
+        return self._extra['app_env']
+
+
+    @property
+    def authz_url(self) -> str:
+        """
+        Returns the authz url
+        """
+        if 'authz_url' not in self._extra:
+            if self.in_k8s: self._extra['authz_url'] = 'http://authz-api-service.api.svc.cluster.local:8080'
+            elif self.debug_enabled: self._extra['authz_url'] = 'http://127.0.0.1:8080'
+            else: self._extra['authz_url'] = self.endpoint
+        return self._extra['authz_url']
+    
+    @property
+    def authz_provider(self) -> str:
+        """
+        Returns the authz provider
+        """
+        return self._extra.get('authz_provider', self.provider)
+
+    @authz_provider.setter
+    def authz_provider(self, value: str):
+        """
+        Sets the authz provider
+        """
+        self._extra['authz_provider'] = value
+
+
+    class Config:
+        env_prefix = "AUTHZ_"
+        case_sensitive = False
+        extra = 'allow'
 
 
 class AuthZAppConfig(BaseModel):
@@ -31,6 +114,10 @@ class AuthZAppConfig(BaseModel):
     authz_offline: Optional[bool] = None
     required_role: Optional[str] = None
     provider: Optional[str] = None
+
+    set_role: Optional[bool] = None # If True, will set the role in the session
+    set_authorization: Optional[bool] = None # If True, will set the authorization in the session
+    set_api_key: Optional[bool] = None # If True, will set the api key in the session
 
 
 
@@ -232,7 +319,7 @@ class AuthZClient(abc.ABC):
         redirect_path_params: Optional[Dict[str, Any]] = None,
 
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> Dict[str, Union[str, Dict[str, Any]]]:
         """
         Creates the authz request
         """
@@ -261,7 +348,7 @@ class AuthZClient(abc.ABC):
             },
             json = request_body,
         )
-        response.raise_for_status()
+        # response.raise_for_status()
         return response.json()
 
 
@@ -283,7 +370,6 @@ class AuthZClient(abc.ABC):
         redirect_url: Optional[str] = None,
         redirect_app_path: Optional[str] = None,
         redirect_path_params: Optional[Dict[str, Any]] = None,
-
 
     ) -> bool:
         """
@@ -314,6 +400,12 @@ class AuthZClient(abc.ABC):
         )
         if data.get('validation_result'):
             request.session['authz_result'] = data['validation_result']
+            if data['validation_result'].get('role') and self.app_config.set_role:
+                request.session['role'] = data['validation_result']['role']
+            if data['validation_result'].get('authorization') and self.app_config.set_authorization:
+                request.session['authorization'] = data['validation_result']['authorization']
+            if data['validation_result'].get('api_key') and self.app_config.set_api_key:
+                request.session['api_key'] = data['validation_result']['api_key']
             self.autologger.info(f'Validation Result: {data["validation_result"]}', colored = True, prefix = f'Validation Result: {session_id}')
             return True
         if data.get('redirect_url'):
