@@ -394,6 +394,7 @@ class AuthZClient(abc.ABC):
         redirect_path_params: Optional[Dict[str, Any]] = None,
 
         test_endpoint: Optional[str] = None,
+        test_endpoint_include_schema: Optional[bool] = None,
 
     ):
         """
@@ -422,7 +423,7 @@ class AuthZClient(abc.ABC):
             return PrettyJSONResponse({'status': 'ok', 'validation_result': validation_result, 'session_id': session_id})
 
         if test_endpoint:
-            @app.get(test_endpoint, include_in_schema = self.debug_enabled)
+            @app.get(test_endpoint, include_in_schema = test_endpoint_include_schema if test_endpoint_include_schema is not None else self.debug_enabled)
             async def app_authz_test(
                 request: Request,
                 valid_authz: bool = Depends(self.create_authz_validation(
