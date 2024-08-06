@@ -163,8 +163,53 @@ class Worker(BaseWorker):
         finally:
             self.cleanup_run_id(run_id)
 
-
     async def handle_start_group_key_run(self, action: Action):
+        action_name = action.action_id
+        context = self._context_cls(
+            action,
+            self.dispatcher_client,
+            self.admin_client,
+            self.client.event,
+            self.client.workflow_listener,
+            self.workflow_run_event_listener,
+            self.client.config.namespace,
+        )
+        self.contexts[action.get_group_key_run_id] = context
+
+        # Find the corresponding action function from the registry
+        action_func = self.action_registry.get(action_name)
+
+        if action_func:
+            # send an event that the group key run has started
+            try:
+                event = self.get_group_key_action_event(
+                    action, GROUP_KEY_EVENT_TYPE_STARTED
+                )
+
+                # Send the action event to the dispatcher
+                asyncio.create_task(
+                    self.dispatcher_client.send_group_key_action_event(event)
+                )
+            except Exception as e:
+                logger.error(f"Could not send action event: {e}")
+
+            task = self.loop.create_task(
+                self.async_wrapped_action_func(
+                    context, action_func, action, action.get_group_key_run_id
+                )
+            )
+
+            task.add_done_callback(self.group_key_run_callback(action))
+            self.tasks[action.get_group_key_run_id] = task
+
+            try:
+                await task
+            except Exception as e:
+                # do nothing, this should be caught in the callback
+                pass
+
+
+    async def _handle_start_group_key_run(self, action: Action):
         # sourcery skip: use-contextlib-suppress
         """
         Handles the start group key run action

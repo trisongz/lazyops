@@ -15,12 +15,13 @@ from hatchet_sdk.clients.rest_client import RestApi
 from hatchet_sdk.client import ClientImpl
 from hatchet_sdk.loader import ClientConfig, ConfigLoader
 from lazyops.libs.logging import logger
+from lazyops.utils.system import get_ulimits, set_ulimits
 from kvdb.io.serializers import get_serializer
 from typing import Any, Dict, Union, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from lazyops.libs.hatchet.config import HatchetSettings
-    from lazyops.libs.hatchet.base import HatchetClient
+    from lazyops.libs.hatchet.client import HatchetClient
     from lazyops.libs.hatchet.session import HatchetSession
 
     
@@ -72,14 +73,14 @@ def set_hatchet_session(
 
 
 
-def get_hatchet_client() -> 'HatchetClient':
+def get_hatchet_client(**kwargs) -> 'HatchetClient':
     """
     Retrieves the Hatchet Client
     """
     global _hatchet_client
     if _hatchet_client is None:
-        from lazyops.libs.hatchet.base import HatchetClient
-        _hatchet_client = HatchetClient()
+        from lazyops.libs.hatchet.client import HatchetClient
+        _hatchet_client = HatchetClient(**kwargs)
     return _hatchet_client
 
 def set_hatchet_client(client: 'HatchetClient'):
@@ -88,36 +89,6 @@ def set_hatchet_client(client: 'HatchetClient'):
     """
     global _hatchet_client
     _hatchet_client = client
-
-def get_ulimits():
-    import resource
-    soft_limit, _ = resource.getrlimit(resource.RLIMIT_NOFILE)
-    return soft_limit
-
-
-def set_ulimits(
-    max_connections: int = 500,
-    verbose: bool = False,
-):
-    """
-    Sets the system ulimits
-    to allow for the maximum number of open connections
-
-    - if the current ulimit > max_connections, then it is ignored
-    - if it is less, then we set it.
-    """
-    import resource
-
-    soft_limit, hard_limit = resource.getrlimit(resource.RLIMIT_NOFILE)
-    if soft_limit > max_connections: return
-    if hard_limit < max_connections and verbose:
-        logger.warning(f"The current hard limit ({hard_limit}) is less than max_connections ({max_connections}).")
-    new_hard_limit = max(hard_limit, max_connections)
-    if verbose: logger.info(f"Setting new ulimits to ({soft_limit}, {hard_limit}) -> ({max_connections}, {new_hard_limit})")
-    resource.setrlimit(resource.RLIMIT_NOFILE, (max_connections + 10, new_hard_limit))
-    new_soft, new_hard = resource.getrlimit(resource.RLIMIT_NOFILE)
-    if verbose: logger.info(f"New Limits: ({new_soft}, {new_hard})")
-
 
 _patched_json = None
 

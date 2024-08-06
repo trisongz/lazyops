@@ -25,7 +25,7 @@ if TYPE_CHECKING:
     from hatchet_sdk.clients.rest.models import WorkflowRun
     from hatchet_sdk.loader import ClientConfig
     from .workflow import WorkflowT
-    from .state import GlobalHatchetContext
+    from .state import GlobalHatchetContext, GlobalHatchetContextObject
     from .worker import Worker
 
     
@@ -61,7 +61,7 @@ class HatchetSession(BaseHatchet):
         config: Union[ClientConfig, Dict[str, Any]] = None,
         settings: Optional['HatchetSettings'] = None,
         instance: Optional[str] = None,
-        _ctx: Optional['GlobalHatchetContext'] = None,
+        _ctx: Optional['GlobalHatchetContextObject'] = None,
         **kwargs,
     ):
         # We do not check whether the hatchet session is already initialized.
@@ -75,18 +75,18 @@ class HatchetSession(BaseHatchet):
         if settings is None: settings = get_hatchet_settings()
         else: set_hatchet_settings(settings)
 
-        self.settings = settings
+        self.hsettings = settings
         self._event_loop: Optional[asyncio.AbstractEventLoop] = None
         self.ensure_loop()
         self.client = new_session(
             defaults = config, 
-            settings = self.settings, 
+            settings = self.hsettings, 
             instance = self.instance, 
             **kwargs
         )
         self.has_namespace = self.client.config.namespace is not None
         # if not debug: logger.disable("hatchet_sdk")
-        # else: self.settings.debug_enabled = True
+        # else: self.hsettings.debug_enabled = True
 
         self.workers: Dict[str, 'Worker'] = {}
         self.registered_workflows: Dict[str, 'WorkflowT'] = {}
@@ -120,14 +120,14 @@ class HatchetSession(BaseHatchet):
         """
         Gets the logger
         """
-        return self.settings.logger
+        return self.hsettings.logger
     
     @property
     def autologger(self) -> 'Logger':
         """
         Gets the autologger
         """
-        return self.settings.autologger
+        return self.hsettings.autologger
 
     def post_init(self):
         """
@@ -153,12 +153,12 @@ class HatchetSession(BaseHatchet):
         """
         Creates a new worker
         """
-        if self.settings.in_k8s:
-            name += f'-{self.settings.host_name[-1]}'
+        if self.hsettings.in_k8s:
+            name += f'-{self.hsettings.host_name[-1]}'
         if name in self.workers: return self.workers[name]
-        if max_runs is None: max_runs = self.settings.workflow_concurrency_limit
+        if max_runs is None: max_runs = self.hsettings.workflow_concurrency_limit
         worker = self.c.worker_class(
-            name=name, 
+            name = name, 
             max_runs=max_runs, 
             config = self.client.config,
             session = self,
@@ -229,7 +229,7 @@ class HatchetSession(BaseHatchet):
         """
         if obj._hatchet_patched: return obj
         obj.workflow_name = obj.op_name
-        if self.settings.include_instance_name_in_workflow:
+        if self.hsettings.include_instance_name_in_workflow:
             obj.workflow_name = f'{self.instance}.{obj.workflow_name}'
         
         if obj.version: obj.workflow_name += f'.{obj.version}'
@@ -248,7 +248,7 @@ class HatchetSession(BaseHatchet):
         obj.name = name or obj.workflow_name
         obj.trigger_name = f'{self.client.config.namespace}{obj.name}' if self.has_namespace else obj.name
         obj.client = self.client
-        obj.version = version or self.settings.version
+        obj.version = version or self.hsettings.version
         obj.timeout = timeout
         obj.schedule_timeout = schedule_timeout
         if getattr(obj, 'workflow_concurrency', None) and not hasattr(obj.concurrency, '_concurrency_fn_name'):

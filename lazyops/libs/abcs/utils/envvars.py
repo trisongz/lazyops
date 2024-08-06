@@ -83,3 +83,68 @@ def parse_envvars_from_text(
 
     return text, values
 
+
+
+def load_env_vars(
+    env_file: str,
+    categories: Optional[Union[str, List[str]]] = None,
+    target_app: Optional[str] = None,
+    included_apps: Optional[Union[str, List[str]]] = None,
+    excluded_apps: Optional[Union[str, List[str]]] = None,
+    included_vars: Optional[Union[str, List[str]]] = None,
+    excluded_vars: Optional[Union[str, List[str]]] = None,
+    set_as_env: Optional[bool] = False,
+    overwrite: Optional[bool] = True,
+) -> Dict[str, str]:
+    """
+    Load Environment Variables from a YAML file
+
+    """
+    import yaml
+    configs: List[Dict[str, Union[str, Dict[str, Any], List[str]]]] = yaml.safe_load(
+        Path(env_file).read_text()
+    )
+    if included_vars and not isinstance(included_vars, list):
+        included_vars = [included_vars]
+    if excluded_vars and not isinstance(excluded_vars, list):
+        excluded_vars = [excluded_vars]
+    if included_apps and not isinstance(included_apps, list):
+        included_apps = [included_apps]
+    if excluded_apps and not isinstance(excluded_apps, list):
+        excluded_apps = [excluded_apps]
+    if categories and not isinstance(categories, list):
+        categories = [categories]
+    
+    if target_app:
+        if not included_apps: included_apps = []
+        included_apps.append(target_app)
+    
+    envvars: Dict[str, str] = {}
+    for config in configs:
+        if config.get('disabled', False): continue
+        if config.get('category') and categories and \
+            all(cat not in config['category'] for cat in categories):
+            continue
+        if included_vars and config['name'] not in included_vars:
+            continue
+        if excluded_vars and config['name'] in excluded_vars:
+            continue
+        if config.get('apps'):
+            if included_apps and all(app not in included_apps for app in config['apps']): 
+                continue
+            if excluded_apps and any(app in excluded_apps for app in config['apps']):
+                continue
+        for key, value in config['envs'].items():
+            if not value: continue
+            if isinstance(value, dict) and target_app:
+                value = value.get(target_app)
+            if isinstance(value, list):
+                value = f'[{", ".join(value)}]'
+            elif isinstance(value, dict):
+                value = json.dumps(value)
+            elif not isinstance(value, str):
+                value = str(value)
+            envvars[key] = value
+            if set_as_env and (overwrite or key not in os.environ):
+                os.environ[key] = value
+    return envvars

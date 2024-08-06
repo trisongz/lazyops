@@ -37,3 +37,4 @@ tests/libs/abcs/k8s.py
 lazyops/libs/kinde/data
 lazyops/libs/hatchet_v1
 lazyops/libs/hatchet/cache
+lazyops/libs/hatchet/data

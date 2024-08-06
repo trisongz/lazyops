@@ -95,23 +95,51 @@ class HatchetSettings(BaseAppSettings):
         self.app_env = self.app_env.from_env(env)
 
     def configure_client_endpoints(self, config: 'ClientConfig') -> None:
+        # sourcery skip: extract-method
         """
         Configure the client endpoints based on the environment variables
         """
         if self.api_endpoint and self.grpc_endpoint:
             config.server_url = self.api_endpoint
             config.host_port = self.grpc_endpoint
-        elif self.grpc_endpoint:
-            config.host_port = self.grpc_endpoint
+        elif self.grpc_endpoint: config.host_port = self.grpc_endpoint
         elif self.endpoints:
-            ref = 'develop' if self.is_development_env else 'prod' 
+            ep_keys = list(self.endpoints.keys())
             from lazyops.libs.abcs.utils.http import validate_website_with_socket
-            if self.in_k8s and self.endpoints.get('api', {}).get(ref, {}).get('cluster') and \
-                validate_website_with_socket(
-                self.endpoints['api'][ref]['cluster'],
-            ):
-                config.server_url = self.endpoints['api'][ref]['cluster']
-                config.host_port = self.endpoints['grpc'][ref]['cluster']
+            endpoints: Dict[str, Dict[str, str]] = None
+            if any(key in ep_keys for key in {'api', 'grpc'}):
+                refs = list(self.endpoints.get('api', {}).keys())
+                # This means there is not env config
+                if 'cluster' in refs or 'public' in refs:
+                    endpoints = self.endpoints
+                else:
+                    ref = 'prod' if 'prod' in refs else 'production'
+                    if self.is_development_env: ref = 'develop' if 'develop' in refs else 'development'
+                    endpoints = {
+                        'api': self.endpoints['api'][ref],
+                        'grpc': self.endpoints.get('grpc', {}).get(ref),
+                    }
+            elif any(key in ep_keys for key in {'prod', 'production', 'develop', 'development'}):
+                ref = 'prod' if 'prod' in ep_keys else 'production'
+                if self.is_development_env: ref = 'develop' if 'develop' in ep_keys else 'development'
+                endpoints = self.endpoints[ref]
+
+            if endpoints:
+                if self.in_k8s and endpoints.get('api', {}).get('cluster') and \
+                    validate_website_with_socket(endpoints['api']['cluster']):
+                    config.server_url = endpoints['api']['cluster']
+                    config.host_port = endpoints['api']['cluster']
+                elif endpoints.get('grpc', {}).get('public'):
+                    config.host_port = endpoints['grpc']['public']
+            # refs = list(self.endpoints.get('api', {}).keys())
+            # ref = 'develop' if self.is_development_env else 'prod' 
+            # from lazyops.libs.abcs.utils.http import validate_website_with_socket
+            # if self.in_k8s and self.endpoints.get('api', {}).get(ref, {}).get('cluster') and \
+            #     validate_website_with_socket(
+            #     self.endpoints['api'][ref]['cluster'],
+            # ):
+            #     config.server_url = self.endpoints['api'][ref]['cluster']
+            #     config.host_port = self.endpoints['grpc'][ref]['cluster']
             elif self.endpoints.get('grpc', {}).get(ref, {}).get('external'):
                 config.host_port = self.endpoints['grpc'][ref]['external']
             
@@ -119,6 +147,78 @@ class HatchetSettings(BaseAppSettings):
 
 
     def configure_session_endpoints(
+        self, 
+        config: 'ClientConfig',
+        instance: str = 'default',
+        api_endpoint: Optional[str] = None,
+        grpc_endpoint: Optional[str] = None,
+        **kwargs,
+    ) -> None:
+        """
+        Configure the session endpoints based on the environment variables
+        """
+        # If no endpoints are provided, then we use the endpoints from the config
+        if not api_endpoint and os.getenv(f'HATCHET_API_ENDPOINT_{instance.upper()}'):
+            api_endpoint = os.getenv(f'HATCHET_API_ENDPOINT_{instance.upper()}')
+        
+        if not grpc_endpoint and os.getenv(f'HATCHET_GRPC_ENDPOINT_{instance.upper()}'):
+            grpc_endpoint = os.getenv(f'HATCHET_GRPC_ENDPOINT_{instance.upper()}')
+
+        if not api_endpoint and not grpc_endpoint and (
+            not self.endpoints or not \
+            self.endpoints.get(instance)
+        ):
+            return self.configure_client_endpoints(config)
+        if api_endpoint and grpc_endpoint:
+            config.server_url = api_endpoint
+            config.host_port = grpc_endpoint
+        elif grpc_endpoint:
+            config.host_port = grpc_endpoint
+        elif self.endpoints.get(instance):
+            endpoints = self.endpoints[instance]
+            ref = 'develop' if self.is_development_env else 'prod' 
+            from lazyops.libs.abcs.utils.http import validate_website_with_socket
+            if self.in_k8s and endpoints.get('api', {}).get(ref, {}).get('cluster') and \
+                validate_website_with_socket(
+                endpoints['api'][ref]['cluster'],
+            ):
+                config.server_url = endpoints['api'][ref]['cluster']
+                config.host_port = endpoints['grpc'][ref]['cluster']
+            elif endpoints.get('grpc', {}).get(ref, {}).get('external'):
+                config.host_port = endpoints['grpc'][ref]['external']
+        elif self.endpoints:
+            ep_keys = list(self.endpoints.keys())
+            from lazyops.libs.abcs.utils.http import validate_website_with_socket
+            endpoints: Dict[str, Dict[str, str]] = None
+            if any(key in ep_keys for key in {'api', 'grpc'}):
+                refs = list(self.endpoints.get('api', {}).keys())
+                # This means there is not env config
+                if 'cluster' in refs or 'public' in refs:
+                    endpoints = self.endpoints
+                else:
+                    ref = 'prod' if 'prod' in refs else 'production'
+                    if self.is_development_env: ref = 'develop' if 'develop' in refs else 'development'
+                    endpoints = {
+                        'api': self.endpoints['api'][ref],
+                        'grpc': self.endpoints.get('grpc', {}).get(ref),
+                    }
+            elif any(key in ep_keys for key in {'prod', 'production', 'develop', 'development'}):
+                ref = 'prod' if 'prod' in ep_keys else 'production'
+                if self.is_development_env: ref = 'develop' if 'develop' in ep_keys else 'development'
+                endpoints = self.endpoints[ref]
+
+            if endpoints:
+                if self.in_k8s and endpoints.get('api', {}).get('cluster') and \
+                    validate_website_with_socket(endpoints['api']['cluster']):
+                    config.server_url = endpoints['api']['cluster']
+                    config.host_port = endpoints['api']['cluster']
+                elif endpoints.get('grpc', {}).get('public'):
+                    config.host_port = endpoints['grpc']['public']
+            elif self.endpoints.get('grpc', {}).get(ref, {}).get('external'):
+                config.host_port = self.endpoints['grpc'][ref]['external']
+        return config
+
+    def configure_session_endpoints_v1(
         self, 
         config: 'ClientConfig',
         instance: str = 'default',
@@ -191,6 +291,13 @@ class HatchetSettings(BaseAppSettings):
             from importlib.metadata import version
             self._extra['version'] = version('hatchet-sdk')
         return self._extra['version']
+    
+    @version.setter
+    def version(self, value: str):
+        """
+        Sets the hatchet sdk version
+        """
+        self._extra['version'] = value
 
     def configure(self, **kwargs):
         """

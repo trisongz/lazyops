@@ -286,7 +286,8 @@ class ApplicationContext(abc.ABC):
         """
         if env_var is not None and (env_val := os.getenv(env_var)):
             env_path = Path(env_val)
-            if env_path.exists(): return env_path
+            if env_path.exists(): 
+                return env_path
         app_env = self.get_app_env()
         is_local_env = app_env in [
             AppEnv.LOCAL,
@@ -341,6 +342,30 @@ class ApplicationContext(abc.ABC):
         default_path = defaults_path.joinpath(f'default.{suffix}')
         return default_path if default_path.exists() else None
     
+
+
+    def load_app_env_file(
+        self,
+        name: Optional[str] = None, 
+        required: Optional[bool] = False, 
+        allow_default: Optional[bool] = True,
+        configs_path: Optional[Path] = None,
+        env_var: Optional[str] = None,
+
+        override: Optional[bool] = True,
+    ) -> Optional[Path]:
+        """
+        Retrieves the app environment file and loads the variables
+
+        Only valid for local/dev environments
+        """
+        env_path = self.get_app_env_file(name = name, required = required, allow_default = allow_default, configs_path = configs_path, env_var = env_var)
+        if env_path is None: return None
+        import dotenv
+        dotenv.load_dotenv(dotenv_path = env_path.as_posix(), override = override)
+        return env_path
+
+
     """
     Migrate from lazy utils
     """

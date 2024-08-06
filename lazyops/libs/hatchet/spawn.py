@@ -6,6 +6,7 @@ Handler for Spawning Workflows
 
 import os
 import time
+import anyio
 import signal
 import atexit
 import contextlib
@@ -15,6 +16,7 @@ from lazyops.libs.logging import logger
 from typing import Any, Dict, List, Optional, Type, Literal, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from .client import HatchetClient
     from .session import HatchetSession
     from .worker import Worker
     from .workflow import WorkflowT
@@ -47,6 +49,14 @@ def get_event_loop():
         _WorkflowEvent = asyncio.Event()
         for signum in SIGNALS: _WorkflowLoop.add_signal_handler(signum, _WorkflowEvent.set)
     return _WorkflowLoop
+
+# def create_event_loop():
+#     """
+#     Creates a new event loop
+#     """
+#     loop = asyncio.new_event_loop()
+    
+#     return loop
 
 
 """
@@ -143,6 +153,7 @@ async def run_workflow(
     workflow_name: Optional[str] = None,
     workflow_obj: Optional[Union[str, Type['WorkflowT']]] = None,
     workflow_mapping: Optional[Dict[str, Union[str, Type['WorkflowT']]]] = None,
+    hatchet_client: Optional['HatchetClient'] = None,
     **kwargs
 ):
     # sourcery skip: reintroduce-else, remove-redundant-continue, replace-dict-items-with-values
@@ -150,8 +161,11 @@ async def run_workflow(
     Handles the start workflow
     """
     global _WorkflowExitRegistered, _WorkflowTasks
-    from .client import HatchetClient
-    if workflow_mapping or worker_name or workflow_obj: HatchetClient.register_workflow(
+    if hatchet_client is None: 
+        from .client import Hatchet
+        hatchet_client = Hatchet
+    # from .client import HatchetClient
+    if workflow_mapping or worker_name or workflow_obj: hatchet_client.register_workflow(
         workflow_name = workflow_name,
         workflow_obj = workflow_obj,
         workflow_mapping = workflow_mapping,
@@ -159,9 +173,10 @@ async def run_workflow(
         **kwargs,
     )
 
-    hatchet = HatchetClient.get_session(instance = instance, **kwargs)
+    hatchet = hatchet_client.get_session(instance = instance, **kwargs)
     if not worker_name: worker_name = f'{hatchet.instance}'
     loop = get_event_loop()
+    # loop = asyncio.new_event_loop()
     workers: List['Worker'] = []
     worker = hatchet.get_worker(worker_name, max_runs = concurrency_limit)
     all_workflows: Dict[str, 'WorkflowT'] = {}
@@ -186,7 +201,7 @@ async def run_workflow(
         for workflow_name, workflow in task_workflows.items():
             if workflow.is_disabled: continue
             if workflow.only_production_env and (
-                not hatchet.settings.is_production_env
+                not hatchet.hsettings.is_production_env
             ): 
                 continue
             task_worker.register_workflow(workflow)
@@ -194,14 +209,17 @@ async def run_workflow(
         if seperate_workflows:
             workers.append(task_worker)
 
+    # loop = asyncio.new_event_loop()
     tasks: List[asyncio.Task] = [
         loop.create_task(worker.async_start()) for worker in workers
     ]
 
     async def exit_all_gracefully():
         exit_tasks = [loop.create_task(worker.exit_gracefully()) for worker in workers]
+        # with anyio.move_on_after(10.0):
         await asyncio.gather(*exit_tasks)
-        loop.stop()
+        with contextlib.suppress(Exception):
+            loop.stop()
     
     def exit_all_forcefully():
         for worker in workers:
@@ -219,7 +237,7 @@ async def run_workflow(
     for workflow_name, workflow in all_workflows.items():
         if workflow.workflow_overrides:
             hatchet.client.admin.put_workflow(
-                f'{hatchet.settings.app_env.name}.{workflow_name}',
+                f'{hatchet.hsettings.app_env.name}.{workflow_name}',
                 workflow,
                 overrides = CreateWorkflowVersionOpts(
                     **workflow.workflow_overrides

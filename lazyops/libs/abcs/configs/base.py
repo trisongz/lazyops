@@ -12,7 +12,7 @@ from pathlib import Path
 from pydantic import model_validator, PrivateAttr
 from lazyops.utils.logs import Logger, null_logger
 from lazyops.imports._pydantic import BaseAppSettings, BaseModel
-from lazyops.libs.abcs.state import GlobalContext
+from lazyops.libs.abcs.state import GlobalContext, get_global_context, GlobalContextObject
 from lazyops.libs.abcs.types.persistence import TemporaryData
 from typing import List, Optional, Dict, Any, Callable, Union, Type, TYPE_CHECKING
 from .types import AppEnv, get_app_env
@@ -249,7 +249,7 @@ class AppSettings(BaseAppSettings):
         return self.ctx.get_app_ingress(app_host = app_host, app_port = app_port)
 
     @property
-    def global_ctx(self) -> GlobalContext:
+    def global_ctx(self) -> 'GlobalContextObject':
         """
         Returns the global context
         """

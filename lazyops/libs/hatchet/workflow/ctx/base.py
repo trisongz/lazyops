@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from lazyops.libs.abcs.types.persistence import TemporaryData
     from lazyops.libs.hatchet.session import HatchetSession
     from lazyops.libs.hatchet.context import Context
+    from lazyops.libs.hatchet.config import HatchetSettings
     from ..base import WorkflowT
 
 
@@ -36,11 +37,12 @@ class BaseWorkflowContext(abc.ABC):
         Initializes the Workflow Context Component
         """
         self.workflow = workflow
-        self.hatchet_settings = workflow.hatchet_settings
+        self.instance = workflow.instance
+        self.hsettings: 'HatchetSettings' = workflow.hsettings
         self.workflow_name = workflow.workflow_name
         self.hatchet = workflow.hatchet
         self.name = 'workflow'
-        self.instance = workflow.instance
+        
         # self.name = workflow.name
 
         self.configure_init(**kwargs)
@@ -68,14 +70,14 @@ class BaseWorkflowContext(abc.ABC):
         """
         Gets the logger
         """
-        return self.hatchet_settings.logger
+        return self.hsettings.logger
     
     @property
     def autologger(self) -> 'Logger':
         """
         Gets the autologger
         """
-        return self.hatchet_settings.autologger
+        return self.hsettings.autologger
 
     def configure_init(self, *args, **kwargs):
         """
@@ -100,7 +102,7 @@ class BaseWorkflowContext(abc.ABC):
         Captures the state of the process
         """
         if prefix: prefix = f'[{prefix}] '
-        return capture_state(as_str = as_str, prefix = prefix, in_k8s = self.hatchet_settings.in_k8s)
+        return capture_state(as_str = as_str, prefix = prefix, in_k8s = self.hsettings.in_k8s)
 
     def get_trace_state(self, prefix: str = 'Start', limit: int = 3) -> Optional[str]:
         """
@@ -223,4 +225,4 @@ class BaseWorkflowContext(abc.ABC):
         """
         Gets the Temporary Data
         """
-        return self.hatchet_settings.temp_data
+        return self.hsettings.temp_data

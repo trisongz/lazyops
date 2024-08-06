@@ -48,6 +48,15 @@ extras = {
         'pycryptodomex',
         'pyjwt[crypto]',
         'python-jose',
+    ],
+    'openai': [
+        'aiohttpx',
+        'backoff',
+        'tiktoken',
+        'jinja2',
+        'pyyaml',
+        'numpy',
+        'scipy',
     ]
 }
 args = {

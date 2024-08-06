@@ -35,8 +35,8 @@ if TYPE_CHECKING:
 
 # class GlobalContextClass(abc.ABC):
 
-@proxied
-class GlobalContext(abc.ABC):
+# @proxied
+class GlobalContextObject(abc.ABC):
     """
     Global Context for FastAPI 
     """
@@ -456,9 +456,17 @@ class GlobalContext(abc.ABC):
         await self.aclose_processes()
 
 
-
+_global_app_ctx: Optional['GlobalContextObject'] = None
     
+def get_global_context(**kwargs) -> 'GlobalContextObject':
+    """
+    Returns the global context
+    """
+    global _global_app_ctx
+    if _global_app_ctx is None:
+        _global_app_ctx = GlobalContextObject(**kwargs)
+    return _global_app_ctx
 
 
 
-# GlobalContext: GlobalContextClass = ProxyObject(GlobalContextClass)
+GlobalContext: GlobalContextObject = ProxyObject(obj_getter=get_global_context)

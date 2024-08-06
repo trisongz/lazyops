@@ -4,7 +4,7 @@ from __future__ import annotations
 Manages the Hatchet State
 """
 import abc
-from lazyops.libs.proxyobj import proxied
+from lazyops.libs.proxyobj import proxied, ProxyObject
 from lazyops.utils import lazy_import
 from typing import Optional, Dict, Any, List, Union, Type, TYPE_CHECKING
 
@@ -26,8 +26,8 @@ if TYPE_CHECKING:
 
 
 
-@proxied
-class GlobalHatchetContext(abc.ABC):
+# @proxied
+class GlobalHatchetContextObject(abc.ABC):
     """
     The Hatchet Context for the Global Hatchet Instance
     """
@@ -256,3 +256,7 @@ class GlobalHatchetContext(abc.ABC):
             if only_crontasks and not wf_ref.is_crontask: continue
             workflows[workflow_name] = wf_ref
         return workflows
+
+GlobalHatchetContext: GlobalHatchetContextObject = ProxyObject(
+    obj_cls = GlobalHatchetContextObject,
+)

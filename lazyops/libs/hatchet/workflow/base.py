@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     from lazyops.libs.logging import Logger
     from lazyops.libs.hatchet.config import HatchetSettings, TemporaryData
     from lazyops.libs.hatchet.session import HatchetSession
+    from pydantic_settings import BaseSettings
     
     from lazyops.libs.hatchet.worker import Worker
     from lazyops.libs.hatchet.context import Context
@@ -67,7 +68,8 @@ class BaseWorkflow:
 
     workflow_context_class: Optional[Union[Type['WorkflowContext'], str]] = None
     
-    _hatchet_settings: Optional['HatchetSettings'] = None
+    _settings: Optional['BaseSettings'] = None
+    _hsettings: Optional['HatchetSettings'] = None
     _clients: Dict[str, Any] = {}
     _hatchet_patched: bool = None
     _extra: Dict[str, Any] = {}
@@ -164,28 +166,28 @@ class BaseWorkflow:
 
 
     @property
-    def hatchet_settings(self) -> 'HatchetSettings':
+    def hsettings(self) -> 'HatchetSettings':
         """
         Gets the Hatchet Settings
         """
-        if not self._hatchet_settings:
+        if not self._hsettings:
             from lazyops.libs.hatchet.utils import get_hatchet_settings
-            self._hatchet_settings = get_hatchet_settings()
-        return self._hatchet_settings
+            self._hsettings = get_hatchet_settings()
+        return self._hsettings
     
     @property
     def logger(self) -> 'Logger':
         """
         Gets the logger
         """
-        return self.hatchet_settings.logger
+        return self.hsettings.logger
     
     @property
     def autologger(self) -> 'Logger':
         """
         Gets the autologger
         """
-        return self.hatchet_settings.autologger
+        return self.hsettings.autologger
     
     @property
     def workflow_trigger(self) -> str:
@@ -193,9 +195,9 @@ class BaseWorkflow:
         Returns the workflow trigger name
         """
         if self.trigger_name: return self.trigger_name
-        if self.on_events: return f'{self.hatchet_settings.app_env.short_name}.{self.on_events[0]}'
+        if self.on_events: return f'{self.hsettings.app_env.short_name}.{self.on_events[0]}'
         if 'workflow_trigger' not in self._extra:
-            self._extra['workflow_trigger'] = f'{self.hatchet_settings.app_env.short_name}.{self.workflow_name}'
+            self._extra['workflow_trigger'] = f'{self.hsettings.app_env.short_name}.{self.workflow_name}'
         return self._extra['workflow_trigger']
     
     @property

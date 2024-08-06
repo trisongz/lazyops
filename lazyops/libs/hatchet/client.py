@@ -3,14 +3,18 @@ from __future__ import annotations
 """
 Base Hatchet Client with Modifications
 """
+import os
 import abc
 import contextlib
+from pathlib import Path
 from lazyops.libs.logging import logger
-from lazyops.libs.proxyobj import proxied
+from lazyops.libs.abcs.configs.types import AppEnv
+from lazyops.libs.proxyobj import proxied, ProxyObject
 from .utils import get_hatchet_settings, set_hatchet_settings
 from typing import Any, Dict, List, Optional, Union, Iterator, Callable, TYPE_CHECKING, ParamSpec, Type, TypeVar, Tuple, overload
 
 if TYPE_CHECKING:
+    
     from lazyops.utils.logs import Logger
     from lazyops.libs.hatchet.config import HatchetSettings
     from .worker import Worker
@@ -23,6 +27,7 @@ if TYPE_CHECKING:
     from hatchet_sdk.workflow import WorkflowMeta
     from hatchet_sdk.rate_limit import RateLimit
     from hatchet_sdk.clients.rest.models import WorkflowRun
+    from hatchet_sdk.client import ClientImpl
 
 
 ResponseT = TypeVar('ResponseT')
@@ -30,13 +35,14 @@ ResponseT = TypeVar('ResponseT')
 RT = TypeVar('RT')
 P = ParamSpec("P")
 
-@proxied
+# @proxied
 class HatchetClient(abc.ABC):
     """
     The Hatchet Client that proxies and manages multiple Hatchet Sessions
     """
     name: str = 'hatchet'
     kind: str = 'client'
+    default_instance: str = 'default'
 
     @overload
     def __init__(
@@ -66,12 +72,12 @@ class HatchetClient(abc.ABC):
         """
         if settings is None: settings = get_hatchet_settings()
         else: set_hatchet_settings(settings)
-        self.settings = settings
-        from .state import GlobalHatchetContext
-        self.c: GlobalHatchetContext = GlobalHatchetContext
+        self.hsettings = settings
+        from .state import GlobalHatchetContext, GlobalHatchetContextObject
+        self.c: GlobalHatchetContextObject = GlobalHatchetContext
         self.configure_classes(**kwargs)
         self.sessions = self.c.sessions
-        self.settings.configure(**kwargs)
+        self.hsettings.configure(**kwargs)
 
     def configure_classes(
         self,
@@ -124,7 +130,7 @@ class HatchetClient(abc.ABC):
         """
         Configures the global settings
         """
-        self.settings.configure(**kwargs)
+        self.hsettings.configure(**kwargs)
         if overwrite is True: self.init_session(overwrite = overwrite, **kwargs)
 
     @property
@@ -161,7 +167,7 @@ class HatchetClient(abc.ABC):
 
     def create_session(
         self,
-        instance: Optional[str] = 'default',
+        instance: Optional[str] = None,
         config: Union['ClientConfig', Dict[str, Any]] = None,
         settings: Optional['HatchetSettings'] = None,
         **kwargs,
@@ -171,7 +177,8 @@ class HatchetClient(abc.ABC):
 
         - Does not perform validation with the current contexts
         """
-        settings = settings or self.settings
+        settings = settings or self.hsettings
+        if instance is None: instance = self.default_instance
         return self.session_class(
             instance = instance,
             config = config,
@@ -182,7 +189,7 @@ class HatchetClient(abc.ABC):
 
     def session(
         self,
-        instance: Optional[str] = 'default',
+        instance: Optional[str] = None,
         config: Union['ClientConfig', Dict[str, Any]] = None,
         settings: Optional['HatchetSettings'] = None,
         set_as_ctx: Optional[bool] = None,
@@ -192,6 +199,7 @@ class HatchetClient(abc.ABC):
         """
         Initializes a Hatchet Session that is managed by the Hatchet Session Manager
         """
+        if instance is None: instance = self.default_instance
         if instance in self.sessions and overwrite is not True:
             if set_as_ctx is True: self.c.set_ctx(instance = instance)
             return self.sessions[instance]
@@ -204,7 +212,7 @@ class HatchetClient(abc.ABC):
 
     def init_session(
         self,
-        instance: Optional[str] = 'default',
+        instance: Optional[str] = None,
         config: Union['ClientConfig', Dict[str, Any]] = None,
         settings: Optional['HatchetSettings'] = None,
         set_as_ctx: Optional[bool] = None,
@@ -216,6 +224,7 @@ class HatchetClient(abc.ABC):
 
         - Raises an error if the session already exists
         """
+        if instance is None: instance = self.default_instance
         if instance in self.sessions and overwrite is not True:
             raise ValueError(f'Session {instance} already exists. Set `overwrite` to True to overwrite')
         return self.session(instance = instance, config = config, settings = settings, set_as_ctx = set_as_ctx, **kwargs)
@@ -229,7 +238,7 @@ class HatchetClient(abc.ABC):
         Returns the Hatchet Session with the given name
         """
         if instance is None: instance = self.c.current
-        if instance is None: instance = 'default'
+        if instance is None: instance = self.default_instance
         if instance not in self.sessions:
             return self.session(instance = instance, **kwargs)
         return self.sessions[instance]
@@ -282,7 +291,14 @@ class HatchetClient(abc.ABC):
         """
         Returns the current session
         """
-        return self.c.current or 'default'
+        return self.c.current or self.default_instance
+    
+    @property
+    def client(self) -> 'ClientImpl':
+        """
+        Returns the client
+        """
+        return self.ctx.client
     
     @contextlib.contextmanager
     def with_session(self, instance: str) -> Iterator['HatchetSession']:
@@ -313,14 +329,14 @@ class HatchetClient(abc.ABC):
         """
         Gets the logger
         """
-        return self.settings.logger
+        return self.hsettings.logger
     
     @property
     def autologger(self) -> 'Logger':
         """
         Gets the autologger
         """
-        return self.settings.autologger
+        return self.hsettings.autologger
     
     """
     Passthrough Methods
@@ -565,6 +581,45 @@ class HatchetClient(abc.ABC):
         Polls the workflow run
         """
         return await self.ctx.poll_workflow_run(request_id = request_id, **kwargs)
+
+    @classmethod
+    def configure_from_env_file(
+        cls,
+        env_file: Optional[Union[str, Path]] = None,
+        app_env: Optional[Union[str, AppEnv]] = None,
+        app_name: Optional[str] = None,
+        endpoint_env: Optional[str] = None,
+        **kwargs,
+    ):
+        """
+        Configures the Hatchet Client from an Environment File
+        """
+        if env_file is None: return
+        if isinstance(env_file, str): env_file = Path(env_file)
+        if not env_file.exists(): return
+        import yaml
+        config_data: Dict[str, Dict[str, Dict[str, str]]] = yaml.safe_load(env_file.read_text())
+        settings = get_hatchet_settings()
+        # if app_env is None: app_env = settings.app_env.name
+        if app_env and isinstance(app_env, AppEnv): app_env = app_env.name
+        endpoint_config = config_data.get('endpoints')
+        if endpoint_config:
+            endpoint_env = endpoint_env or app_env
+            if endpoint_env and endpoint_env in endpoint_config:
+                settings.endpoints = endpoint_config[endpoint_env]
+            else: settings.endpoints = endpoint_config
+        if app_name:
+            apikeys = config_data.get('apikeys')
+            if apikeys and app_name in apikeys:
+                app_env = app_env or 'production'
+                if app_env in apikeys[app_name]:
+                    os.environ['HATCHET_CLIENT_TOKEN'] = apikeys[app_name][app_env]
+
+
     
 
+Hatchet: HatchetClient = ProxyObject(
+    # obj_cls = HatchetClient,
+    obj_getter = 'lazyops.libs.hatchet.utils.get_hatchet_client',
+)
 
