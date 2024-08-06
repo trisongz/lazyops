@@ -1,0 +1,244 @@
+# The OpenAI Pricing
+# https://openai.com/api/pricing/
+# Last Updated: 2024-08-02
+
+- name: gpt-4o-mini
+  aliases:
+  - gpt-4-o-mini
+  - gpt4o-mini
+  - gpt-4o-mini-2024-07-18
+  context_length: 128000
+  costs:
+    unit: 1_000_000
+    input: 0.150
+    output: 0.600
+  batch_costs:
+    unit: 1_000_000
+    input: 0.075
+    output: 0.300
+  endpoints:
+  - chat
+
+- name: gpt-4o
+  aliases:
+  - gpt-4-o
+  - gpt4o
+  - gpt-4o-2024-05-13
+  context_length: 128000
+  costs:
+    unit: 1_000_000
+    input: 5.00
+    output: 15.00
+  batch_costs:
+    unit: 1_000_000
+    input: 2.50
+    output: 7.50
+  endpoints:
+  - chat
+
+- name: gpt-4
+  aliases:
+  - gpt-4-0613
+  context_length: 8192
+  costs:
+    unit: 1000
+    input: 0.03
+    output: 0.06
+  endpoints:
+  - chat
+
+- name: gpt-4-1106-preview
+  aliases:
+  - gpt-4-turbo
+  context_length: 128000 # 131072 ?
+  costs:
+    unit: 1000
+    input: 0.01
+    output: 0.03
+  endpoints:
+  - chat
+
+- name: gpt-4-0125-preview
+  aliases:
+  - gpt-4-turbo-preview
+  - gpt-4-turbo-v
+  context_length: 128000
+  costs:
+    unit: 1000
+    input: 0.01
+    output: 0.03
+  endpoints:
+  - chat
+
+- name: gpt-4-turbo-2024-04-09
+  aliases:
+  - gpt-4-turbo-2024
+  - gpt-4-turbo-2024-04-09
+  - gpt-4-2024-preview
+  context_length: 128000
+  costs:
+    unit: 1_000_000
+    input: 10.00
+    output: 30.00
+  endpoints:
+  - chat
+
+- name: gpt-4-32k
+  aliases:
+  - gpt-4-32k-0613
+  context_length: 32768
+  costs:
+    unit: 1000
+    input: 0.06
+    output: 0.12
+  endpoints:
+  - chat
+
+
+- name: gpt-3.5-turbo
+  aliases:
+  # - gpt-35
+  # - gpt-35-turbo
+  - gpt-3.5
+  # Support previous 16k context length
+  # - gpt-3.5-16k
+  # - gpt-35-16k
+  # - gpt-35-turbo-16k
+  # - gpt-3.5-turbo-16k
+  # - gpt-3.5-turbo-1106
+  # - gpt-35-turbo-1106
+  # - gpt-3.5-turbo-0301
+  # - gpt-35-turbo-0301
+  # - gpt-3.5-turbo-0613
+  # - gpt-35-turbo-0613
+  context_length: 16384
+  costs:
+    unit: 1000
+    input: 0.0010
+    output: 0.0020
+  endpoints:
+  - chat
+
+- name: gpt-3.5-turbo-16k
+  aliases:
+  # Support previous 16k context length
+  - gpt-3.5-16k
+  # - gpt-35-16k
+  # - gpt-35-turbo-16k
+  - gpt-3.5-turbo-16k
+  - gpt-3.5-turbo-16k-0613
+  context_length: 16384
+  costs:
+    unit: 1000
+    input: 0.0010
+    output: 0.0020
+  endpoints:
+  - chat
+
+- name: gpt-3.5-turbo-1106
+  aliases:
+  - gpt-3.5-1106
+  # - gpt-35-1106
+  # - gpt-35-turbo-1106
+  context_length: 16384
+  costs:
+    unit: 1000
+    input: 0.0010
+    output: 0.0020
+  endpoints:
+  - chat
+
+- name: gpt-3.5-turbo-0301
+  aliases:
+  - gpt-3.5-0301
+  # - gpt-35-0301
+  # - gpt-35-turbo-0301
+  context_length: 16384
+  costs:
+    unit: 1000
+    input: 0.0010
+    output: 0.0020
+  endpoints:
+  - chat
+
+- name: gpt-3.5-turbo-0613
+  aliases:
+  - gpt-3.5-0613
+  # - gpt-35-0613
+  # - gpt-35-turbo-0613
+  context_length: 16384
+  costs:
+    unit: 1000
+    input: 0.0010
+    output: 0.0020
+  endpoints:
+  - chat
+
+- name: gpt-3.5-turbo-0125
+  aliases:
+  - gpt-3.5-0125
+  context_length: 16384
+  costs:
+    unit: 1000
+    input: 0.0005
+    output: 0.0015
+  endpoints:
+  - chat
+
+- name: gpt-3.5-turbo-instruct
+  aliases:
+  - gpt-3.5-instruct
+  # - gpt-35-instruct
+  # - gpt-35-turbo-instruct
+  context_length: 4096
+  costs:
+    unit: 1000
+    input: 0.0015
+    output: 0.0020
+  endpoints:
+  - completion
+
+
+- name: text-embedding-3-small
+  aliases:
+  - t3small
+  - t3-small
+  context_length: 8191
+  costs:
+    unit: 1_000_000
+    input: 0.200
+  batch_costs:
+    unit: 1_000_000
+    input: 0.100
+  endpoints:
+  - embeddings
+
+- name: text-embedding-3-large
+  aliases:
+  - t3large
+  - t3-large
+  context_length: 8191
+  costs:
+    unit: 1_000_000
+    input: 0.130
+  batch_costs:
+    unit: 1_000_000
+    input: 0.065
+  endpoints:
+  - embeddings
+
+
+- name: text-embedding-ada-002
+  aliases:
+  - ada
+  - ada-v2
+  - text-embedding-ada
+  context_length: 8191
+  costs:
+    unit: 1_000_000
+    input: 0.100
+  batch_costs:
+    unit: 1_000_000
+    input: 0.050
+  endpoints:
+  - embeddings
