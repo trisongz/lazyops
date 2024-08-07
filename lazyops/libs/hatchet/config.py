@@ -208,7 +208,7 @@ class HatchetSettings(BaseAppSettings):
                 endpoints = self.endpoints[ref]
 
             if endpoints:
-                self.logger.info(f'Configuring Hatchet Endpoints: {endpoints}', colored = True)
+                # self.logger.info(f'Configuring Hatchet Endpoints: {endpoints}', colored = True)
                 if self.in_k8s and endpoints.get('api', {}).get('cluster') and \
                     validate_website_with_socket(endpoints['api']['cluster']):
                     config.server_url = endpoints['api']['cluster']
