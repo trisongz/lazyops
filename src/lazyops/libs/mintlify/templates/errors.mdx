@@ -1,0 +1,33 @@
+---
+title: "Errors"
+"og:title": "The {{ source.app_name }} API returns machine readable error codes, human readable error messages and a link to the docs for more information"
+description: "Troubleshoot problems with this comprehensive breakdown of all error codes."
+icon: bug
+---
+
+{{ source.app_name }} API returns machine readable error codes, human readable error messages and a link to the docs for more information.
+
+Here is how an error response looks like:
+
+```json
+{
+  "error": {
+    "code": "not_found",
+    "message": "The requested resource was not found.",
+    "doc_url": "{{ source.app_endpoint }}/docs/api-reference/errors#not-found"
+  }
+}
+```
+
+## Error Codes
+
+Here is a list of all error codes {{ source.app_name }} API returns:
+
+{% for error in source.errors %}
+### `{{ error.kind }}`
+
+- **Status:** {{ error.status }}
+- **Problem:** {{ error.problem }}
+- **Solution:** {{ error.solution }}
+
+{% endfor %}

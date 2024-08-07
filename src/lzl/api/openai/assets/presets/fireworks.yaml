@@ -1,0 +1,17 @@
+# Configuration for fireworks.ai External Provider
+name: fireworks
+config:
+  api_base: https://api.fireworks.ai
+  api_path: inference/v1
+  api_key_header: Authorization
+  api_key_scheme: Bearer 
+  api_keys: env/FIREWORK_AI_API_KEYS
+  api_key: env/FIREWORK_AI_API_KEY
+  hf_compatible: true
+routes:
+  chat:
+    object_class: lazyops.libs.openai.schemas.external.fireworks.chat.ChatObject
+    response_class: lazyops.libs.openai.schemas.external.fireworks.chat.ChatResponse
+    route_class: lazyops.libs.openai.schemas.external.fireworks.chat.ChatRoute
+  
+models: fireworks

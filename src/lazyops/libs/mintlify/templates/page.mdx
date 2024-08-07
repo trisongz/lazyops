@@ -1,0 +1,9 @@
+---
+openapi: {{ method  }} {{ path }}
+{% if summary %}
+og:title: '{{ summary }} - API Reference'
+{%- endif %}
+---
+{% if description %}
+{{ description }}
+{% endif %}

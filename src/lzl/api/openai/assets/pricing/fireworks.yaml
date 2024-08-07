@@ -1,0 +1,34 @@
+- name: accounts/fireworks/models/firefunction-v1
+  aliases:
+  - firefunction-v1
+  context_length: 32768
+  costs: 
+    unit: 1_000_000
+    input: 0.7
+    output: 2.8
+  endpoints:
+  - chat
+
+- name: accounts/fireworks/models/bleat-adapter
+  aliases:
+  - fireworks-bleat
+  context_length: 4096
+  costs: 
+    unit: 1_000_000
+    input: 0.7
+    output: 2.8
+  endpoints:
+  - completions
+
+- name: accounts/fireworks/models/mixtral-8x7b-instruct
+  aliases:
+  - mixtral-8x7b
+  - mixtral-8x7b-instruct
+  context_length: 32768
+  costs: 
+    unit: 1_000_000
+    input: 0.4
+    output: 1.6
+  endpoints:
+  - chat
+  - completions

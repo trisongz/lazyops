@@ -60,7 +60,12 @@ extras = {
     ]
 }
 args = {
-    'packages': find_packages(include = [f'{pkg_name}', f'{pkg_name}.*',]),
+    'package_dir': {'': 'src'},
+    'py_modules': [pkg_name, 'lzl', 'lzo'],
+    'packages': find_packages(
+        "src",
+    ),
+    # 'packages': find_packages(include = [f'{pkg_name}', f'{pkg_name}.*',]),
     'install_requires': requirements,
     'include_package_data': True,
     'long_description': root.joinpath('README.md').read_text(encoding='utf-8'),

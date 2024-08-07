@@ -1,0 +1,73 @@
+- name: mistralai/Mixtral-8x7B-Instruct-v0.1
+  aliases:
+  - mixtral-8x7b
+  - mixtral-8x7b-instruct
+  context_length: 32768
+  costs: 
+    unit: 1_000_000
+    input: 0.6
+    output: 0.6
+  endpoints:
+  - chat
+  - completions
+
+- name: mistralai/Mistral-7B-Instruct-v0.1
+  aliases:
+  - mistral-7b-instruct-v1
+  context_length: 4096
+  costs: 
+    unit: 1_000_000
+    input: 0.2
+    output: 0.2
+  endpoints:
+  - chat
+  - completions
+
+- name: mistralai/Mistral-7B-Instruct-v0.2
+  aliases:
+  - mistral-7b-instruct-v2
+  context_length: 32768
+  costs: 
+    unit: 1_000_000
+    input: 0.2
+    output: 0.2
+  endpoints:
+  - chat
+  - completions
+
+# Embedding Models
+- name: togethercomputer/m2-bert-80M-2k-retrieval
+  aliases:
+  - m2-bert-80M-2k-retrieval
+  - m2-bert-2k-retrieval
+  - m2-bert-2k
+  context_length: 2048
+  costs: 
+    unit: 1_000_000
+    input: 0.008
+  endpoints:
+  - embeddings
+
+- name: togethercomputer/m2-bert-80M-8k-retrieval
+  aliases:
+  - m2-bert-80M-8k-retrieval
+  - m2-bert-8k-retrieval
+  - m2-bert-8k
+  context_length: 8192
+  costs: 
+    unit: 1_000_000
+    input: 0.008
+  endpoints:
+  - embeddings
+
+- name: togethercomputer/m2-bert-80M-32k-retrieval
+  aliases:
+  - m2-bert-80M-32k-retrieval
+  - m2-bert-32k-retrieval
+  - m2-bert-32k
+  context_length: 32768
+  costs: 
+    unit: 1_000_000
+    input: 0.008
+  endpoints:
+  - embeddings
