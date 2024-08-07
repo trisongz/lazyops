@@ -165,7 +165,7 @@ class HatchetSettings(BaseAppSettings):
             grpc_endpoint = os.getenv(f'HATCHET_GRPC_ENDPOINT_{instance.upper()}')
 
         if not api_endpoint and not grpc_endpoint and (
-            not self.endpoints or not \
+            not self.endpoints and not \
             self.endpoints.get(instance)
         ):
             return self.configure_client_endpoints(config)
@@ -208,6 +208,7 @@ class HatchetSettings(BaseAppSettings):
                 endpoints = self.endpoints[ref]
 
             if endpoints:
+                self.logger.info(f'Configuring Hatchet Endpoints: {endpoints}', colored = True)
                 if self.in_k8s and endpoints.get('api', {}).get('cluster') and \
                     validate_website_with_socket(endpoints['api']['cluster']):
                     config.server_url = endpoints['api']['cluster']
