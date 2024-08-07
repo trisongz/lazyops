@@ -211,7 +211,7 @@ class HatchetSettings(BaseAppSettings):
                 if self.in_k8s and endpoints.get('api', {}).get('cluster') and \
                     validate_website_with_socket(endpoints['api']['cluster']):
                     config.server_url = endpoints['api']['cluster']
-                    config.host_port = endpoints['api']['cluster']
+                    config.host_port = endpoints['grpc']['cluster']
                 elif endpoints.get('grpc', {}).get('public'):
                     config.host_port = endpoints['grpc']['public']
             elif self.endpoints.get('grpc', {}).get(ref, {}).get('external'):
@@ -235,7 +235,8 @@ class HatchetSettings(BaseAppSettings):
         
         if not grpc_endpoint and os.getenv(f'HATCHET_GRPC_ENDPOINT_{instance.upper()}'):
             grpc_endpoint = os.getenv(f'HATCHET_GRPC_ENDPOINT_{instance.upper()}')
-
+        
+        ref = 'develop' if self.is_development_env else 'production' 
         if not api_endpoint and not grpc_endpoint and (
             not self.endpoints or not \
             self.endpoints.get(instance)
@@ -246,9 +247,17 @@ class HatchetSettings(BaseAppSettings):
             config.host_port = grpc_endpoint
         elif grpc_endpoint:
             config.host_port = grpc_endpoint
+        elif self.endpoints.get(ref):
+            endpoints = self.endpoints[ref]
+            if endpoints.get('api', {}).get('cluster') and \
+                validate_website_with_socket(endpoints['api']['cluster']):
+                config.server_url = endpoints['api']['cluster']
+                config.host_port = endpoints['grpc']['cluster']
+            elif endpoints.get('grpc', {}).get('public'):
+                config.host_port = endpoints['grpc']['public']
         elif self.endpoints.get(instance):
             endpoints = self.endpoints[instance]
-            ref = 'develop' if self.is_development_env else 'prod' 
+            ref = 'develop' if self.is_development_env else 'production' 
             from lazyops.libs.abcs.utils.http import validate_website_with_socket
             if self.in_k8s and endpoints.get('api', {}).get(ref, {}).get('cluster') and \
                 validate_website_with_socket(
@@ -258,6 +267,12 @@ class HatchetSettings(BaseAppSettings):
                 config.host_port = endpoints['grpc'][ref]['cluster']
             elif endpoints.get('grpc', {}).get(ref, {}).get('external'):
                 config.host_port = endpoints['grpc'][ref]['external']
+        elif self.endpoints.get('api', {}).get('cluster') and \
+            validate_website_with_socket(self.endpoints['api']['cluster']):
+            config.server_url = self.endpoints['api']['cluster']
+            config.host_port = self.endpoints['grpc']['cluster']
+        elif self.endpoints.get('grpc', {}).get('public'):
+            config.host_port = self.endpoints['grpc']['public']
         return config
 
 
