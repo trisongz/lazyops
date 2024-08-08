@@ -4,9 +4,6 @@ import json
 import pathlib
 from pydantic import Field, field_validator
 from lzo.types import AppEnv, eproperty
-# from lzo.types.props import eproperty
-# from lazyops.libs.abcs.configs.types import AppEnv
-# from lazyops.libs.abcs.types.props import eproperty
 from .base import BaseOpenAISettings, ApiType, DEFAULT_AZURE_VERSION
 from .proxy import BaseProxySettings, OpenAIProxySettings
 from typing import Optional, Dict, Union, Any
@@ -61,12 +58,12 @@ class OpenAISettings(BaseOpenAISettings):
         """
         return AzureOpenAISettings()
     
-    @eproperty
-    def proxy(self) -> OpenAIProxySettings:
-        """
-        Return the Proxy Settings
-        """
-        return OpenAIProxySettings()
+    # @eproperty
+    # def proxy(self) -> OpenAIProxySettings:
+    #     """
+    #     Return the Proxy Settings
+    #     """
+    #     return OpenAIProxySettings()
     
     @property
     def has_valid_azure(self) -> bool:
@@ -105,6 +102,7 @@ class OpenAISettings(BaseOpenAISettings):
         auto_loadbalance_clients: Optional[bool] = None,
         proxy_app_name: Optional[str] = None,
         proxy_env_name: Optional[str] = None,
+        proxy_provider: Optional[str] = None,
         proxy_config: Optional[Union[Dict[str, Any], pathlib.Path]] = None,
         client_configurations: Optional[Union[Dict[str, Dict[str, Any]], pathlib.Path]] = None,
         **kwargs
@@ -141,12 +139,28 @@ class OpenAISettings(BaseOpenAISettings):
         if auto_healthcheck is not None: self.auto_healthcheck = auto_healthcheck
         if auto_loadbalance_clients is not None: self.auto_loadbalance_clients = auto_loadbalance_clients
         if proxy_config:
+            if not proxy_provider: 
+                if isinstance(proxy_config, pathlib.Path):
+                    proxy_provider = self.proxy.proxy_provider
+                else:
+                    proxy_provider = proxy_config.pop('proxy_provider', self.proxy.proxy_provider)
+            
+            # if not proxy_provider: raise ValueError("Proxy Provider must be provided")
             if isinstance(proxy_config, pathlib.Path):
-                self.proxy.load_proxy_config(proxy_config)
-            else: self.proxy.update(**proxy_config)
-            self.proxy.init()
-        if proxy_app_name: self.proxy.proxy_app_name = proxy_app_name
-        if proxy_env_name: self.proxy.proxy_name = proxy_env_name
+                self.proxy.load_proxy_config(proxy_config, proxy_provider)
+            else: self.proxy.update_proxy_config(proxy_provider, **proxy_config)
+            self.proxy.init_proxy()
+            self.azure.proxy = self.proxy
+        
+        elif proxy_provider: 
+            self.proxy.current = proxy_provider
+            self.azure.proxy.current = proxy_provider
+        if proxy_app_name: 
+            self.proxy.proxy_app_name = proxy_app_name
+            self.azure.proxy.proxy_app_name = proxy_app_name
+        if proxy_env_name: 
+            self.proxy.proxy_env_name = proxy_env_name
+            self.azure.proxy.proxy_env_name = proxy_env_name
         if client_configurations:
             if isinstance(client_configurations, pathlib.Path):
                 self.load_client_configurations(client_configurations)

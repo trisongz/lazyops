@@ -10,14 +10,6 @@ from lzl.api.openai.utils import logger
 from lzl.api.openai.configs import get_settings, OpenAISettings, AzureOpenAISettings, ProxyObject
 from lzl.api.openai.types.auth import OpenAIAuth
 from .routes import ApiRoutes
-# from lazyops.utils.helpers import timed_cache
-# from async_openai.schemas import *
-# from async_openai.types.options import ApiType
-# from async_openai.utils.logs import logger
-# from async_openai.utils.config import get_settings, OpenAISettings, AzureOpenAISettings, OpenAIAuth, ProxyObject
-# from async_openai.routes import ApiRoutes
-# from async_openai.meta import OpenAIMetaClass
-# from async_openai.manager import OpenAIManager as OpenAISessionManager
 
 _update_params = [
     'url',
@@ -457,17 +449,4 @@ class OpenAIClient:
         except Exception as e:
             logger.error(f"[{self.name}] API Ping Failed: {e}")
         return False
-
-
-# class OpenAI(metaclass = OpenAIMetaClass):
-#     """
-#     [V1] Interface for OpenAI
-
-#     Deprecating this class in future versions
-#     """
-#     pass
-
-# OpenAIManager: OpenAISessionManager = ProxyObject(OpenAISessionManager)
-
-
 

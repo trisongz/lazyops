@@ -6,7 +6,7 @@ import contextlib
 from typing import Optional, Union, List, Dict, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from async_openai.schemas.chat import ChatMessage
+    from lzl.api.openai.schemas.chat import ChatMessage
 
 def modelname_to_contextsize(modelname: str) -> int:
     """

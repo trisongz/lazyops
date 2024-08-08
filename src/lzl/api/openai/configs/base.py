@@ -339,3 +339,10 @@ class BaseOpenAISettings(BaseSettings):
         from ..utils.logs import configure_httpx_logger
         configure_httpx_logger(logging.INFO)
 
+
+    @eproperty
+    def proxy(self) -> OpenAIProxySettings:
+        """
+        Return the Proxy Settings
+        """
+        return OpenAIProxySettings()

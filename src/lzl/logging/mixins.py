@@ -91,11 +91,11 @@ class LoggingMixin(abc.ABC):
         finally:
             self.remove_silenced_modules(*modules)
 
-    def set_module_name(self, src_name: str, module_name: str):
+    def set_module_name(self, src_name: str, module_name: str, is_relative: bool = False):
         """
         Sets the module name
         """
-        register_module_name(src_name, module_name)
+        register_module_name(src_name, module_name, is_relative = is_relative)
 
     """
     This part still doesn't work atm.

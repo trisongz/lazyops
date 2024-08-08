@@ -5,6 +5,7 @@ import json
 import enum
 import time
 import asyncio
+import functools
 import aiohttpx
 import contextlib
 from typing import Optional, Type, Any, Union, List, Dict, Iterator, TypeVar, AsyncIterator, Generator, AsyncGenerator, overload, TYPE_CHECKING
@@ -24,21 +25,8 @@ from lzl.api.openai.types.handlers import ModelContextHandler
 from lzl.api.openai.types.base import BaseResource, Usage
 from lzl.api.openai.types.responses import BaseResponse
 from lzl.api.openai.types.routes import BaseRoute
-from lzl.api.openai.types.errors import RateLimitError, InvalidMaxTokens, InvalidRequestError, APIError, MaxRetriesExceeded, ServiceTimeoutError
 from lzl.api.openai.utils import logger, parse_stream, aparse_stream, resolve_json
-
-
-# from lazyops.types import validator, lazyproperty, Literal
-# from lazyops.types.models import root_validator, pre_root_validator, Field, BaseModel, PYD_VERSION, get_pyd_schema
-
-# from async_openai.types.context import ModelContextHandler
-# from async_openai.types.resources import BaseResource, Usage
-# from async_openai.types.responses import BaseResponse
-# from async_openai.types.routes import BaseRoute
-# from async_openai.types.errors import RateLimitError, InvalidMaxTokens, InvalidRequestError, APIError, MaxRetriesExceeded, ServiceTimeoutError
-# from async_openai.utils import logger, parse_stream, aparse_stream
-# from async_openai.utils.fixjson import resolve_json
-
+from lzl.api.openai.utils.schemas import generate_json_schema, function_generate_json_schema
 
 __all__ = [
     'ChatMessage',
@@ -51,6 +39,9 @@ __all__ = [
 
 SchemaObj = TypeVar("SchemaObj", bound=BaseModel)
 SchemaType = TypeVar("SchemaType", bound=Type[BaseModel])
+
+
+
 
 class MessageKind(str, enum.Enum):
     CONTENT = 'content'
@@ -124,8 +115,12 @@ class Function(BaseResource):
         name: str = Field(..., max_length = 64, pattern = r'^[a-zA-Z0-9_]+$')
     else:
         name: str = Field(..., max_length = 64, regex = r'^[a-zA-Z0-9_]+$')
+    
     parameters: Union[Dict[str, Any], SchemaType, str]
     description: Optional[str] = None
+    # Add optional enforcement of structured outputs
+    # strict: Optional[bool] = None
+
     source_object: Optional[Union[SchemaType, Any]] = Field(default = None, exclude = True)
 
     @root_validator(pre = True)
@@ -149,6 +144,47 @@ class Function(BaseResource):
                 # logger.warning(f'Invalid parameters: {params}. Must be a dict or pydantic BaseModel.')
                 raise ValueError(f'Parameters must be a dict or pydantic BaseModel. Provided: {type(params)}')
         return values
+
+class JSONSchema(BaseResource):
+    """
+    Represents a JSON Schema
+    """
+    if PYDANTIC_VERSION == 2:
+        name: str = Field(..., max_length = 64, pattern = r'^[a-zA-Z0-9_]+$')
+    else:
+        name: str = Field(..., max_length = 64, regex = r'^[a-zA-Z0-9_]+$')
+    
+    # This raises a warning Field name "schema" in "JSONSchema" shadows an attribute in parent "BaseModel"
+    # So we alias it to jschema
+    jschema: Union[Dict[str, Any], SchemaType, str] = Field(..., alias = 'schema')
+    description: Optional[str] = None
+    strict: Optional[bool] = True
+    from_function: Optional[bool] = Field(None, exclude = True)
+    source_object: Optional[Union[SchemaType, Any]] = Field(default = None, exclude = True)
+
+    @root_validator(pre = True)
+    def validate_json_schema(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate the schema
+        """
+        from_func = values.get('from_function', False)
+        if schema := values.get('schema'):
+            if isinstance(schema, dict):
+                pass
+            elif issubclass(schema, BaseModel) or isinstance(schema, type(BaseModel)):
+                values['schema'] = function_generate_json_schema(schema) if from_func else generate_json_schema(schema)
+                values['source_object'] = schema
+            elif isinstance(schema, str):
+                try:
+                    values['schema'] = json.loads(schema)
+                except Exception as e:
+                    raise ValueError(f'Invalid JSON: {schema}, {e}. Must be a dict or pydantic BaseModel.') from e
+            else:
+                # logger.warning(f'Invalid parameters: {params}. Must be a dict or pydantic BaseModel.')
+                raise ValueError(f'Schema must be a dict or pydantic BaseModel. Provided: {type(schema)}')
+        return values
+
+
 
 
 class Tool(BaseResource):
@@ -181,6 +217,7 @@ class ChatObject(BaseResource):
     # v2 Params
     # response_format: Optional[Dict[str, Literal['json_object', 'text']]] = None
     # Don't enforce response_format
+    json_schema: Optional[Union[JSONSchema, Dict[str, Any]]] = None # Field(default = None, exclude = True)
     response_format: Optional[Dict[str, Any]] = None
     seed: Optional[int] = None
 
@@ -194,7 +231,7 @@ class ChatObject(BaseResource):
     # api_version: Optional[str] = None
 
     # @validator('messages', pre = True, always = True)
-    @field_validator('messages')
+    @field_validator('messages', mode = 'before')
     def validate_messages(cls, v) -> List[ChatMessage]:
         """
         Validate the Input Messages
@@ -204,7 +241,7 @@ class ChatObject(BaseResource):
             v = [v]
         for i in v:
             if isinstance(i, dict):
-                vals.append(ChatMessage.parse_obj(i))
+                vals.append(ChatMessage.model_validate(i))
             elif isinstance(i, str):
                 vals.append(ChatMessage(content = i))
             else:
@@ -212,7 +249,7 @@ class ChatObject(BaseResource):
         return vals
 
     # @validator('model', pre=True, always=True)
-    @field_validator('model')
+    @field_validator('model', mode = 'before')
     def validate_model(cls, v, values: Dict[str, Any]) -> str:
         """
         Validate the model
@@ -222,8 +259,8 @@ class ChatObject(BaseResource):
                 v = values.get('engine')
             elif values.get('deployment'):
                 v = values.get('deployment')
-        
-        v = ModelContextHandler.resolve_model_name(v)
+        with contextlib.suppress(KeyError):
+            v = ModelContextHandler.resolve_model_name(v)
         # if values.get('validate_model_aliases', False):
         #     v = ModelContextHandler[v].name
         return v
@@ -282,13 +319,21 @@ class ChatObject(BaseResource):
         """
 
         is_azure = values.pop('is_azure', False)
-        
         if values.get('functions'):
             if not all(isinstance(f, Function) for f in values['functions']):
                 values['functions'] = [Function(**f) for f in values['functions']]
+            
             if not values.get('function_call'):
                 values['function_call'] = 'auto'
         
+        if values.get('json_schema'):
+            if not isinstance(values['json_schema'], JSONSchema):
+                values['json_schema'] = JSONSchema(**values['json_schema'])
+            values['response_format'] = {
+                'type': 'json_schema',
+                'json_schema': values['json_schema'],
+            }
+
         if values.get('tools'):
             tools = []
             for tool in values['tools']:
@@ -334,6 +379,29 @@ class ChatResponse(BaseResponse):
         if self.choices_results:
             return [choice.message for choice in self.choices]
         return self.response.text
+    
+    @eproperty
+    def json_schema(self) -> Optional[Union[SchemaType, Dict[str, Any]]]:
+        """
+        Returns the JSON Schema for the completions
+        """
+        if self.choices_results:
+            if self.input_object.json_schema:
+                message = self.messages[0]
+                if self.input_object.json_schema.source_object:
+                    return self.input_object.json_schema.source_object.model_validate_json(message.content)
+                if not isinstance(message.content, dict):
+                    message.content = json.loads(message.content)
+                return message.content
+        return None
+    
+
+    @eproperty
+    def has_json_schema(self) -> bool:
+        """
+        Returns whether the response has a JSON Schema
+        """
+        return bool(self.input_object.json_schema)
     
     @eproperty
     def function_results(self) -> List[FunctionCall]:
@@ -471,7 +539,7 @@ class ChatResponse(BaseResponse):
             data = []
             for tool_obj in self.tool_result_objects:
                 if isinstance(tool_obj, BaseModel):
-                    data.append(tool_obj.dict())
+                    data.append(tool_obj.model_dump())
                 else:
                     data.append(tool_obj)
             return json.dumps(data, indent = 2)
@@ -479,7 +547,7 @@ class ChatResponse(BaseResponse):
             data = []
             for func_obj in self.function_result_objects:
                 if isinstance(func_obj, BaseModel):
-                    data.append(func_obj.dict())
+                    data.append(func_obj.model_dump())
                 else:
                     data.append(func_obj)
             return json.dumps(data, indent = 2)
@@ -525,6 +593,7 @@ class ChatResponse(BaseResponse):
             model_name = self.openai_model,
             usage = self.usage,
         )
+    
 
     def dict(self, *args, exclude: Any = None, **kwargs):
         """
@@ -563,7 +632,7 @@ class ChatResponse(BaseResponse):
         """
         Handle the stream response
         """
-        results = {}
+        results: Dict[str, Dict[str, Any]] = {}
         for line in parse_stream(response):
             try:
                 item = json.loads(line)
@@ -631,7 +700,7 @@ class ChatResponse(BaseResponse):
         """
         Handles the streaming response
         """
-        results = {}
+        results: Dict[str, Dict[str, Any]] = {}
         async for line in aparse_stream(response):
             # logger.info(f'line: {line}')
             try:
@@ -715,6 +784,21 @@ class ChatRoute(BaseRoute):
     response_model: Optional[Type[BaseResource]] = ChatResponse
     api_resource: Optional[str] = Field(default = 'chat/completions')
     root_name: Optional[str] = Field(default = 'chat')
+
+    def get_serialization_kwargs(
+        self,
+        data: 'ChatObject',
+    ) -> Dict[str, Any]:
+        """
+        Returns the serialization kwargs
+        """
+        opts = {
+            'exclude_none': self.exclude_null,
+        }
+        if data.json_schema: 
+            opts['by_alias'] = True
+            opts['exclude'] = {'json_schema'}
+        return opts
 
 
     @overload
@@ -1111,6 +1195,7 @@ class ChatRoute(BaseRoute):
         functions: Optional[List[Function]] = None,
         function_call: Optional[Union[str, Dict[str, str]]] = None,
         response_format: Optional[Dict[str, Literal['json_object', 'text']]] = None,
+        json_schema: Optional[Union[JSONSchema, Dict[str, Any]]] = None,
         max_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         auto_retry: Optional[bool] = False,

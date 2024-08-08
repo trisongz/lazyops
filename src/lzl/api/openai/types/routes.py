@@ -21,12 +21,6 @@ from lzl.api.openai.types.errors import fatal_exception, error_handler, RateLimi
 from lzl.api.openai.types.base import BaseResource, FileResource, FileObject
 from lzl.api.openai.types.responses import BaseResponse, BaseBatchResponseItem, BatchBaseResponse, BatchStatusResponse
 
-# from async_openai.utils.logs import logger
-# from async_openai.utils.config import get_settings, get_default_headers, get_max_retries, OpenAISettings, AzureOpenAISettings
-# from async_openai.types.errors import fatal_exception, error_handler, RateLimitError, APIError, InvalidMaxTokens, InvalidRequestError, MaxRetriesExceeded
-# from async_openai.types.resources import BaseResource, FileResource, FileObject
-# from async_openai.types.responses import BaseResponse, BaseBatchResponseItem, BatchBaseResponse, BatchStatusResponse
-
 __all__ = [
     'BaseRoute',
     'RESPONSE_SUCCESS_CODES',
@@ -81,7 +75,7 @@ class BaseRoute(BaseModel):
     max_retries: Optional[int] = None
     retry_function: Optional[Callable] = None # Allow for customized retry functions
 
-    settings: Optional[Union[OpenAISettings, AzureOpenAISettings]] = Field(default_factory = get_settings)
+    settings: Optional[Union[OpenAISettings, AzureOpenAISettings]] = Field(default_factory = get_settings, validate_default = False)
     is_azure: Optional[bool] = None
     azure_model_mapping: Optional[Dict[str, str]] = None
 
@@ -89,10 +83,10 @@ class BaseRoute(BaseModel):
 
     api_resource: Optional[str] = Field(default = '', exclude = True)
     root_name: Optional[str] = Field(default = '', exclude = True)
-
-
     is_rate_limited_value: Optional[bool] = Field(default = False, exclude = True, description = 'A flag to indicate if the API is rate limited')
 
+
+    proxy_provider: Optional[str] = Field(default = None, exclude = True)
     # @eproperty
     # def api_resource(self):
     #     """
@@ -175,6 +169,24 @@ class BaseRoute(BaseModel):
         """
         return False
     
+    @eproperty
+    def proxy_enabled(self):
+        """
+        Returns whether the Proxy Route is Enabled
+        """
+        return self.proxy_provider is not None
+    
+    def get_serialization_kwargs(
+        self,
+        data: 'BaseResource',
+    ) -> Dict[str, Any]:
+        """
+        Returns the serialization kwargs
+        """
+        return {
+            'exclude_none': self.exclude_null,
+        }
+    
     def get_resource_url(self, data: Optional[Dict[str, Any]] = None, **kwargs) -> str:
         """
         Returns the Resource URL from the Response Data
@@ -226,8 +238,7 @@ class BaseRoute(BaseModel):
                 resource = self.input_model,
                 **kwargs
             )
-        # data = get_pyd_dict(input_object, exclude_none = self.exclude_null)
-        data = input_object.dict(exclude_none = self.exclude_null)
+        data = input_object.model_dump(**self.get_serialization_kwargs(input_object))
         api_response = self._send(
             method = 'POST',
             url = self.get_resource_url(data = data, **kwargs),
@@ -299,10 +310,15 @@ class BaseRoute(BaseModel):
             logger.warning(f'[{self.name} - {current_model}: {current_attempt}/{auto_retry_limit}] API Error: {e}. Sleeping for 10 seconds')
             time.sleep(10.0)
             current_attempt += 1
-            if header_cache_keys and headers:
-                # headers = kwargs.pop('headers')
-                _ = [headers.pop(k) for k in header_cache_keys if k in headers]
-                # kwargs['headers'] = headers
+            if self.proxy_enabled:
+                headers = self.settings.proxy.disable_caching_headers(
+                    headers = headers,
+                    provider = self.proxy_provider,
+                )
+            # if header_cache_keys and headers:
+            #     # headers = kwargs.pop('headers')
+            #     _ = [headers.pop(k) for k in header_cache_keys if k in headers]
+            #     # kwargs['headers'] = headers
             return self.create(
                 input_object = input_object,
                 headers = headers,
@@ -329,10 +345,15 @@ class BaseRoute(BaseModel):
             logger.warning(f'[{self.name} - {current_model}: {current_attempt}/{auto_retry_limit}] {error_kind}: ({type(e)}) {error_value}. Sleeping for 10 seconds')
             time.sleep(10.0)
             current_attempt += 1
-            if header_cache_keys and headers:
-                # headers = kwargs.pop('headers')
-                _ = [headers.pop(k) for k in header_cache_keys if k in headers]
-                # kwargs['headers'] = headers
+            if self.proxy_enabled:
+                headers = self.settings.proxy.disable_caching_headers(
+                    headers = headers,
+                    provider = self.proxy_provider,
+                )
+            # if header_cache_keys and headers:
+            #     # headers = kwargs.pop('headers')
+            #     _ = [headers.pop(k) for k in header_cache_keys if k in headers]
+            #     # kwargs['headers'] = headers
             return self.create(
                 input_object = input_object,
                 headers = headers,
@@ -365,7 +386,8 @@ class BaseRoute(BaseModel):
                 **kwargs
             )
         # data = get_pyd_dict(input_object, exclude_none = self.exclude_null)
-        data = input_object.model_dump(exclude_none = self.exclude_null)
+        # data = input_object.model_dump(exclude_none = self.exclude_null, by_alias = True)
+        data = input_object.model_dump(**self.get_serialization_kwargs(input_object))
         api_response = await self._async_send(
             method = 'POST',
             url = self.get_resource_url(data = data, **kwargs),
@@ -429,10 +451,15 @@ class BaseRoute(BaseModel):
             logger.warning(f'[{self.name} - {current_model}: {current_attempt}/{auto_retry_limit}] API Error: {e}. Sleeping for 10 seconds')
             await asyncio.sleep(5.0 * max(2, current_attempt))
             current_attempt += 1
-            if header_cache_keys and headers:
-                # headers = kwargs.pop('headers')
-                _ = [headers.pop(k) for k in header_cache_keys if k in headers]
-                # kwargs['headers'] = headers
+            if self.proxy_enabled:
+                headers = self.settings.proxy.disable_caching_headers(
+                    headers = headers,
+                    provider = self.proxy_provider,
+                )
+            # if header_cache_keys and headers:
+            #     # headers = kwargs.pop('headers')
+            #     _ = [headers.pop(k) for k in header_cache_keys if k in headers]
+            #     # kwargs['headers'] = headers
             return await self.async_create(
                 input_object = input_object,
                 headers = headers,
@@ -459,10 +486,15 @@ class BaseRoute(BaseModel):
             logger.warning(f'[{self.name} - {current_model}: {current_attempt}/{auto_retry_limit}] {error_kind}: ({type(e)}) {error_value}. Sleeping for 10 seconds')
             await asyncio.sleep(5.0 * max(2, current_attempt))
             current_attempt += 1
-            if header_cache_keys and headers:
-                # headers = kwargs.pop('headers')
-                _ = [headers.pop(k) for k in header_cache_keys if k in headers]
-                # kwargs['headers'] = headers
+            if self.proxy_enabled:
+                headers = self.settings.proxy.disable_caching_headers(
+                    headers = headers,
+                    provider = self.proxy_provider,
+                )
+            # if header_cache_keys and headers:
+            #     # headers = kwargs.pop('headers')
+            #     _ = [headers.pop(k) for k in header_cache_keys if k in headers]
+            #     # kwargs['headers'] = headers
             return await self.async_create(
                 input_object = input_object,
                 headers = headers,
@@ -600,7 +632,8 @@ class BaseRoute(BaseModel):
         api_resource = f'{self.api_resource}/batch'
         data = json.dumps(
             # get_pyd_dict(input_object, exclude_none = self.exclude_null),
-            input_object.dict(exclude_none = self.exclude_null), 
+            input_object.model_dump(**self.get_serialization_kwargs(input_object)),
+            # input_object.dict(exclude_none = self.exclude_null), 
             cls = ObjectEncoder
         )
         api_response = await self._async_send(  

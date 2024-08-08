@@ -1,9 +1,10 @@
 
 ## Base Object Models
-from .chat import ChatMessage, ChatChoice, ChatObject, ChatResponse, Function, FunctionCall, Tool
+from .chat import ChatMessage, ChatChoice, ChatObject, ChatResponse, Function, FunctionCall, Tool, JSONSchema
 from .completions import CompletionChoice, CompletionObject, CompletionResponse
 from .embeddings import EmbeddingData, EmbeddingObject, EmbeddingResponse
 from .models import ModelData, ModelObject, ModelResponse
+from .functions import BaseFunctionModel, BaseFunction
 
 ## Route Models
 from .chat import ChatRoute

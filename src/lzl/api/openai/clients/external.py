@@ -17,13 +17,6 @@ from lzl.api.openai.types.auth import ExternalProviderAuth
 from lzl.api.openai.configs.external import ExternalProviderSettings
 from .routes import ApiRoutes
 
-# from async_openai.schemas import *
-# from async_openai.utils.config import get_settings, OpenAISettings
-# from async_openai.utils.logs import logger
-# from async_openai.utils.config import ProxyObject
-# from async_openai.utils.external_config import ExternalProviderSettings, ExternalProviderAuth
-# from async_openai.routes import ApiRoutes
-
 
 class ExternalOpenAIClient(abc.ABC):
     """

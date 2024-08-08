@@ -3,18 +3,11 @@ from __future__ import annotations
 import random
 import aiohttpx
 from lzl.types import BaseModel, Field
-
-# from lazyops.types import BaseSettings, validator, BaseModel, lazyproperty, Field
-# from lazyops.libs.proxyobj import ProxyObject
-# from lazyops.libs.abcs.configs.types import AppEnv
-# from lazyops.libs.openai.version import VERSION
-# from async_openai.types.options import ApiType
 from typing import Optional, Dict, Union, Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..configs.openai import OpenAISettings, AzureOpenAISettings
     from ..configs.external import ExternalProviderConfig
-#     from ..configs
 
 class OpenAIContext(BaseModel):
     """

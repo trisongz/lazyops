@@ -7,7 +7,7 @@ OpenAI Cost Functions and Handler
 import abc
 import tiktoken
 from lzl import load
-from lzl.proxied import proxied
+from lzl.proxied import proxied, ProxyObject
 from lzl.api.openai.assets import load_provider_prices
 from .base import ModelCostItem, Usage
 
@@ -22,13 +22,16 @@ else:
 
 if TYPE_CHECKING:
     from tiktoken import Encoding
-    from async_openai.schemas.chat import ChatMessage
+    from lzl.api.openai.schemas.chat import ChatMessage
+    from lzl.api.openai.configs.external import ExternalProviderSettings, ProviderModel
+    # from async_openai.schemas.chat import ChatMessage
     from transformers import PreTrainedTokenizer
-    from async_openai.utils.external_config import ExternalProviderSettings, ProviderModel
+    # from async_openai.utils.external_config import ExternalProviderSettings, ProviderModel
 
+# ModelCostHandlerClass
+# @proxied
 
-@proxied
-class ModelContextHandler(abc.ABC):
+class ModelCostHandler(abc.ABC):
     """
     The Model Context Handler
     """
@@ -250,3 +253,5 @@ class ModelContextHandler(abc.ABC):
             decoded = tokenizer.decode(tokens)
             text = text[-len(decoded):]
         return text
+
+ModelContextHandler: ModelCostHandler = ProxyObject(ModelCostHandler)

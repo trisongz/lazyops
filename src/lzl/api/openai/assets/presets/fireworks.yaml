@@ -10,8 +10,8 @@ config:
   hf_compatible: true
 routes:
   chat:
-    object_class: lazyops.libs.openai.schemas.external.fireworks.chat.ChatObject
-    response_class: lazyops.libs.openai.schemas.external.fireworks.chat.ChatResponse
-    route_class: lazyops.libs.openai.schemas.external.fireworks.chat.ChatRoute
+    object_class: lzl.api.openai.schemas.external.fireworks.chat.ChatObject
+    response_class: lzl.api.openai.schemas.external.fireworks.chat.ChatResponse
+    route_class: lzl.api.openai.schemas.external.fireworks.chat.ChatRoute
   
 models: fireworks

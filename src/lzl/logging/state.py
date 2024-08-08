@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 
 _registered_logger_modules: Set[str] = set()
 _module_name_mapping: Dict[str, str] = {}
+_module_name_mapping_relative: Dict[str, bool] = {}
 
 def register_logger_module(module: str):
     """
@@ -31,12 +32,13 @@ def is_registered_logger_module(name: str) -> bool:
     return module_name in _registered_logger_modules
 
 
-def register_module_name(module_name: str, module: str):
+def register_module_name(module_name: str, module: str, is_relative: bool = False):
     """
     Registers a module name
     """
-    global _module_name_mapping
+    global _module_name_mapping, _module_name_mapping_relative
     _module_name_mapping[module_name] = module
+    _module_name_mapping_relative[module_name] = is_relative
 
 
 def run_record_patching_hook(record: Union['logging.LogRecord', Dict[str, Any]]):
@@ -45,6 +47,17 @@ def run_record_patching_hook(record: Union['logging.LogRecord', Dict[str, Any]])
     """
     if record['name'] in _module_name_mapping:
         record['extra']['module_name'] = _module_name_mapping[record['name']]
+    
+    elif any(record['name'].startswith(module) for module in _module_name_mapping):
+        matching_module = next(
+            (module for module in _module_name_mapping if record['name'].startswith(module)),
+            None,
+        )
+        if _module_name_mapping_relative.get(matching_module, False):
+            module = record['name'].replace(matching_module, _module_name_mapping[matching_module]).strip()
+            # print(f'[{matching_module}] Matching Module: {record["name"]} -> {module}')
+            register_module_name(record['name'], module, is_relative = False)
+            record['extra']['module_name'] = _module_name_mapping[record['name']]
     return record
 
 

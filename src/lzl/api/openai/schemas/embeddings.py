@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 import asyncio
+import contextlib
 from typing import Optional, Type, Any, Union, List, Dict, overload
 from lzo.types import (
     eproperty, 
@@ -17,15 +18,6 @@ from lzl.api.openai.types.base import BaseResource
 from lzl.api.openai.types.responses import BaseResponse
 from lzl.api.openai.types.routes import BaseRoute
 from lzl.api.openai.utils import logger
-# from lzl.api.openai.types.errors import RateLimitError, InvalidMaxTokens, InvalidRequestError, APIError, MaxRetriesExceeded, ServiceTimeoutError
-# from lzl.api.openai.utils import logger, parse_stream, aparse_stream, resolve_json
-# from lazyops.types import validator, eproperty, Field
-# from async_openai.types.context import ModelContextHandler
-# from async_openai.types.resources import BaseResource
-# from async_openai.types.responses import BaseResponse
-# from async_openai.types.routes import BaseRoute
-# from async_openai.types.errors import RateLimitError, InvalidMaxTokens, InvalidRequestError, APIError, MaxRetriesExceeded
-# from async_openai.utils import logger
 
 __all__ = [
     'EmbeddingData',
@@ -50,7 +42,7 @@ class EmbeddingObject(BaseResource):
 
 
     # @validator('model', pre=True, always=True)
-    @field_validator('model')
+    @field_validator('model', mode = 'before')
     def validate_model(cls, v, values: Dict[str, Any]) -> str:
         """
         Validate the model
@@ -60,7 +52,8 @@ class EmbeddingObject(BaseResource):
                 v = values.get('engine')
             elif values.get('deployment'):
                 v = values.get('deployment')
-        v = ModelContextHandler.resolve_model_name(v)
+        with contextlib.suppress(KeyError):
+            v = ModelContextHandler.resolve_model_name(v)
         # if values.get('validate_model_aliases', False):
         #     v = ModelContextHandler[v].name
         return v

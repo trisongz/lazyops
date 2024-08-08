@@ -7,7 +7,7 @@ from lzl.logging import get_logger, change_logger_level, null_logger
 logger_level: str = os.getenv('LOGGER_LEVEL', 'INFO').upper()
 logger = get_logger(logger_level)
 
-logger.set_module_name('lzl.api.openai', 'openai')
+logger.set_module_name('lzl.api.openai', 'openai', is_relative = True)
 
 def configure_httpx_logger(level: int = logging.ERROR):
     """

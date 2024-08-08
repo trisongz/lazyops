@@ -14,16 +14,11 @@ from lzo.types.base import (
     PYDANTIC_VERSION,
 )
 
-# from lazyops.types import BaseModel, lazyproperty
-# from lazyops.types.models import get_pyd_field_names, Field, PYD_VERSION
 from pydantic import RootModel
 from typing import Dict, Optional, Any, List, Type, Union, Generator, AsyncGenerator, cast
 from lzl.api.openai.types.errors import error_handler
 from lzl.api.openai.types.base import BaseResource, Usage, FileObject
 from lzl.api.openai.utils import logger
-# from async_openai.types.errors import error_handler
-# from async_openai.types.resources import BaseResource, FileObject, Usage
-# from async_openai.utils import logger
 
 __all__ = [
     'BaseResponse',
@@ -79,9 +74,9 @@ class BaseResponse(BaseResource):
         _stream_consumed: Optional[bool] = PrivateAttr(default = False)
         _stream_chunks: Optional[List[Any]] = PrivateAttr(default = None)
     else:
-        _has_metadata: Optional[bool] = False
-        _stream_consumed: Optional[bool] = False
-        _stream_chunks: Optional[List[Any]] = None
+        _has_metadata: Optional[bool] = Field(default = False, exclude = True)
+        _stream_consumed: Optional[bool] = Field(default = False, exclude = True)
+        _stream_chunks: Optional[List[Any]] = Field(default = None, exclude = True)
 
 
     @property
@@ -240,6 +235,20 @@ class BaseResponse(BaseResource):
         Returns the model name
         """
         return self.model.split('-')[1]
+    
+    @property
+    def consumption(self) -> Optional[float]:
+        """
+        Returns the consumption cost
+        """
+        return None
+    
+    @eproperty
+    def consumption_cost(self) -> str:
+        """
+        Returns the consumption cost for the completions
+        """
+        return f'${self.consumption:.5f}' if self.consumption else '$0.00'
     
     """
     Object Data Properties

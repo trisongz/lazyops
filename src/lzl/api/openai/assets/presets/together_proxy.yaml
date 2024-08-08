@@ -16,12 +16,13 @@ config:
     Helicone-Target-Url: https://api.together.xyz
 routes:
   chat:
-    object_class: lazyops.libs.openai.schemas.external.together.chat.ChatObject
-    response_class: lazyops.libs.openai.schemas.external.together.chat.ChatResponse
-    route_class: lazyops.libs.openai.schemas.external.together.chat.ChatRoute
+    object_class: lzl.api.openai.schemas.external.together.chat.ChatObject
+    response_class: lzl.api.openai.schemas.external.together.chat.ChatResponse
+    route_class: lzl.api.openai.schemas.external.together.chat.ChatRoute
+    
   embeddings: 
-    object_class: lazyops.libs.openai.schemas.external.together.embeddings.EmbeddingObject
-    response_class: lazyops.libs.openai.schemas.external.together.embeddings.EmbeddingResponse
-    route_class: lazyops.libs.openai.schemas.external.together.embeddings.EmbeddingRoute
+    object_class: lzl.api.openai.schemas.external.together.embeddings.EmbeddingObject
+    response_class: lzl.api.openai.schemas.external.together.embeddings.EmbeddingResponse
+    route_class: lzl.api.openai.schemas.external.together.embeddings.EmbeddingRoute
 
 models: together

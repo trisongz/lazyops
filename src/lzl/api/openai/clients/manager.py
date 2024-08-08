@@ -16,7 +16,7 @@ from lzl.api.openai.types.handlers import ModelContextHandler
 from lzl.api.openai.configs import get_settings, OpenAISettings
 from lzl.api.openai.configs.external import ExternalProviderSettings
 from lzl.api.openai.utils import logger, weighted_choice
-from lzl.api.openai.types.functions import FunctionManager, OpenAIFunctions
+# from lzl.api.openai.types.functions import FunctionManager, OpenAIFunctions
 
 # from async_openai.schemas import *
 # from async_openai.types.options import ApiType
@@ -32,6 +32,7 @@ from .loadbalancer import ClientLoadBalancer
 if TYPE_CHECKING:
     from .base import OpenAIClient
     from .external import ExternalOpenAIClient
+    from .functions import FunctionManager
     from lzl.pool import ThreadPool
     from lzl.api.openai.schemas.chat import Function
     # from async_openai.client import OpenAIClient
@@ -94,7 +95,8 @@ class OpenAIManager(abc.ABC):
 
         self.no_proxy_client_names: Optional[List[str]] = []
         self.client_callbacks: Optional[List[Callable]] = []
-        self.functions: FunctionManager = OpenAIFunctions
+        from .functions import OpenAIFunctions
+        self.functions: 'FunctionManager' = OpenAIFunctions
         self.ctx = ModelContextHandler
         if self.auto_loadbalance_clients is None: self.auto_loadbalance_clients = self.settings.auto_loadbalance_clients
         if self.auto_healthcheck is None: self.auto_healthcheck = self.settings.auto_healthcheck
@@ -764,6 +766,7 @@ class OpenAIManager(abc.ABC):
             if client_weight: self.client_weights[name] = client_weight
             if client_ping_timeout is not None: self.client_ping_timeouts[name] = client_ping_timeout
             _has_proxy = False
+            _proxy_provider = None
             if (self.settings.proxy.enabled and not proxy_disabled) and config.get('api_base'):
                 # Initialize a non-proxy version of the client
                 config['api_base'] = source_endpoint
@@ -780,6 +783,7 @@ class OpenAIManager(abc.ABC):
                 )
                 config['api_base'] = self.settings.proxy.endpoint
                 _has_proxy = True
+                _proxy_provider = self.settings.proxy.current
             c = self.init_api_client(name, is_azure = is_azure, set_as_default = is_default, **config)
             msg = f'Registered: `|g|{c.name}|e|` @ `{source_endpoint or c.base_url}`'
             extra_msgs = []
@@ -794,7 +798,7 @@ class OpenAIManager(abc.ABC):
                 else:
                     extra_msgs.append(f'Weight: {client_weight}')
             if c.is_azure: extra_msgs.append('Azure')
-            if _has_proxy: extra_msgs.append('Proxied')
+            if _has_proxy: extra_msgs.append(f'Proxied (via |g|{_proxy_provider}|e|)')
             if extra_msgs: msg += f' ({", ".join(extra_msgs)})'
             logger.info(msg, colored = True)
         
@@ -838,15 +842,24 @@ class OpenAIManager(abc.ABC):
                 if not values['models'] or model not in values['models']:
                     available_clients.append(name)
                     # return name
-            
+
             if not available_clients: available_clients.append(oai_name)
             return available_clients
         if azure_required:
             return [
                 k for k, v in self.client_model_exclusions.items() if v['is_azure'] and \
-                ('noproxy' in k if noproxy_required else 'noproxy' not in k)
+                    ('noproxy' in k if noproxy_required else 'noproxy' not in k)
             ]
             # return [k for k, v in self.client_model_exclusions.items() if v['is_azure']]
+        # Only 1 client / likely openai
+        if len(self.client_model_exclusions) == 2:
+            return (
+                [i for i in self.client_model_exclusions if 'noproxy' in i]
+                if noproxy_required
+                else [
+                    i for i in self.client_model_exclusions if 'noproxy' not in i
+                ]
+            )
         return None
     
     @property

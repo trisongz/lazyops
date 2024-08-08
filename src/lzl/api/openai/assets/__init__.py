@@ -55,7 +55,7 @@ def load_preset_config(
         ".yaml", ".yml", ".json"
     }, f"The {name} preset file must be a YAML or JSON file: {filepath}"
 
-    from lazyops.libs.abcs.utils.envvars import parse_envvars_from_text
+    from lzo.utils import parse_envvars_from_text
     text = filepath.read_text()
     text, _ = parse_envvars_from_text(text)
     if filepath.suffix == ".json":
@@ -64,7 +64,7 @@ def load_preset_config(
         import yaml
         data = yaml.safe_load(text)
     if overrides: 
-        from lazyops.libs.abcs.utils.helpers import update_dict
+        from lzo.utils import update_dict
         data = update_dict(data, overrides)
     if data.get('models') and not isinstance(data['models'], list):
         if isinstance(data['models'], str):

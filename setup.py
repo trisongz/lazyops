@@ -9,7 +9,7 @@ pkg_name = 'lazyops'
 gitrepo = 'trisongz/lazyops'
 
 root = Path(__file__).parent
-version = root.joinpath(f'{pkg_name}/version.py').read_text().split('VERSION = ', 1)[-1].strip().replace('-', '').replace("'", '')
+version = root.joinpath(f'src/{pkg_name}/version.py').read_text().split('VERSION = ', 1)[-1].strip().replace('-', '').replace("'", '')
 
 requirements = [
     'loguru',

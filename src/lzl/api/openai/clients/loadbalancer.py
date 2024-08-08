@@ -10,16 +10,9 @@ from lzl.api.openai.schemas import *
 from lzl.api.openai.utils import logger
 from lzl.api.openai.configs import get_settings, OpenAISettings
 
-# from async_openai.schemas import *
-# from async_openai.utils.config import get_settings, OpenAISettings
-# from async_openai.utils.logs import logger
-
 if TYPE_CHECKING:
     from .base import OpenAIClient
-    from .external import ExternalOpenAIClient, ExternalProviderSettings
     from .manager import OpenAIManager
-    # from async_openai.client import OpenAIClient, OpenAISessionManager
-    # from async_openai.external_client import ExternalOpenAIClient, ExternalProviderSettings
 
 
 class ClientLoadBalancer:

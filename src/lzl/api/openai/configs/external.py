@@ -29,10 +29,10 @@ from typing import Optional, Dict, Union, Any, List, Type, TYPE_CHECKING
 #     from lazyops.types.models import root_validator
 
 if TYPE_CHECKING:
-    from async_openai.types.routes import BaseRoute, BaseResource
+    from lzl.api.openai.types.routes import BaseRoute, BaseResource
 
 
-preset_path = pathlib.Path(__file__).parent.joinpath('presets')
+# preset_path = pathlib.Path(__file__).parent.joinpath('presets')
 
 
 class ExternalProviderConfig(BaseModel):
@@ -55,7 +55,7 @@ class ExternalProviderConfig(BaseModel):
     hf_compatible: Optional[bool] = Field(None, description="Whether the provider is HuggingFace Compatible for Tokenization")
 
     # @validator("custom_headers", "proxy_headers", pre=True)
-    @field_validator("custom_headers", "proxy_headers")
+    @field_validator("custom_headers", "proxy_headers", mode = 'before')
     def validate_headers(cls, value: Optional[Dict[str, Any]]) -> Optional[Dict[str, str]]:
         """
         Validates the Headers
@@ -67,7 +67,7 @@ class ExternalProviderConfig(BaseModel):
         return value
     
     # @validator("max_retries", pre=True)
-    @field_validator("max_retries")
+    @field_validator("max_retries", mode = 'before')
     def validate_max_retries(cls, value: Optional[Union[str, int]]) -> Optional[int]:
         """
         Validates the Max Retries
@@ -79,7 +79,7 @@ class ExternalProviderConfig(BaseModel):
             return None
         
     # @validator("weight", pre=True)
-    @field_validator("weight")
+    @field_validator("weight", mode = 'before')
     def validate_weight(cls, value: Optional[Union[str, float]]) -> Optional[float]:
         """
         Validates the Weight
@@ -163,7 +163,7 @@ class ProviderRoute(BaseModel):
     
 
     # @validator("route_class", "object_class", "response_class", pre=True)
-    @field_validator("route_class", "object_class", "response_class")
+    @field_validator("route_class", "object_class", "response_class", mode = 'before')
     def validate_route_classes(cls, value: Union[str, Type]) -> Type:
         """
         Validates the Route Classes
@@ -366,34 +366,36 @@ class ExternalProviderSettings(BaseModel):
         """
         Loads the Provider Settings from a Preset
         """
-        assert name or path, "You must provide either a name or a path to the preset"
-        if path:
-            preset_file = pathlib.Path(path)
-            assert preset_file.exists(), f"Could not find the preset path: {preset_file}"
-        else:
-            preset_file = preset_path.joinpath(f"{name}.yaml")
-            if not preset_file.exists():
-                raise FileNotFoundError(f"Could not find the preset file: {preset_file} for {name}")
+        # assert name or path, "You must provide either a name or a path to the preset"
+        # if path:
+        #     preset_file = pathlib.Path(path)
+        #     assert preset_file.exists(), f"Could not find the preset path: {preset_file}"
+        # else:
+            
+        #     preset_file = preset_path.joinpath(f"{name}.yaml")
+        #     if not preset_file.exists():
+        #         raise FileNotFoundError(f"Could not find the preset file: {preset_file} for {name}")
         
-        assert preset_file.suffix in {
-            ".yaml", ".yml", ".json"
-        }, f"The preset file must be a YAML or JSON file: {preset_file}"
-        from lzo.utils import parse_envvars_from_text
+        # assert preset_file.suffix in {
+        #     ".yaml", ".yml", ".json"
+        # }, f"The preset file must be a YAML or JSON file: {preset_file}"
+        # from lzo.utils import parse_envvars_from_text
         
-        text = preset_file.read_text()
-        text, _ = parse_envvars_from_text(text)
-        if preset_file.suffix == ".json":
-            data = json.loads(text)
-        else:
-            import yaml
-            data = yaml.safe_load(text)
-        
-        if overrides: 
-            from lzo.utils import update_dict
-            data = update_dict(data, overrides)
+        # text = preset_file.read_text()
+        # text, _ = parse_envvars_from_text(text)
+        # if preset_file.suffix == ".json":
+        #     data = json.loads(text)
+        # else:
+        #     import yaml
+        #     data = yaml.safe_load(text)
+        # data = load_preset_config(name, path, **overrides)
+        # if overrides: 
+        #     from lzo.utils import update_dict
+        #     data = update_dict(data, overrides)
         # from lazyops.utils import logger
+        data = load_preset_config(name, path, **overrides)
         # logger.info(data)
-        provider_settings = cls.parse_obj(data)
+        provider_settings = cls.model_validate(data)
         ModelContextHandler.add_provider(provider_settings)
         return provider_settings
     

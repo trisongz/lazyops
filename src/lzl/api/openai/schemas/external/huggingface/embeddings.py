@@ -13,9 +13,12 @@ from ...embeddings import (
     EmbeddingResponse as BaseEmbeddingResponse,
     logger
 )
-from lazyops.types import validator, lazyproperty, Field
-from async_openai.types.context import ModelContextHandler
-from async_openai.types.resources import Usage
+from lzl.types import validator, eproperty, Field
+from lzl.api.openai.types.handlers import ModelContextHandler
+from lzl.api.openai.types.base import Usage
+# from lazyops.types import validator, eproperty, Field
+# from async_openai.types.context import ModelContextHandler
+# from async_openai.types.resources import Usage
 from typing import Any, Dict, List, Optional, Union, Set, Type, TYPE_CHECKING
 
 
@@ -41,7 +44,7 @@ class EmbeddingResponse(BaseEmbeddingResponse):
     usage: Optional[Usage] = Field(default_factory = Usage)
 
 
-    @lazyproperty
+    @eproperty
     def consumption(self) -> int:
         """
         Returns the consumption for the completions

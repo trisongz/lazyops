@@ -26,15 +26,6 @@ from lzl.api.openai.types.responses import BaseResponse
 from lzl.api.openai.types.routes import BaseRoute
 from lzl.api.openai.utils import logger, parse_stream, aparse_stream
 
-# from lazyops.types import validator, eproperty
-# from lazyops.types.models import root_validator, pre_root_validator, Field
-# from async_openai.types.context import ModelContextHandler
-# from async_openai.types.resources import BaseResource, Usage
-# from async_openai.types.responses import BaseResponse
-# from async_openai.types.routes import BaseRoute
-# from async_openai.types.errors import RateLimitError, APIError, MaxRetriesExceeded, InvalidMaxTokens, InvalidRequestError
-# from async_openai.utils import logger, parse_stream, aparse_stream
-
 
 __all__ = [
     'CompletionChoice',

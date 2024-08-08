@@ -55,6 +55,7 @@ class ApiRoutes:
         is_azure: Optional[bool] = None,
         client_callbacks: Optional[List[Callable]] = None,
         route_classes: Optional[Dict[str, Type[BaseRoute]]] = None,
+        proxy_provider: Optional[str] = None,
         
         **kwargs
     ):
@@ -71,6 +72,7 @@ class ApiRoutes:
         self.timeout = timeout
         self.max_retries = max_retries
         self.route_classes = route_classes or RouteClasses.copy()
+        self.proxy_provider = proxy_provider or self.settings.proxy.current
         self.is_azure = is_azure if is_azure is not None else \
             isinstance(self.settings, AzureOpenAISettings)
         self.kwargs = kwargs or {}
@@ -99,6 +101,7 @@ class ApiRoutes:
                     max_retries = self.max_retries,
                     settings = self.settings,
                     is_azure = self.is_azure,
+                    proxy_provider = self.proxy_provider,
                     **self.kwargs
                 ))
             except Exception as e:
