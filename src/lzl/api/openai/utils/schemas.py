@@ -130,6 +130,8 @@ if PYDANTIC_VERSION == 2:
                 # Remove description from here
                 if 'description' in json_schema:
                     _ = json_schema.pop('description')
+            if 'title' in json_schema:
+                _ = json_schema.pop('title')
             return json_schema
 
         def field_is_required(
@@ -165,7 +167,24 @@ if PYDANTIC_VERSION == 2:
             json_schema = super()._named_required_fields_schema(named_required_fields)
             json_schema['additionalProperties'] = False
             return json_schema
-        
+            
+
+        # def model_fields_schema(self, schema: 'core_schema.ModelFieldsSchema') -> JsonSchemaValue:
+        #     """Generates a JSON schema that matches a schema that defines a model's fields.
+
+        #     Args:
+        #         schema: The core schema.
+
+        #     Returns:
+        #         The generated JSON schema.
+        #     """
+        #     json_schema = super().model_fields_schema(schema)
+        #     print(json_schema)
+        #     if 'examples' in json_schema:
+        #         _ = json_schema.pop('examples')
+        #     return json_schema
+            
+
     _excluded_fields = ['function_name', 'function_model', 'function_duration', 'function_client_name', 'function_usage']
     
     class FunctionGenerateJsonSchema(GenerateJsonSchema):
