@@ -38,3 +38,5 @@ lazyops/libs/kinde/data
 lazyops/libs/hatchet_v1
 lazyops/libs/hatchet/cache
 lazyops/libs/hatchet/data
+src/lzl/api/hatchet/patches/context.j2.py
+src/lzl/api/hatchet/patches/worker.j2.py

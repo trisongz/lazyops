@@ -56,6 +56,13 @@ class BaseSettings(_BaseSettings):
         Returns the autologger
         """
         return self.logger if (self.debug_enabled or self.is_development_env) else self.null_logger
+    
+    @eproperty
+    def app_module_name(self) -> Optional[str]:
+        """
+        Returns the app module name
+        """
+        return self._extra.get('app_module_name')
 
     @model_validator(mode = 'after')
     def validate_app_env(self):
@@ -64,9 +71,16 @@ class BaseSettings(_BaseSettings):
         """
         if self.app_env is None:
             try:
-                self.app_env = get_app_env(self.module_name)
+                if self.app_module_name:
+                    self.app_env = AppEnv.from_module_name(self.app_module_name)
+                elif self.Config.env_prefix:
+                    self.app_env = get_app_env(self.Config.env_prefix.rstrip('_'))
+                else:
+                    self.app_env = get_app_env(self.app_module_name or self.module_name)
             except Exception as e:
                 self.app_env = get_app_env('lzo')
+        elif isinstance(self.app_env, str):
+            self.app_env = AppEnv.from_env(self.app_env)
         return self
 
     @property
@@ -89,6 +103,14 @@ class BaseSettings(_BaseSettings):
         Returns whether the environment is development
         """
         return self.app_env in [AppEnv.DEVELOPMENT, AppEnv.LOCAL, AppEnv.CICD]
+    
+
+    def set_app_env(self, env: AppEnv) -> None:
+        """
+        Sets the app environment
+        """
+        self.app_env = self.app_env.from_env(env)
+
     
 
 
