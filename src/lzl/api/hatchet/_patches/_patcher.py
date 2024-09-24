@@ -6,12 +6,12 @@ import jinja2
 import hatchet_sdk
 from importlib.metadata import version
 
-here = pathlib.Path(__file__).parent
-patches_dir = here.joinpath('patches')
+here = pathlib.Path(__file__).parent.parent
+patches_dir = here.joinpath('_patches')
 
 j2 = jinja2.Environment(loader=jinja2.FileSystemLoader(patches_dir))
 
-last_version = '0.31.0'
+last_version = '0.32.0'
 
 replacements = {
     'worker.py': {
@@ -123,7 +123,8 @@ replacements = {
 
 def patch_worker(
     version: str,
-    timestamp: str
+    timestamp: str,
+    version_dir: pathlib.Path,
 ):
     """
     Patches the worker class to add the ability to handle start step run
@@ -138,12 +139,13 @@ def patch_worker(
     
     template = j2.get_template('worker.j2.py')
     output = template.render(new_funcs = patched_funcs, version = version, timestamp = timestamp, last_version = last_version)
-    output_file = here.joinpath('worker.py')
+    output_file = version_dir.joinpath('worker.py')
     output_file.write_text(output)
 
 def patch_context(
     version: str,
-    timestamp: str
+    timestamp: str,
+    version_dir: pathlib.Path,
 ):
     """
     Patches the context class to add the necessary methods
@@ -160,27 +162,58 @@ def patch_context(
     
     template = j2.get_template('context.j2.py')
     output = template.render(new_funcs = patched_funcs, version = version, timestamp = timestamp, last_version = last_version)
-    output_file = here.joinpath('context.py')
+    output_file = version_dir.joinpath('context.py')
     output_file.write_text(output)
 
 def create_version_file(
     version: str,
+    version_dir: pathlib.Path,
 ):
     """
     Creates the version file
     """
     template = j2.get_template('version.j2.py')
     output = template.render(version = version, last_version = last_version)
-    output_file = here.joinpath('version.py')
+    output_file = version_dir.joinpath('version.py')
+    output_file.write_text(output)
+
+def create_init_file(
+    version: str,
+    version_dir: pathlib.Path,
+) -> None:
+    """
+    Creates the init file
+    """
+    template = j2.get_template('ver_init.j2.py')
+    output = template.render(version = version, last_version = last_version)
+    output_file = version_dir.joinpath('__init__.py')
+    output_file.write_text(output)
+
+def create_current_file(
+    version: str,
+    version_dir: pathlib.Path,
+) -> None:
+    """
+    Creates the current file
+    """
+    template = j2.get_template('current.j2.py')
+    current_version_name = version_dir.name
+    output = template.render(version = version, last_version = last_version, current_version_name = current_version_name)
+    output_file = here.joinpath('current', '__init__.py')
     output_file.write_text(output)
 
 
 def run_patches():
     ver = version('hatchet-sdk')
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    patch_worker(ver, timestamp)
-    patch_context(ver, timestamp)
-    create_version_file(ver)
+    ver_dir_name = f'v{ver.replace(".", "")}'
+    ver_dir = here.joinpath(ver_dir_name)
+    ver_dir.mkdir(exist_ok = True)
+    patch_worker(ver, timestamp, ver_dir)
+    patch_context(ver, timestamp, ver_dir)
+    create_version_file(ver, ver_dir)
+    create_init_file(ver, ver_dir)
+    create_current_file(ver, ver_dir)
 
 if __name__ == '__main__':
     run_patches()
