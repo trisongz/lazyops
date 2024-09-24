@@ -19,7 +19,7 @@ from hatchet_sdk.context.context import Context as BaseContext, ContextAioImpl
 # from hatchet_sdk.context import Context as BaseContext
 from hatchet_sdk.logger import logger
 from lazyops.libs.abcs.utils.format_utils import clean_html
-from .utils import json_serializer
+from ..utils import json_serializer
 from typing import TypeVar, Dict, Any, Optional, List, Union, TYPE_CHECKING
 
 if TYPE_CHECKING:
