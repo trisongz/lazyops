@@ -11,10 +11,12 @@ Last Version: {{ last_version }}
 
 import copy
 from concurrent.futures import ThreadPoolExecutor
-{%- if version == '0.31.0' %}
-from hatchet_sdk.context import Context as BaseContext, ContextAioImpl
-{%- else %}
+{%- if version_id >= 37.0 %}
+
+{%- elif version_id >= 32.0 %}
 from hatchet_sdk.context.context import Context as BaseContext, ContextAioImpl
+{%- else %}
+from hatchet_sdk.context import Context as BaseContext, ContextAioImpl
 {%- endif %}
 # from hatchet_sdk.context import Context as BaseContext
 from hatchet_sdk.logger import logger

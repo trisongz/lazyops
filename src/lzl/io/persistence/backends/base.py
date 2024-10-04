@@ -830,3 +830,18 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
 
 
 
+    """
+    Backend Supported Methods
+    """
+
+    def select(self, *args, **kwargs) -> Any:
+        """
+        Selects the data from the backend
+        """
+        raise NotImplementedError
+    
+    async def aselect(self, *args, **kwargs) -> Any:
+        """
+        [Async] Selects the data from the backend
+        """
+        raise NotImplementedError

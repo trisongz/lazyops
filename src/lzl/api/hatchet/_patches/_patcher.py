@@ -125,6 +125,7 @@ def patch_worker(
     version: str,
     timestamp: str,
     version_dir: pathlib.Path,
+    version_id: float,
 ):
     """
     Patches the worker class to add the ability to handle start step run
@@ -146,6 +147,7 @@ def patch_context(
     version: str,
     timestamp: str,
     version_dir: pathlib.Path,
+    version_id: float,
 ):
     """
     Patches the context class to add the necessary methods
@@ -168,6 +170,7 @@ def patch_context(
 def create_version_file(
     version: str,
     version_dir: pathlib.Path,
+    version_id: float,
 ):
     """
     Creates the version file
@@ -180,6 +183,7 @@ def create_version_file(
 def create_init_file(
     version: str,
     version_dir: pathlib.Path,
+    version_id: float,
 ) -> None:
     """
     Creates the init file
@@ -192,6 +196,7 @@ def create_init_file(
 def create_current_file(
     version: str,
     version_dir: pathlib.Path,
+    version_id: float,
 ) -> None:
     """
     Creates the current file
@@ -209,11 +214,12 @@ def run_patches():
     ver_dir_name = f'v{ver.replace(".", "")}'
     ver_dir = here.joinpath(ver_dir_name)
     ver_dir.mkdir(exist_ok = True)
-    patch_worker(ver, timestamp, ver_dir)
-    patch_context(ver, timestamp, ver_dir)
-    create_version_file(ver, ver_dir)
-    create_init_file(ver, ver_dir)
-    create_current_file(ver, ver_dir)
+    ver_id = float(ver.split('.', 1)[1])
+    patch_worker(ver, timestamp, ver_dir, ver_id)
+    patch_context(ver, timestamp, ver_dir, ver_id)
+    create_version_file(ver, ver_dir, ver_id)
+    create_init_file(ver, ver_dir, ver_id)
+    create_current_file(ver, ver_dir, ver_id)
 
 if __name__ == '__main__':
     run_patches()
