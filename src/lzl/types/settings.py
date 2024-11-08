@@ -19,6 +19,8 @@ from typing import Optional, Dict, Any, List, TYPE_CHECKING
 if PYDANTIC_VERSION == 2:
     from pydantic import PrivateAttr
 
+if TYPE_CHECKING:
+    from lzo.types import AppEnv
 
 class BaseSettings(_BaseSettings):
     """
@@ -135,3 +137,13 @@ class BaseSettings(_BaseSettings):
         Get an attribute from the model
         """
         return getattr(self, name, default)
+
+
+    @classmethod
+    def _fetch_app_env(cls, module: Optional[str] = None) -> Optional['AppEnv']:
+        """
+        Fetches the App Env
+        """
+        if module is None: module = cls.__module__.split('.')[0]
+        from lzo.types import AppEnv
+        return AppEnv.from_module_name(module)

@@ -7,19 +7,25 @@ Persistence Types
 """
 
 import gc
+import copy
 import atexit
 import asyncio
 import contextlib
 import collections.abc
+import typing as t
 
 from lazyops.utils.lazy import lazy_import, get_keydb_enabled
-from lazyops.utils.logs import logger, null_logger
-# from lazyops.utils.pooler import ThreadPoolV2 as ThreadPooler
-from lazyops.utils.pooler import ThreadPooler
+from lzl.logging import logger, null_logger
+from lzl.pool import ThreadPool
 
 from typing import Any, Dict, Optional, Union, Iterable, List, Type, Set, Callable, Mapping, MutableMapping, Tuple, TypeVar, overload, TYPE_CHECKING
-from .backends import LocalStatefulBackend, RedisStatefulBackend, StatefulBackendT
-from .serializers import ObjectValue
+from .backends import (
+    LocalStatefulBackend, 
+    ObjStorageStatefulBackend,
+    RedisStatefulBackend, 
+    SqliteStatefulBackend,
+    StatefulBackendT
+)
 from .addons import (
     NumericValuesContainer,
     DurationMetric, 
@@ -33,7 +39,7 @@ from .addons import (
 from .debug import get_autologger
 
 if TYPE_CHECKING:
-    from lazyops.types.models import BaseSettings
+    from lzo.types import BaseSettings
     from kvdb.components.persistence import KVDBStatefulBackend
 
     BackendT = Union[KVDBStatefulBackend, StatefulBackendT]
@@ -46,6 +52,8 @@ autologger = get_autologger('main')
 RegisteredBackends = {
     'local': LocalStatefulBackend,
     'redis': RedisStatefulBackend,
+    'objstore': ObjStorageStatefulBackend,
+    'sqlite': SqliteStatefulBackend,
 }
 
 def is_in_async_loop() -> bool:
@@ -100,11 +108,44 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         """
         Initializes the Persistent Dictionary
         """
+        if 'new_base' in kwargs:
+            self._child_init(**kwargs)
+        else:
+            self._new_init_(
+                name = name,
+                serializer = serializer,
+                serializer_kwargs = serializer_kwargs,
+                base_key = base_key,
+                async_enabled = async_enabled,
+                settings = settings,
+                backend = backend,
+                backend_type = backend_type,
+                metric_types = metric_types,
+                **kwargs,
+            )
+
+    
+    def _new_init_(
+        self,
+        name: Optional[str] = None,
+        serializer: Optional[str] = None,
+        serializer_kwargs: Optional[Dict[str, Any]] = None,
+        base_key: Optional[str] = None,
+        async_enabled: Optional[bool] = False,
+        settings: Optional['BaseSettings'] = None,
+        backend: Optional['BackendT'] = None,
+        backend_type: Optional[str] = None,
+        metric_types: Optional[Dict[str, Union[str, Type['MetricT']]]] = None,
+        **kwargs,
+    ):
+        """
+        Initializes the Persistent Dictionary
+        """
         if backend_type is not None: self.backend_type = backend_type
         if backend is not None:
             self.base_class = lazy_import(backend) if isinstance(backend, str) else backend
         if self.base_class is None:
-            self.base_class = self.get_backend_class(**kwargs)
+            self.base_class = self.get_backend_class(base_key = base_key, **kwargs)
         self.name = name
         self.base_key = base_key
         self.settings = settings
@@ -125,23 +166,59 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
             settings = self.settings,
             **self._kwargs,
         )
-        # self._mutation_tracker: Dict[str, ObjectValue] = {}
+        self._metric_types: Dict[str, Type['MetricT']] = metric_types or {}
+        self._init_ctx_()
+
+    def _child_init(
+        self,
+        parent: 'PersistentDict',
+        new_base: 'BackendT',
+        **kwargs,
+    ):
+        """
+        Initializes the Persistent Dictionary from a Parent Instance
+        """
+        self.name = kwargs.get('name') or parent.name
+        self.base_key = kwargs.get('base_key') or parent.base_key
+        self.settings = kwargs.get('settings') or parent.settings
+        self.base_class = kwargs.get('base_class') or parent.base_class
+        self.parent_base_key = kwargs.get('parent_base_key') or parent.base_key
+        self.child_base_key = kwargs.get('child_base_key') or parent.base_key
+        self.is_child_cache = True
+        self._metric_types: Dict[str, Type['MetricT']] = kwargs.get('metric_types') or copy.deepcopy(parent._metric_types)
+        self.base = new_base
+
+        # self.async_enabled = kwargs.get('async_enabled', parent.async_enabled)
+        # self._kwargs = copy.deepcopy(parent._kwargs)
+        self._kwargs = parent._kwargs.copy()
+        self._kwargs.update(kwargs)
+        self._init_ctx_()
+        
+
+    def _init_ctx_(self):
+        """
+        Initializes the context
+        """
         self._mutation_tracker: Dict[KT, VT] = {}
         self._mutation_hashes: Dict[str, str] = {}
 
-        # V2 Mutation Tracking with Context Manager
+        # V2 Mutation Tracking with Context Manager  
         self._in_context: bool = False
-        # self._temporal_dict: Dict[str, ObjectValue] = {}
         self._temporal_dict: Dict[KT, VT] = {}
-        self._metric_types: Dict[str, Type['MetricT']] = metric_types or {}
+
         if self._metric_types:
             for k, v in self._metric_types.items():
                 if isinstance(v, str): v = lazy_import(v)
                 self._metric_types[k] = v
-        
-        # self._metrics_dict: Dict[str, 'MetricT'] = {}
-        atexit.register(self.flush)
-    
+
+        if is_in_async_loop():
+            from lzo.utils import aioexit
+            aioexit.register(self.aflush)
+        else:
+            atexit.register(self.flush)
+
+
+
     @classmethod
     def register_backend(cls, name: str, backend: Union[str, Type['BackendT']]):
         """
@@ -150,7 +227,7 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         global RegisteredBackends
         RegisteredBackends[name] = backend
 
-    def get_backend_class(self, **kwargs) -> Type['BackendT']:
+    def get_backend_class(self, base_key: Optional[str] = None, **kwargs) -> Type['BackendT']:
         # sourcery skip: assign-if-exp, hoist-similar-statement-from-if, reintroduce-else, swap-nested-ifs
         """
         Returns the Backend Class
@@ -163,6 +240,11 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         # elif self.backend_type == 'redis':
         #     return RedisStatefulBackend
         if self.backend_type == 'auto':
+            if base_key is not None and '://' in base_key:
+                if base_key.startswith('sqlite://'):
+                    return SqliteStatefulBackend
+                return ObjStorageStatefulBackend
+        
             with contextlib.suppress(Exception):
                 import kvdb
                 if kvdb.is_available(url = kwargs.get('url')):
@@ -218,10 +300,23 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         """
         Gets a Child Persistent Dictionary
         """
+        if hasattr(self.base, 'get_child'):
+            new_base = self.base.get_child(key, **kwargs)
+            return self.__class__(
+                parent = self,
+                new_base = new_base,
+                **kwargs,
+            )
+
         base_key = f'{self.base_key}:{key}' if self.base_key else key
         base_kwargs = self.get_child_kwargs(**kwargs)
         return self.__class__(base_key = base_key, parent_base_key = self.base_key, child_base_key = key, **base_kwargs)
 
+    def get_key(self, key: str) -> str:
+        """
+        Gets a Key
+        """
+        return self.base.get_key(key)
 
     def get(self, key: KT, default: Optional[VT] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[VT]:
         """
@@ -248,7 +343,7 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         Saves a Value to the DB
         """
         if self.base.async_enabled and is_in_async_loop():
-            ThreadPooler.create_background_task(self.base.aset(key, value, ex = ex, _raw = _raw, **kwargs))
+            ThreadPool.create_background_task(self.base.aset(key, value, ex = ex, _raw = _raw, **kwargs))
         else:
             self.base.set(key, value, ex = ex, _raw = _raw, **kwargs)
     
@@ -257,7 +352,7 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         Saves a Value to the DB
         """
         if self.base.async_enabled:
-            ThreadPooler.create_background_task(self.base.aset_batch(data, **kwargs))
+            ThreadPool.create_background_task(self.base.aset_batch(data, **kwargs))
         else:
             self.base.set_batch(data, **kwargs)
 
@@ -266,7 +361,7 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         Deletes a Value from the DB
         """
         if self.base.async_enabled and is_in_async_loop():
-            ThreadPooler.create_background_task(self.base.adelete(key, **kwargs))
+            ThreadPool.create_background_task(self.base.adelete(key, **kwargs))
         else:
             self.base.delete(key, **kwargs)
 
@@ -281,7 +376,7 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         Clears the Cache
         """
         if self.base.async_enabled and is_in_async_loop():
-            ThreadPooler.create_background_task(self.base.clear(*keys, **kwargs))
+            ThreadPool.create_background_task(self.base.clear(*keys, **kwargs))
         else:
             self.base.clear(*keys, **kwargs)
     
@@ -329,7 +424,7 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         """
         return await self.base.acontains(key, **kwargs)
     
-    async def aclear(self, *keys, **kwargs) -> None:
+    async def aclear(self, *keys: KT, **kwargs) -> None:
         """
         Clears the Cache
         """
@@ -421,7 +516,7 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         return await self.base.avalues(**kwargs)
     
     @overload
-    async def aitems(self, iterable: None = None, **kwargs) -> Iterable[Tuple[KT, VT]]:
+    async def aitems(self, iterable: None = None, **kwargs) -> Iterable[Tuple[KT, VT]]: 
         """
         Returns the Items
         """
@@ -447,15 +542,19 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         Expires a Key
         """
         # Add a check to see if expiration or timeout is set
+        if 'ex' in kwargs:
+            expiration = kwargs.pop('ex')
         ex = expiration if expiration is not None else timeout
-        self.base.expire(key, ex, **kwargs)
+        self.base.expire(key, ex = ex, **kwargs)
 
     async def aexpire(self, key: KT, timeout: Optional[int] = None, expiration: Optional[int] = None, **kwargs) -> None:
         """
         Expires a Key
         """
+        if 'ex' in kwargs:
+            expiration = kwargs.pop('ex')
         ex = expiration if expiration is not None else timeout
-        await self.base.aexpire(key, ex, **kwargs)
+        await self.base.aexpire(key, ex = ex, **kwargs)
 
     @contextlib.contextmanager
     def track_changes(self, key: KT, func: str, *args, **kwargs):
@@ -544,6 +643,19 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         await self._asave_mutation_objects()
         await self.base.aupdate(data, **kwargs)
 
+
+    def update_key(self, key: str, data: Dict[str, Any], deep: Optional[bool] = True,  exclude_none: Optional[bool] = True, **kwargs) -> Dict[str, Any]:
+        """
+        Updates the Dict at the Key
+        """
+        return self.base.update_key(key, data, deep = deep, exclude_none = exclude_none, **kwargs)
+    
+    async def aupdate_key(self, key: str, data: Dict[str, Any], deep: Optional[bool] = True,  exclude_none: Optional[bool] = True, **kwargs) -> Dict[str, Any]:
+        """
+        [Async] Updates the Dict at the Key
+        """
+        return await self.base.aupdate_key(key, data, deep = deep, exclude_none = exclude_none, **kwargs)
+
     def popitem(self, **kwargs) -> Any:
         """
         Pops an Item from the Cache
@@ -578,6 +690,8 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         """
         Returns the Representation of the Cache
         """
+        if hasattr(self.base, '__repr__'):
+            return self.base.__repr__()
         return f'{self.base_key}: {dict(self.items())}'
 
     def _clear_from_mutation_tracker(self, key: KT):
@@ -600,9 +714,15 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         
         else:
             autologger.info(f'_save_mutation_objects: {list(self._mutation_tracker.keys())}')
-            self.base.set_batch(self._mutation_tracker)
-            self._mutation_tracker = {}
-            self._mutation_hashes = {}
+            try:
+                self.base.set_batch(self._mutation_tracker)
+                self._mutation_tracker = {}
+                self._mutation_hashes = {}
+            except RuntimeError as e:
+                logger.warning(f'Unable to Save {len(self._mutation_tracker)} Mutation Objects: {e}')
+            except Exception as e:
+                logger.trace(f'Error Saving {len(self._mutation_tracker)} Mutation Objects:', e)
+                raise e
         gc.collect()
 
     async def _asave_mutation_objects(self, *keys: str):
@@ -822,7 +942,7 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         Finalize any in-memory objects
         """
         if self.base.async_enabled and is_in_async_loop():
-            ThreadPooler.create_background_task(self._asave_mutation_objects(*keys))
+            ThreadPool.create_background_task(self._asave_mutation_objects(*keys))
         else:
             self._save_mutation_objects(*keys)
 
@@ -1181,4 +1301,39 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         return self.__getitem__('metrics')
     
 
-    
+    def __call__(
+        self,
+        method: str,
+        *args,
+        **kwargs
+    ) -> Any:
+        """
+        Calls the method
+        """
+        return getattr(self.base, method)(*args, **kwargs)
+
+
+    # def __getattribute__(self, name: str) -> Any:
+    #     """
+    #     Gets the attribute
+    #     """
+    #     if hasattr(self.base, name):
+    #         print(f'Getting Attribute: {name} from {self.base}')
+    #         return getattr(self.base, name)
+    #     return super().__getattribute__(name)
+
+    """
+    Extra Methods
+    """
+
+    def select(self, *args, **kwargs) -> t.Union[t.Dict[str, t.Any], t.Tuple[t.Dict[str, t.Any], t.Dict[str, t.Any]]]:
+        """
+        Select all items with the given tags
+        """
+        return self.base.select(*args, **kwargs)
+
+    async def aselect(self, *args, **kwargs) -> t.Union[t.Dict[str, t.Any], t.Tuple[t.Dict[str, t.Any], t.Dict[str, t.Any]]]:
+        """
+        [Async] Select all items with the given tags
+        """
+        return await self.base.aselect(*args, **kwargs)

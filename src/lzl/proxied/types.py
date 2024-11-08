@@ -19,7 +19,9 @@ class ProxyDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
     """
     _dict: Dict[KT, DictValue] = {}
     _initialized: Dict[KT, bool] = {} 
-    _excluded_attrs: Set[str] = {
+    # _rxtra: Dict[str, Any] = {}
+    _excluded_attrs: Set[str] = set()
+    _pdict_attrs: Set[str] = {
         'get_or_init',
         'keys',
         'values',
@@ -33,17 +35,20 @@ class ProxyDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         'update',
         'post_init',
         'pre_init',
+        'cls_init',
+        'cls_post_init',
         'proxy_schema',
         'module',
         'components',
         '_init_component',
         '_prevalidate_component',
         '_init_default',
+        # '_rxtra',
     }
 
     module: Optional[str] = None
     components: Optional[List[str]] = None
-    proxy_schema: Optional[Dict[str, str]] = None
+    proxy_schema: Optional[Dict[str, str]] = {}
     initialize_objects: bool = False
 
     def __init__(
@@ -57,13 +62,29 @@ class ProxyDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         """
         Initializes the Proxy Dict
         """
+        self.cls_init(**kwargs)
         if initialize_objects is not None: self.initialize_objects = initialize_objects
         if module is not None: self.module = module
         if components is not None: self.components = components
-        self.proxy_schema = proxy_schema if proxy_schema is not None else {}
+        if proxy_schema is not None: self.proxy_schema = proxy_schema
+        self.cls_post_init(**kwargs)
+        # self.proxy_schema = proxy_schema if proxy_schema is not None else {}
         self.pre_init(**kwargs)
         self.post_init(**kwargs)
+        # logger.info(f'Initialized ProxyDict: {self.module} - {self.proxy_schema}')
 
+    def cls_init(self, **kwargs):
+        """
+        Class Initialization
+        """
+        pass
+        
+    def cls_post_init(self, **kwargs):
+        """
+        Class Post Initialization
+        """
+        pass
+        
     def pre_init(self, **kwargs):
         """
         Pre Initialization
@@ -86,11 +107,13 @@ class ProxyDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         """
         Subclass Hook to add defined attributes to the excluded list
         """
+        # from lzl.logging import logger
         for attr in dir(cls):
-            if attr in cls._excluded_attrs: continue
+            # if attr in cls._excluded_attrs or attr in cls._pdict_attrs: continue
+            if attr in cls._pdict_attrs: continue
             if attr.startswith('_'): continue
             # logger.info(f'Excluding ProxyDict Attribute: {attr}')
-            cls._excluded_attrs.add(attr)
+            cls._pdict_attrs.add(attr)
         return super().__init_subclass__()
     
     def _init_component(self, name: KT, default: Optional[VT] = None) -> None:
@@ -151,9 +174,28 @@ class ProxyDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         """
         Get an attribute from the dictionary        
         """
-        if name.startswith('__') and name.endswith('__') or name in self._excluded_attrs:
-            return getattr(self, name)
+        if (name.startswith('__') and name.endswith('__')) or \
+            name.startswith('_r') or \
+            name in self._excluded_attrs or \
+            name in self._pdict_attrs:
+            # print(f'Getting Attribute: {name}')
+            return super().__getattr__(name)
+            # return getattr(self, name)
         return self.get_or_init(name, None)
+    
+    def __setattr__(self, name: str, value: VT) -> None:
+        """
+        Set an attribute in the dictionary
+        """
+        if (name.startswith('__') and name.endswith('__')) or \
+            name.startswith('_r') or \
+            name in self._excluded_attrs or \
+            name in self._pdict_attrs:
+            # print(f'Setting Attribute: {name}: {value}')
+            return super().__setattr__(name, value)
+            # return setattr(self, name, value)
+        self._dict[name] = value
+        
 
     def __getitem__(self, name: KT) -> VT:
         """

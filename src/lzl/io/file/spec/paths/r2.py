@@ -16,6 +16,7 @@ from ..path import (
     PosixPath, 
     WindowsPath,
     register_pathlike,
+    register_pydantictype,
     FileMode,
     DEFAULT_ENCODING,
     ON_ERRORS,
@@ -252,3 +253,5 @@ register_pathlike(
         PureFileR2WindowsPath
     ]
 )
+
+register_pydantictype(FileR2Path)

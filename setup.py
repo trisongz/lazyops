@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 from setuptools import setup, find_packages
@@ -11,12 +12,17 @@ gitrepo = 'trisongz/lazyops'
 root = Path(__file__).parent
 version = root.joinpath(f'src/{pkg_name}/version.py').read_text().split('VERSION = ', 1)[-1].strip().replace('-', '').replace("'", '')
 
+is_builder_ci = os.getenv('BUILDER_CI', 'false').lower() in {'true', '1', 't', 'y', 'yes'}
 requirements = [
     'loguru',
     'pydantic',
     # 'pydantic-settings',
     'frozendict',
     'async_lru',
+] if not is_builder_ci else [
+    'typer',
+    'pydantic',
+    'pyyaml',
 ]
 
 if sys.version_info.minor < 8:
@@ -72,6 +78,7 @@ args = {
     'entry_points': {
         "console_scripts": [
             'lazyops-build = lazyops.libs.abc.builder:main',
+            'lzl = lzl.cmd:main'
         ]
     },
     'extras_require': extras,

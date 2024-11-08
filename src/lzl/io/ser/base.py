@@ -40,6 +40,7 @@ class BaseSerializer(abc.ABC):
     enforce_string_value: Optional[bool] = False
     enforce_byte_value: Optional[bool] = False
     ser_mode: Optional[SerMode] = 'auto'
+    _is_ser: Optional[bool] = True
 
     def __init__(
         self,

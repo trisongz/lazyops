@@ -378,6 +378,33 @@ class BaseStatefulBackend(collections.abc.MutableMapping):
         for key, value in data.items():
             await self.aset(key, value, **kwargs)
 
+    def update_key(self, key: str, data: Dict[str, Any], deep: Optional[bool] = True,  exclude_none: Optional[bool] = True, **kwargs) -> Dict[str, Any]:
+        """
+        Updates the Dict at the Key
+        """
+        src = self.get(key, default = {}) or {}
+        if deep:
+            from lazyops.libs.abcs.utils.helpers import update_dict
+            src = update_dict(src, data, exclude_none = exclude_none)
+        else:
+            src.update(data)
+        self.set(key, src, **kwargs)
+        return src
+
+
+    async def aupdate_key(self, key: str, data: Dict[str, Any], deep: Optional[bool] = True,  exclude_none: Optional[bool] = True, **kwargs) -> Dict[str, Any]:
+        """
+        [Async] Updates the Dict at the Key
+        """
+        src = await self.aget(key, default = {}) or {}
+        if deep:
+            from lazyops.libs.abcs.utils.helpers import update_dict
+            src = update_dict(src, data, exclude_none = exclude_none)
+        else:
+            src.update(data)
+        await self.aset(key, src, **kwargs)
+        return src
+        
     def popitem(self, **kwargs):
         """
         Pops an Item from the Cache

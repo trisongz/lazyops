@@ -3,10 +3,15 @@ from __future__ import annotations
 from typing import Any, Union, Dict, TYPE_CHECKING
 
 if TYPE_CHECKING:
+    import abc
+
     from pydantic import BaseModel as _BaseModel, PrivateAttr
 
     class BaseModel(_BaseModel):
         _extra: Dict[str, Any] = PrivateAttr(default_factory = dict)
+
+    class ObjWithABC(abc.ABC):
+        _rxtra: Dict[str, Any] = {}
 
 
 class eproperty(property):
@@ -93,3 +98,39 @@ class eproperty(property):
         """
         if self.fdel: self.fdel(obj)
         obj._extra.pop(self._key, None)    # Delete if present
+
+class rproperty(eproperty):
+    def __get__(self, obj: 'ObjWithABC', owner=None):
+        """
+        Returns the value
+        """
+        try:
+            if self._key not in obj._rxtra: 
+                obj._rxtra[self._key] = self.fget(obj)
+            return obj._rxtra.get(self._key)
+        except AttributeError:
+            if obj is None:
+                return self
+            raise
+
+    def __set__(self, obj: 'ObjWithABC', val):
+        """
+        Sets the value
+        """
+        if self.fset:
+            ret = self.fset(obj, val)
+            if ret is not None and obj._rxtra.get(self._key) is ret:
+                # By returning the value set the setter signals that it
+                # took over setting the value in obj.__dict__; this
+                # mechanism allows it to override the input value
+                return
+            val = ret
+        obj._rxtra[self._key] = val
+
+
+    def __delete__(self, obj: 'ObjWithABC'):
+        """
+        Deletes the value
+        """
+        if self.fdel: self.fdel(obj)
+        obj._rxtra.pop(self._key, None)    # Delete if present

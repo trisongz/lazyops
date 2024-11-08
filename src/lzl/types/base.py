@@ -3,8 +3,8 @@ from __future__ import annotations
 """
 Resolver for Pydantic v1/v2 imports with additional helpers
 """
-
 import typing
+import functools
 from pydantic import BaseModel, Field
 from pydantic.fields import FieldInfo
 from pydantic.types import ByteSize
@@ -16,7 +16,7 @@ try:
     from pydantic import model_validator
     from pydantic import validator as _validator
     from pydantic import ConfigDict
-    
+    from pydantic import PrivateAttr
 
     PYDANTIC_VERSION = 2
 
@@ -62,7 +62,7 @@ except ImportError:
             return root_validator(*args, **kwargs)(func)
         return decorator
     
-
+    PrivateAttr = functools.partial(Field, exclude = True)
 
 try:
     from pydantic_settings import BaseSettings

@@ -8,6 +8,7 @@ from .common.appenv import AppEnv, get_app_env
 from .common.extra import Final, Literal
 from .base import (
     BaseModel, 
+    RBaseModel,
     Field, 
     root_validator, 
     pre_root_validator, 

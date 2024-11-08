@@ -1,8 +1,12 @@
 from __future__ import annotations
+from typing_extensions import Unpack
 
 """
 Common Types
 """
+import abc
+import inspect
+from pathlib import Path
 from pydantic import PrivateAttr
 from lzl.types import (
     BaseSettings as _BaseSettings, 
@@ -22,9 +26,49 @@ from lzl.types import (
     PYDANTIC_VERSION,
 )
 from .common.appenv import AppEnv, get_app_env
-from typing import Optional, Dict, Any, List, TYPE_CHECKING
+from typing import Optional, Dict, Any, List, TypeVar, TYPE_CHECKING
+
 if TYPE_CHECKING:
     from lzl.logging import Logger, NullLogger
+    from lzo.types.settings.context import AppContext
+    # from pydantic.main import Model
+
+Model = TypeVar('Model', bound='BaseModel')
+    
+class Registered(abc.ABC):
+    """
+    Registers this as the module settings
+    """
+    _rmodule: Optional[str] = None
+    _rxtra: Dict[str, Any] = {}
+
+    def __init_subclass__(cls, **kwargs: ConfigDict):
+        from lzo.registry.settings import register_settings
+        register_settings(cls)
+        return super().__init_subclass__(**kwargs)
+    
+    if TYPE_CHECKING:
+
+        @property
+        def module_path(self) -> Path:
+            """
+            Gets the module root path
+            """
+            ...
+
+        @property
+        def module_config_path(self) -> Path:
+            """
+            Returns the config module path
+            """
+            ...
+
+        @property
+        def module_name(self) -> str:
+            """
+            Returns the module name
+            """
+            ...
 
 class BaseSettings(_BaseSettings):
     """
@@ -34,6 +78,43 @@ class BaseSettings(_BaseSettings):
     app_env: Optional[AppEnv] = None
     debug_enabled: Optional[bool] = None
 
+    if TYPE_CHECKING:
+        _rxtra: Dict[str, Any] = {}
+
+    @eproperty
+    def _is_registered(self) -> bool:
+        """
+        Returns whether the settings are registered
+        """
+        return hasattr(self, '_rxtra')
+
+    @eproperty
+    def module_path(self) -> Path:
+        """
+        Gets the module root path
+        """
+        if self._is_registered and self._rxtra.get('module_path'):
+            return self._rxtra['module_path']
+        return super().module_path
+    
+    @eproperty
+    def module_config_path(self) -> Path:
+        """
+        Returns the config module path
+        """
+        if self._is_registered and self._rxtra.get('module_config_path'):
+            return self._rxtra['module_config_path']
+        return super().module_config_path
+    
+    @eproperty
+    def module_name(self) -> str:
+        """
+        Returns the module name
+        """
+        if self._is_registered and self._rxtra.get('module'):
+            return self._rxtra['module']
+        return super().module_name
+    
     @eproperty
     def logger(self) -> 'Logger':
         """
@@ -63,6 +144,18 @@ class BaseSettings(_BaseSettings):
         Returns the app module name
         """
         return self._extra.get('app_module_name')
+    
+    @eproperty
+    def ctx(self) -> Optional['AppContext']:
+        """
+        Returns the app context
+
+        - Only if this is a registered settings
+        """
+        if not self._is_registered: return None
+        from lzo.types.settings.context import AppContextManager
+        return AppContextManager.get_ctx(self.module_name)
+
 
     @model_validator(mode = 'after')
     def validate_app_env(self):
@@ -111,8 +204,6 @@ class BaseSettings(_BaseSettings):
         """
         self.app_env = self.app_env.from_env(env)
 
-    
-
 
 class BaseModel(_BaseModel):
     """
@@ -133,3 +224,92 @@ class BaseModel(_BaseModel):
         Get an attribute from the model
         """
         return getattr(self, name, default)
+
+    @classmethod
+    def model_validate_batch(
+        cls: type['Model'],
+        items: List[Any], 
+        *,
+        strict: bool | None = None,
+        from_attributes: bool | None = None,
+        context: dict[str, Any] | None = None,
+        **kwargs
+    ) -> List['Model']:
+        """
+        Validates the items
+        """
+        return [cls.model_validate(item, strict = strict, from_attributes = from_attributes, context = context) for item in items]
+
+
+class RBaseModel(BaseModel):
+    """
+    Base Model with Module Properties
+    """
+    
+    @eproperty
+    def module_path(self) -> Path:
+        """
+        Gets the module root path
+
+        https://stackoverflow.com/questions/25389095/python-get-path-of-root-project-structure
+        """
+        import pkg_resources
+        p = Path(pkg_resources.get_distribution(self.module_name).location)
+        if 'src' in p.name and p.joinpath(self.module_name).exists():
+            p = p.joinpath(self.module_name)
+        elif p.joinpath('src').exists() and p.joinpath('src', self.module_name).exists():
+            p = p.joinpath('src', self.module_name)
+        return p
+    
+    @eproperty
+    def module_config_path(self) -> Path:
+        """
+        Returns the config module path
+        """
+        return Path(inspect.getfile(self.__class__)).parent
+    
+    @eproperty
+    def module_name(self) -> str:
+        """
+        Returns the module name
+        """
+        return self.__class__.__module__.split(".")[0]
+    
+    @eproperty
+    def module_version(self) -> str:
+        """
+        Returns the module version
+        """
+        import pkg_resources
+        return pkg_resources.get_distribution(self.module_name).version
+    
+    @eproperty
+    def module_pkg_name(self) -> str:
+        """
+        Returns the module pkg name
+        
+        {pkg}/src   -> src
+        {pkg}/{pkg} -> {pkg}
+        """
+        config_path = self.module_config_path.as_posix()
+        module_path = self.module_path.as_posix()
+        return config_path.replace(module_path, "").strip().split("/", 2)[1]
+
+    @eproperty
+    def in_k8s(self) -> bool:
+        """
+        Returns whether the app is running in kubernetes
+        """
+        from lzo.utils.system import is_in_kubernetes
+        return is_in_kubernetes()
+    
+
+if TYPE_CHECKING:
+
+    from .settings.context import AppContext
+
+    class RegisteredSettings(BaseSettings, Registered):
+        """
+        Registered Settings
+        """
+        ctx: AppContext

@@ -72,11 +72,14 @@ def format_item(
                 _value = f'{_value[:max_length]}...'
             _msg += f'- {prefix}{key}{suffix}: {_value}\n'
         return _msg.rstrip()
-
+    
     if isinstance(msg, tuple):
         _msg = "".join(f'- {prefix}{key}{suffix}: {format_item(value, max_length = max_length, colored = colored, level = level,  _is_part = True)}\n' for key, value in zip(msg[0], msg[1]))
         return _msg[:max_length] if max_length else _msg
 
+    # Test for FileIO
+    if hasattr(msg, 'is_fsspec'):
+        return format_item(repr(msg), max_length = max_length, colored = colored, level = level, _is_part = _is_part)
 
     # Complex Types
     # Likely Pydantic Model v1

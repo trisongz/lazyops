@@ -276,7 +276,7 @@ class BaseSqliteDB(abc.ABC):
         """
         if self._io is not None: return
         self._io = self._get_io_()
-        if self._debug_enabled: logger.info(f'[Async] Opened {self._db_kind} Database Connection: {self.conn_uri}', prefix = self.table, colored = True)
+        if self._debug_enabled: logger.info(f'[Sync] Opened {self._db_kind} Database Connection: {self.conn_uri}', prefix = self.table, colored = True)
         self._validate_table_(self._io)
         if not self.is_configured:
             self._is_configuring = True

@@ -90,17 +90,34 @@ def serialize_object(
 
     Returns:
         the serialized object in dict
+        
+        if not disable_nested_values:
         {
             "__type__": ...,
             "value": ...,
         }
+
+        otherwise for JSON Objects:
+
+        {
+            "__type__": ...,
+            ...,
+        }
+
     """
     if obj is None: return None
+    disable_nested_values: Optional[bool] = kwargs.get('disable_nested_values')
 
     if isinstance(obj, BaseModel) or hasattr(obj, 'model_dump'):
         obj_class_name = register_object_class(obj)
         obj_value = obj.model_dump(mode = 'json', round_trip = True, **kwargs)
         if mode == 'raw': return obj_value
+        if disable_nested_values:
+            return {
+                "__type__": "pydantic",
+                "__class__": obj_class_name,
+                **obj_value,
+            }
         return {
             "__type__": "pydantic",
             "__class__": obj_class_name,
@@ -168,6 +185,12 @@ def serialize_object(
     if isinstance(obj, dataclasses.InitVar) or dataclasses.is_dataclass(obj):
         if mode == 'raw': return dataclasses.asdict(obj)
         obj_class_name = register_object_class(obj)
+        if disable_nested_values:
+            return {
+                "__type__": "dataclass",
+                "__class__": obj_class_name,
+                **dataclasses.asdict(obj),
+            }
         return {
             "__type__": "dataclass",
             "__class__": obj_class_name,
@@ -284,21 +307,21 @@ def deserialize_object(
     if isinstance(obj, dict):
         if "__type__" not in obj:
             return {key: deserialize_object(value, schema_map = schema_map, allow_failed_import = allow_failed_import) for key, value in obj.items()}
-        
-        obj_type = obj["__type__"]
-        obj_value = obj["value"]
+
+        # obj_type = obj["__type__"]
+        obj_type = obj.pop("__type__")
         if '__class__' in obj:
             if schema_map is not None and obj['__class__'] in schema_map:
                 obj['__class__'] = schema_map[obj['__class__']]
             elif obj['__class__'] in _alias_schema_mapping:
                 obj['__class__'] = _alias_schema_mapping[obj['__class__']]
         
+        obj_class_type = obj.pop('__class__', None)
         if obj_type == "type":
-            obj_class_type = obj["__class__"]
             return get_object_class(obj_class_type)
-
+        
+        obj_value = obj["value"] if len(obj) == 1 and "value" in obj else obj
         if obj_type == "pydantic":
-            obj_class_type = obj["__class__"]
             try:
                 obj_class = get_object_class(obj_class_type)
                 # for k,v in obj_value.items():
@@ -309,9 +332,8 @@ def deserialize_object(
                 if allow_failed_import:
                     return deserialize_object(obj_value, schema_map = schema_map, allow_failed_import = allow_failed_import)
                 raise e
-        
+
         if obj_type == "serializable":
-            obj_class_type = obj["__class__"]
             try:
                 obj_class = get_object_class(obj_class_type)
                 return obj_class(**obj_value)
@@ -321,50 +343,51 @@ def deserialize_object(
                 raise e
 
         if obj_type == "numpy" and np is not None:
-            dtype = obj.get("__class__")
+            # dtype = obj.get("__class__")
+            dtype = obj_class_type
             if dtype: dtype = dtype.replace("numpy.", "")
             return np.array(obj_value, dtype = dtype)
-        
+
         if obj_type == "pickle":
             try:
                 obj_value = bytes.fromhex(obj_value)
                 return default_pickle.loads(obj_value)
             except Exception as e:
                 raise TypeError(f"Cannot deserialize object of type {obj_type}: {e}") from e
-        
+
         if obj_type == "datetime":
             return datetime.datetime.fromisoformat(obj_value)
-        
+
         if obj_type == "timedelta":
             return datetime.timedelta(seconds=obj_value)
-        
+
         if obj_type == "dataclass":
-            obj_class_type = obj["__class__"]
+            # obj_class_type = obj["__class__"]
             # if schema_map is not None and obj_class_type in schema_map:
             #     obj_class_type = schema_map[obj_class_type]
-            
+
             obj_class = get_object_class(obj_class_type)
             return obj_class(**obj_value)
-        
+
         if obj_type == "path":
-            obj_class = get_object_class(obj["__class__"])
+            obj_class = get_object_class(obj_class_type)
             return obj_class(obj_value)
-        
+
         if obj_type == "enum":
-            obj_class = get_object_class(obj["__class__"])
+            obj_class = get_object_class(obj_class_type)
             return obj_class(obj_value)
-        
+
         if obj_type == "uuid":
             return UUID(obj_value)
 
         if obj_type == "bytes":
             return bytes.fromhex(obj_value)
-        
+
         if obj_type == "set":
             return set(obj_value)
-        
+
         raise TypeError(f"Cannot deserialize object of type {obj_type}")
-    
+
     if isinstance(obj, bytes):
         # Try to deserialize with pickle
         with contextlib.suppress(Exception):

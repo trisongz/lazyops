@@ -15,6 +15,7 @@ from ..path import (
     PosixPath, 
     WindowsPath,
     register_pathlike,
+    register_pydantictype,
     CloudPathT,
 )
 
@@ -228,3 +229,5 @@ register_pathlike(
         PureFileS3CWindowsPath
     ]
 )
+
+register_pydantictype(FileS3CPath)

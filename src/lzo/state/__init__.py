@@ -1,3 +1,3 @@
 """
-Stateful Configurations and Utilities
+Registry of Apps / Modules / Objects 
 """

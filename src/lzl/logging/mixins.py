@@ -61,13 +61,16 @@ class LoggingMixin(abc.ABC):
             self._silenced_modules.remove(module)
             self.remove_temp_silence_from_logging_module(module)
     
-    def run_logging_hooks(self, message: str, hook: Optional[Callable] = None):
+    def run_logging_hooks(self, message: str, hook: Optional[Union[Callable, List[Callable]]] = None):
         """
         Runs the logging hooks
         """
         for log_hook in self._logging_hooks:
             log_hook(message)
-        if hook: hook(message)
+        if hook: 
+            if not isinstance(hook, list): hook = [hook]
+            for h in hook:
+                h(message)
 
     @contextlib.contextmanager
     def hooks(self, *hooks: Callable):

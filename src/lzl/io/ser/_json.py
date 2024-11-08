@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Union, Type
 from lzl.load import lazy_import
-from .base import BaseSerializer, ObjectValue, SchemaType, BaseModel, logger, ThreadPool, ModuleType
+from .base import BaseSerializer, ObjectValue, SchemaType, SerializableObject, BaseModel, logger, ThreadPool, ModuleType
+from .utils import serialize_object
 from .defaults import default_json, JsonLibT
 
 class JsonSerializer(BaseSerializer):
@@ -11,6 +12,7 @@ class JsonSerializer(BaseSerializer):
     encoding: Optional[str] = "utf-8"
     jsonlib: JsonLibT = default_json
     disable_object_serialization: Optional[bool] = False
+    disable_nested_values: Optional[bool] = None
     allow_failed_import: Optional[bool] = False
 
     def __init__(
@@ -22,6 +24,8 @@ class JsonSerializer(BaseSerializer):
         serialization_obj: Optional[Type[BaseModel]] = None,
         serialization_obj_kwargs: Optional[Dict[str, Any]] = None,
         disable_object_serialization: Optional[bool] = None,
+        disable_nested_values: Optional[bool] = None,
+        verbosity: Optional[int] = None,
         **kwargs
     ):
         super().__init__(compression = compression, compression_level = compression_level, encoding = encoding, **kwargs)
@@ -30,11 +34,14 @@ class JsonSerializer(BaseSerializer):
         self.serialization_schemas: Dict[str, Type[BaseModel]] = {}
         if disable_object_serialization is not None:
             self.disable_object_serialization = disable_object_serialization
+        if disable_nested_values is not None:
+            self.disable_nested_values = disable_nested_values
         if jsonlib is not None:
             if isinstance(jsonlib, str):
                 jsonlib = lazy_import(jsonlib, is_module=True)
             assert hasattr(jsonlib, "dumps") and hasattr(jsonlib, "loads"), f"Invalid JSON Library: {jsonlib}"
             self.jsonlib = jsonlib
+        self.verbosity = verbosity
         self.jsonlib_name = self.jsonlib.__name__
 
     @classmethod
@@ -49,7 +56,23 @@ class JsonSerializer(BaseSerializer):
         cls.jsonlib = lib
         default_json = lib
 
-        
+    @property
+    def _is_verbose(self) -> bool:
+        """
+        Returns whether the serializer is verbose
+        """
+        return self.verbosity is None or self.verbosity >= 1
+    
+    def serialize_obj(self, obj: SerializableObject, mode: Optional[SerMode] = None, **kwargs) -> Union[str, bytes]:
+        """
+        Serializes the object
+        """
+        mode = mode or self.ser_mode
+        if 'disable_nested_values' not in kwargs and self.disable_nested_values is not None:
+            kwargs['disable_nested_values'] = self.disable_nested_values
+        return serialize_object(obj, mode = mode, **kwargs)
+    
+
     def encode_value(self, value: Union[Any, SchemaType], **kwargs) -> str:
         """
         Encode the value with the JSON Library
@@ -99,7 +122,7 @@ class JsonSerializer(BaseSerializer):
                     return value
                 str_value = str(value)
                 if not schema_map: str_value = str_value[:1000]
-                logger.info(f'Error JSON Decoding Value: |r|({type(value)}) {e}|e| {str_value}', colored = True, prefix = self.jsonlib_name)
+                if self._is_verbose: logger.info(f'Error JSON Decoding Value: |r|({type(value)}) {e}|e| {str_value}', colored = True, prefix = self.jsonlib_name)
                 if raise_errors or self.raise_errors: raise e
         try:
             return self.deserialize_obj(value, schema_map = schema_map, allow_failed_import = self.allow_failed_import)

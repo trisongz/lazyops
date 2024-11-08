@@ -99,14 +99,14 @@ def convert_date(
 def parse_datetime(
     dt: Optional[Union[str, List[str]]] = None, 
     timeaware: bool = True,
-    tz: Optional[str] = None,
+    tz: Optional[Union[str, datetime.tzinfo]] = None,
 ) -> Optional[Union[datetime.datetime, List[datetime.datetime]]]:
     """
     Parses the datetime string into a datetime
     """
     if not dt: return None
     tz_info = None
-    if tz:  tz_info = pytz.timezone(tz_map.get(tz.upper(), tz))
+    if tz: tz_info = pytz.timezone(tz_map.get(tz.upper(), tz)) if isinstance(tz, str) else tz
     elif timeaware: tz_info = datetime.timezone.utc
 
     if isinstance(dt, datetime.datetime):
@@ -124,6 +124,7 @@ def parse_datetime(
 
 def parse_datetime_from_timestamp(
     timestamp: Optional[int],
+    is_ms: Optional[bool] = True,
 ) -> Optional[datetime.datetime]:
     """
     Parses the timestamp into a datetime
@@ -131,16 +132,17 @@ def parse_datetime_from_timestamp(
     Format: 1666699200000 -> 2022-12-24T00:00:00.000Z
     """
     if timestamp is None: return None
-    return datetime.datetime.fromtimestamp(timestamp / 1000, tz = datetime.timezone.utc)
+    if is_ms: timestamp /= 1000
+    return datetime.datetime.fromtimestamp(timestamp, tz = datetime.timezone.utc)
 
 
 def get_current_datetime(
-    tz: Optional[str] = None,
+    tz: Optional[Union[str, datetime.tzinfo]] = None,
 ) -> datetime.datetime:
     """
     Gets the current datetime in the specified timezone
     """
-    if tz: tz = pytz.timezone(tz_map.get(tz.upper(), tz))
+    if tz and isinstance(tz, str): tz = pytz.timezone(tz_map.get(tz.upper(), tz))
     return datetime.datetime.now(tz)
 
 
@@ -148,7 +150,7 @@ def is_expired_datetime(
     dt: datetime.datetime, 
     delta_days: Optional[int] = None, 
     now: Optional[datetime.datetime] = None,
-    tz: Optional[str] = None,
+    tz: Optional[Union[str, datetime.tzinfo]] = None,
 ) -> bool:
     """
     Checks if the datetime is expired
@@ -161,7 +163,7 @@ def is_expired_datetime(
 
 
 def create_timestamp(
-    tz: Optional[datetime.tzinfo] = datetime.timezone.utc,
+    tz: Optional[Union[str, datetime.tzinfo]] = datetime.timezone.utc,
     as_str: Optional[bool] = False,
 ):
     """
@@ -170,5 +172,6 @@ def create_timestamp(
         tz: timezone
         as_str: if True, returns a string
     """
+    if tz and isinstance(tz, str): tz = pytz.timezone(tz_map.get(tz.upper(), tz))
     dt = datetime.datetime.now(tz =tz)
     return dt.isoformat() if as_str else dt

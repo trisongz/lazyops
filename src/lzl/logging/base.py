@@ -49,7 +49,6 @@ class Logger(_Logger, LoggingMixin):
     conditions: Dict[str, Tuple[Union[Callable, bool], str]] = {}
     default_trace_depth: Optional[int] = None
     is_global: bool = False
-
     _colored_opts = None
     _current_level: Optional[str] = None
 
@@ -255,7 +254,7 @@ class Logger(_Logger, LoggingMixin):
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
         colored: Optional[bool] = False,
-        hook: Optional[Callable] = None,
+        hook: Optional[Union[Callable, List[Callable]]] = None,
         **kwargs
     ):  # noqa: N805
         """
@@ -279,7 +278,7 @@ class Logger(_Logger, LoggingMixin):
         colored: Optional[bool] = False, 
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
-        hook: Optional[Callable] = None,
+        hook: Optional[Union[Callable, List[Callable]]] = None,
         **kwargs
     ):  # noqa: N805
         """
@@ -300,7 +299,7 @@ class Logger(_Logger, LoggingMixin):
         colored: Optional[bool] = False, 
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
-        hook: Optional[Callable] = None,
+        hook: Optional[Union[Callable, List[Callable]]] = None,
         **kwargs
     ):  # noqa: N805
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'SUCCESS'``."""
@@ -319,7 +318,7 @@ class Logger(_Logger, LoggingMixin):
         colored: Optional[bool] = False, 
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
-        hook: Optional[Callable] = None,
+        hook: Optional[Union[Callable, List[Callable]]] = None,
         **kwargs
     ):  # noqa: N805
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'WARNING'``."""
@@ -338,7 +337,7 @@ class Logger(_Logger, LoggingMixin):
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
         colored: Optional[bool] = False,
-        hook: Optional[Callable] = None,
+        hook: Optional[Union[Callable, List[Callable]]] = None,
         **kwargs
     ) -> None:
         """
@@ -361,7 +360,7 @@ class Logger(_Logger, LoggingMixin):
         colored: Optional[bool] = False,
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
-        hook: Optional[Callable] = None,
+        hook: Optional[Union[Callable, List[Callable]]] = None,
         **kwargs,
     ) -> None:
         """
@@ -389,7 +388,7 @@ class Logger(_Logger, LoggingMixin):
         colored: Optional[bool] = False,
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
-        hook: Optional[Callable] = None,
+        hook: Optional[Union[Callable, List[Callable]]] = None,
         **kwargs
     ):
         """
@@ -448,7 +447,10 @@ class InterceptHandler(logging.Handler):
     loglevel_mapping = LOGLEVEL_MAPPING
 
     def emit(self, record):
-        from .main import logger
+        try:
+            from .main import logger
+        except ImportError:
+            return
         try:
             level = logger.level(record.levelname).name
         except ValueError:

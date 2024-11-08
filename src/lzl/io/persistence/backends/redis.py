@@ -3,13 +3,11 @@ Redis Persistence Type leveraging `aiokeydb` library
 """
 
 from typing import Any, Dict, Optional, Union, Iterable, List, Type, TYPE_CHECKING
-from lazyops.utils.lazy import get_keydb_session
 from .base import BaseStatefulBackend, SchemaType, logger
 
 if TYPE_CHECKING:
     from aiokeydb import KeyDBSession
-    from lazyops.types.models import BaseSettings
-
+    from lzo.types import BaseSettings
 
 class RedisStatefulBackend(BaseStatefulBackend):
     """
@@ -59,6 +57,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
         if expiration is not None: self.expiration = expiration
         self.hset_enabled = (not hset_disabled and self.base_key is not None)
         if keyjoin is not None: self.keyjoin = keyjoin
+        from lazyops.utils.lazy import get_keydb_session
         self.cache: 'KeyDBSession' = get_keydb_session(
             name = self.name, 
             **_kdb_kwargs
