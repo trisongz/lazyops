@@ -75,6 +75,25 @@ def register_schema_mapping(schemas: Dict[str, str]):
     global _alias_schema_mapping
     _alias_schema_mapping.update(schemas)
 
+def extract_model_dumps_kwargs(kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extracts the model dumps kwargs
+    """
+    return {
+        k: v for k,v in kwargs.items() if k in {
+            'include', 
+            'exclude', 
+            'context', 
+            'by_alias', 
+            'exclude_unset',
+            'exclude_defaults',
+            'exclude_none',
+            'warnings',
+            'serialize_as_any',
+        }
+    }
+
+
 
 def serialize_object(
     obj: SerializableObject,
@@ -110,7 +129,7 @@ def serialize_object(
 
     if isinstance(obj, BaseModel) or hasattr(obj, 'model_dump'):
         obj_class_name = register_object_class(obj)
-        obj_value = obj.model_dump(mode = 'json', round_trip = True, **kwargs)
+        obj_value = obj.model_dump(mode = 'json', round_trip = True, **extract_model_dumps_kwargs(kwargs))
         if mode == 'raw': return obj_value
         if disable_nested_values:
             return {

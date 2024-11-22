@@ -1,3 +1,19 @@
+## v0.3.0rc01 - Last Updated: Nov 22, 2024
+
+This is a major release that includes a lot of new features.
+
+`lazyops` is remains for compatability, but will no longer be maintained.
+
+Going forward, the library is split into two parts:
+
+- `lzl` - Seperate, independent modules that can be imported and used independently
+
+- `lzo` - A collection of submodules/patterns that are commonly used within Internal Development
+
+This is under beta development and is not yet ready for production use.
+
+The minimum python version is now 3.9.
+
 ## v0.2.85 - Last Updated: Feb 23, 2023
 
 - Added New Library: `hatchet`

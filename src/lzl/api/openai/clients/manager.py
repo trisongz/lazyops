@@ -8,10 +8,10 @@ import abc
 import copy
 import pathlib
 import random
-from typing import Optional, List, Callable, Dict, Union, Any, overload, TYPE_CHECKING
+from typing import Optional, List, Callable, Dict, Union, Any, overload, Tuple, TYPE_CHECKING, Literal
 from lzl.proxied import proxied, ProxyObject
 from lzl.api.openai.schemas import *
-from lzl.api.openai.types.base import ApiType
+from lzl.api.openai.types.base import ApiType, Usage
 from lzl.api.openai.types.handlers import ModelContextHandler
 from lzl.api.openai.configs import get_settings, OpenAISettings
 from lzl.api.openai.configs.external import ExternalProviderSettings
@@ -1483,6 +1483,50 @@ class OpenAIManager(abc.ABC):
             client = self.get_client(model = model, azure_required = True, noproxy_required = noproxy_required, **kwargs)
         return embeddings
 
+    @overload
+    async def async_create_embeddings(
+        self,
+        inputs: Union[str, List[str]],
+        model: Optional[str] = ...,
+        auto_retry: Optional[bool] = ...,
+        strip_newlines: Optional[bool] = ...,
+        headers: Optional[Dict[str, str]] = ...,
+        noproxy_required: Optional[bool] = ...,
+        include_metadata: Literal[False] = ...,
+        **kwargs,
+    ) -> List[List[float]]:
+        """
+        Creates the embeddings
+
+        Args:
+            inputs (Union[str, List[str]]): The input text or list of input texts.
+            model (str, optional): The model to use. Defaults to None.
+            auto_retry (bool, optional): Whether to automatically retry the request. Defaults to True.
+            strip_newlines (bool, optional): Whether to strip newlines from the input. Defaults to False.
+        """
+    @overload
+    async def async_create_embeddings(
+        self,
+        inputs: Union[str, List[str]],
+        model: Optional[str] = ...,
+        auto_retry: Optional[bool] = ...,
+        strip_newlines: Optional[bool] = ...,
+        headers: Optional[Dict[str, str]] = ...,
+        noproxy_required: Optional[bool] = ...,
+        include_metadata: Literal[True] = ...,
+        **kwargs,
+    ) -> Tuple[List[List[float]], Usage]:
+        """
+        Creates the embeddings
+
+        Args:
+            inputs (Union[str, List[str]]): The input text or list of input texts.
+            model (str, optional): The model to use. Defaults to None.
+            auto_retry (bool, optional): Whether to automatically retry the request. Defaults to True.
+            strip_newlines (bool, optional): Whether to strip newlines from the input. Defaults to False.
+        """
+        ...
+    
 
     async def async_create_embeddings(
         self,
@@ -1492,8 +1536,9 @@ class OpenAIManager(abc.ABC):
         strip_newlines: Optional[bool] = False,
         headers: Optional[Dict[str, str]] = None,
         noproxy_required: Optional[bool] = False,
+        include_metadata: Optional[bool] = False,
         **kwargs,
-    ) -> List[List[float]]:
+    ) -> List[List[float]] | Tuple[List[List[float]], Usage]:
         """
         Creates the embeddings
 
@@ -1515,18 +1560,21 @@ class OpenAIManager(abc.ABC):
         client = self.get_client(model = model, noproxy_required = noproxy_required, **kwargs)
         if not client.is_azure:
             response = await client.embeddings.async_create(input = inputs, model = model, auto_retry = auto_retry, headers = headers, **kwargs)
-            return response.embeddings
+            return (response.embeddings, response.usage) if include_metadata else response.embeddings
 
         embeddings = []
+        usage = None
         # We need to split into batches of 5 for Azure
         # Azure has a limit of 5 inputs per request
         batches = split_into_batches(inputs, 5)
         for batch in batches:
             response = await client.embeddings.async_create(input = batch, model = model, auto_retry = auto_retry, headers = headers, **kwargs)
             embeddings.extend(response.embeddings)
+            if usage is None: usage = response.usage
+            else: usage.update(response.usage)
             # Shuffle the clients to load balance
             client = self.get_client(model = model, azure_required = True, noproxy_required = noproxy_required, **kwargs)
-        return embeddings
+        return (embeddings, usage) if include_metadata else embeddings
 
     acreate_embeddings = async_create_embeddings
 

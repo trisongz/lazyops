@@ -45,6 +45,7 @@ class MRegistry(Generic[RT]):
         self.lazy_import = lazy_import
         self.verbose = verbose
         self.idx: Dict[str, RT] = {}
+        self._extra: Dict[str, Any] = {}
 
     def _register(self, key: str, value: RT) -> None:
         """
@@ -115,11 +116,11 @@ class MRegistry(Generic[RT]):
         Gets an item from the registry
         """
         if key in self.init_registry:
-            print(f'Getting init key: {key}: {self.init_registry[key]} {type(self.init_registry[key])}')
+            # print(f'Getting init key: {key}: {self.init_registry[key]} {type(self.init_registry[key])}')
             return self.init_registry[key]
         
         if key in self.uninit_registry:
-            print(f'Getting uninit key: {key}')
+            # print(f'Getting uninit key: {key}')
             _path = self.uninit_registry[key]
             _obj = self.lazy_import(_path)
             self.init_registry[key] = self.run_obj_init(key, _obj, **kwargs)
@@ -127,7 +128,7 @@ class MRegistry(Generic[RT]):
             return self.init_registry[key]
         
         if key in self.mregistry:
-            print(f'Getting mregistry key: {key}')
+            # print(f'Getting mregistry key: {key}')
             _obj = self.mregistry[key]
             self.init_registry[key] = self.run_obj_init(key, _obj, **kwargs)
             return self.init_registry[key]
@@ -140,7 +141,7 @@ class MRegistry(Generic[RT]):
         Gets an item from the registry
         """
         if key in self.idx: return self.idx[key]
-        print(f'Getting key: {key}')
+        # print(f'Getting key: {key}')
         if (item := self._get(key, _raise_error = False, **kwargs)) is not None:
             self.idx[key] = item
             return item

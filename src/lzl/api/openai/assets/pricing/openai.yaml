@@ -1,6 +1,29 @@
 # The OpenAI Pricing
 # https://openai.com/api/pricing/
-# Last Updated: 2024-08-02
+# Last Updated: 2024-10-09
+
+- name: o1
+  aliases:
+  - o1-preview
+  - o1-preview-2024-09-12
+  context_length: 128000
+  costs:
+    unit: 1_000_000
+    input: 15.00
+    output: 60.00
+  endpoints:
+  - chat
+
+- name: o1-mini
+  aliases:
+  - o1-mini-2024-09-12
+  context_length: 128000
+  costs:
+    unit: 1_000_000
+    input: 3.00
+    output: 12.00
+  endpoints:
+  - chat
 
 - name: gpt-4o-mini
   aliases:
@@ -24,6 +47,7 @@
   - gpt-4-o
   - gpt4o
   - gpt-4o-2024-05-13
+  - gpt-4o-2024-08-06
   context_length: 128000
   costs:
     unit: 1_000_000

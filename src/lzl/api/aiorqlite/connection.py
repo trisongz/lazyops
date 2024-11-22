@@ -56,6 +56,7 @@ class Connection:
         freshness: str = "0",
         log: Union[logging.LogConfig, bool] = True,
         default_mode: Literal["sync", "async"] = "sync",
+        default_return: Literal["result", "cursor"] = "result",
     ):
         """Initializes a new synchronous Connection. This is typically
         called with the alias rqlite.connect
@@ -130,6 +131,7 @@ class Connection:
             max_attempts_per_host = self.max_attempts_per_host,
         )
         self.default_mode = default_mode
+        self.default_return = default_return
     
     @property
     def _is_async_default(self) -> bool:
@@ -140,6 +142,7 @@ class Connection:
         read_consistency: Optional[Literal["none", "weak", "strong"]] = None,
         freshness: Optional[str] = None,
         default_mode: Literal["sync", "async"] = None,
+        default_return: Literal["result", "cursor"] = None,
     ) -> "Cursor":
         """Creates a new cursor for this connection.
 
@@ -156,7 +159,8 @@ class Connection:
         if read_consistency is None: read_consistency = self.read_consistency
         if freshness is None: freshness = self.freshness
         if default_mode is None: default_mode = self.default_mode
-        return Cursor(self, read_consistency, freshness, default_mode)
+        if default_return is None: default_return = self.default_return
+        return Cursor(self, read_consistency, freshness, default_mode, default_return = default_return)
 
     def backup(self, file: SyncWritableIO, /, raw: bool = False) -> None:
         """Backup the database to a file.
@@ -238,7 +242,8 @@ class Connection:
         raise_on_error: bool = True,
         read_consistency: t.Optional[t.Literal["none", "weak", "strong"]] = None,
         freshness: t.Optional[str] = None,
-        is_async: bool = None,
+        is_async: t.Optional[bool] = None,
+        return_type: t.Optional[Literal["result", "cursor"]] = None,
     ) -> t.Union[ResultItem, t.Awaitable[ResultItem]]:
         """Executes a single query and returns the result. This will also
         update this object so that fetchone() and related functions can be used
@@ -261,9 +266,11 @@ class Connection:
             ResultItem: The result of the query.
         """
         if is_async is None: is_async = self._is_async_default
+        if return_type is None: return_type = self.default_return
         return self.cursor(
             read_consistency = read_consistency, 
-            freshness = freshness
+            freshness = freshness,
+            default_return = return_type,
         ).execute(
             operation = operation,
             parameters = parameters,

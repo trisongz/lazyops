@@ -86,6 +86,29 @@ class Client:
         It allows setting intial headers, auth, proxies, cookies, verify, allow_redirects, timeout, and cert.
         that are used for all requests.
 
+        :param base_url: The base url to append to each url in the request.
+        :param headers: The headers to use for all requests.
+        :param auth: The auth to use for all requests.
+        :param proxies: The proxies to use for all requests.
+        :param cookies: The cookies to use for all requests.
+        :param verify: The verify to use for all requests.
+        :param allow_redirects: The allow_redirects to use for all requests.
+        :param timeout: The timeout to use for all requests.
+        :param cert: The cert to use for all requests.
+        :param hooks: The hooks to use for all sync requests.
+        :param ahooks: The hooks to use for all async requests.
+
+        :param resolver: Specify a DNS resolver that should be used within this Session.
+        :param source_address: Bind Session to a specific network adapter and/or port so that all outgoing requests.
+        :param quic_cache_layer: Provide an external cache mechanism to store HTTP/3 host capabilities.
+        :param retries: Configure a number of times a request must be automatically retried before giving up.
+        :param multiplexed: Enable or disable concurrent request when the remote host support HTTP/2 onward.
+        :param disable_http2: Toggle to disable negotiating HTTP/2 with remote peers.
+        :param disable_http3: Toggle to disable negotiating HTTP/3 with remote peers.
+        :param disable_ipv6: Toggle to disable using IPv6 even if the remote host supports IPv6.
+        :param disable_ipv4: Toggle to disable using IPv4 even if the remote host supports IPv4.
+        :param pool_connections: Number of concurrent hosts to be handled by this Session at a maximum.
+        :param pool_maxsize: Maximum number of concurrent connections per (single) host at a time.
 
         """
         self.base_url = base_url
@@ -182,7 +205,7 @@ class Client:
             self._aio = niquests.AsyncSession(**self._client_kwargs)
             self._aio = self._update_session_(self._aio)
             if self._auto_close_on_exit:
-                from lzo.utils import aexit as aioexit
+                from lzo.utils import aioexit
                 aioexit.register(self.aclose)
         return self._aio
     

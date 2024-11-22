@@ -116,8 +116,9 @@ class FunctionManager(ABC):
         overwrite: Optional[bool] = False,
         raise_error: Optional[bool] = False,
         initialize: Optional[bool] = True,
+        return_initialized: Optional[bool] = False,
         **kwargs,
-    ):
+    ) -> Optional['BaseFunction']:
         """
         Registers the function
         """
@@ -130,9 +131,10 @@ class FunctionManager(ABC):
         name = name or func.name
         if not overwrite and name in self.functions:
             if raise_error: raise ValueError(f"Function {name} already exists")
-            return
+            return self.functions[name] if return_initialized else None
         self.functions[name] = func
-        self.autologger.info(f"Registered Function: |g|{name}|e|", colored=True)
+        self.logger.info(f"Registered Function: |g|{name}|e|", colored=True)
+        return func if return_initialized else None
 
     async def acreate_hash(self, *args, **kwargs) -> str:
         """
@@ -151,10 +153,18 @@ class FunctionManager(ABC):
             self.functions[name] = func
         return func
 
-    def get(self, name: Union[str, 'FunctionT']) -> Optional['FunctionT']:
+    def get(self, name: Union[str, 'FunctionT', Type['FunctionT']]) -> 'FunctionT':
         """
         Gets the function
         """
+        # print(name, type(name), isinstance(name, BaseFunction), issubclass(name, BaseFunction))
+        self.logger.info(f'Getting Function: {name}')
+        if isinstance(name, str): return self._get_function(name)
+        if isinstance(name, type): return self.register_function(name, initialize = True, return_initialized = True)
+        if issubclass(name, BaseFunction):
+            func = name(**self._kwargs)
+            self.functions[name.name] = func
+            return func    
         return name if isinstance(name, BaseFunction) else self._get_function(name)
         
     
@@ -217,8 +227,8 @@ class FunctionManager(ABC):
         
         if item_hashkey is None: item_hashkey = self.create_hash(**function_kwargs)
         key = f'{item_hashkey}.{function.name}'
-        if function.has_diff_model_than_default:
-            key += f'.{function.default_model_func}'
+        if function.has_diff_model_than_default: key += f'.{function.default_model_func}'
+        if function.version: key += f'.{function.version}'
 
         t = Timer(format_short = 1)
         result = None
@@ -258,6 +268,7 @@ class FunctionManager(ABC):
         overwrite = function_kwargs.pop('overwrite', None)
         overwrite = overwrite or overrides and 'functions' in overrides
         function = self.get(function)
+
         if overwrite and overrides and self.check_value_present(overrides, f'{function.name}.cachable'):
             cachable = False
         
@@ -268,9 +279,8 @@ class FunctionManager(ABC):
 
         if item_hashkey is None: item_hashkey = await self.acreate_hash(*args, **function_kwargs)
         key = f'{item_hashkey}.{function.name}'
-        if function.has_diff_model_than_default:
-            key += f'.{function.default_model_func}'
-
+        if function.has_diff_model_than_default: key += f'.{function.default_model_func}'
+        if function.version: key += f'.{function.version}'
         t = Timer(format_short = 1)
         result = None
         cache_hit = False

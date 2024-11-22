@@ -1,0 +1,4 @@
+"""
+RQLite Adapted from `pyrqlite`
+"""
+

@@ -85,7 +85,8 @@ class CompletionObject(BaseResource):
                 v = values.get('engine')
             elif values.get('deployment'):
                 v = values.get('deployment')
-        v = ModelContextHandler.resolve_model_name(v)
+        with contextlib.suppress(KeyError):
+            v = ModelContextHandler.resolve_model_name(v)
         # if values.get('validate_model_aliases', False):
         #     v = ModelContextHandler[v].name
         return v

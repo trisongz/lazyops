@@ -7,6 +7,7 @@ OpenAI Functions Base Class
 import jinja2
 import inspect
 import random
+
 from abc import ABC
 from pydantic import Field, BaseModel
 
@@ -19,7 +20,7 @@ from lzl.api.openai.utils.helpers import weighted_choice
 from lzl.api.openai.utils.fixjson import resolve_json
 from lzl.api.openai.version import DEFAULT_FUNCTION_MODEL
 
-from typing import Optional, Any, Set, Dict, List, Union, Type, Tuple, TypeVar, TYPE_CHECKING
+from typing import Optional, Any, Set, Dict, List, Union, Type, Tuple, TypeVar, Iterable, TYPE_CHECKING
 
 
 if TYPE_CHECKING:
@@ -173,6 +174,7 @@ class BaseFunction(ABC):
     result_buffer: Optional[int] = 1000
     retry_limit: Optional[int] = 5
     max_attempts: Optional[int] = 2
+    version: Optional[str] = None # Can be used as a cache buster
 
     default_model_local: Optional[str] = None
     default_model_develop: Optional[str] = None
@@ -192,9 +194,10 @@ class BaseFunction(ABC):
         Subclass Hook
         """
         cls.configure_subclass(**kwargs)
-        if cls.auto_register_function:
+        if cls.auto_register_function and cls.name and cls.function_name:
             from lzl.api.openai.clients.functions import OpenAIFunctions
             OpenAIFunctions.register_function(cls, initialize = False)
+        return super().__init_subclass__(**kwargs)
 
 
     def __init__(
@@ -919,8 +922,10 @@ class BaseFunction(ABC):
                 system_template = self.system_template.render(**kwargs)
             else:
                 system_template = self.system_template
+            system_role = "system" if "o1" not in model else "user"
             messages.append({
-                "role": "system",
+                # "role": "system",
+                "role": system_role,
                 "content": system_template,
             })
         messages.append({
@@ -946,8 +951,10 @@ class BaseFunction(ABC):
                 system_template = self.system_template.render(**kwargs)
             else:
                 system_template = self.system_template
+            system_role = "system" if "o1" not in model else "user"
             messages.append({
-                "role": "system",
+                # "role": "system",
+                "role": system_role,
                 "content": system_template,
             })
         messages.append({
@@ -988,9 +995,65 @@ class BaseFunction(ABC):
         return [p.name for p in sig.parameters.values() if p.kind in {p.KEYWORD_ONLY, p.VAR_KEYWORD, p.POSITIONAL_OR_KEYWORD} and p.name not in {'kwargs', 'args', 'model'}]
 
     """
+    Batch Handler
+    """
+    def _get_batch_params(
+        self,
+        *args,
+        batch: Optional[Iterable[Dict[str, Any]]] = None,
+        model: Optional[str] = None, 
+        **kwargs
+    ) -> List[Dict[str, Any]]:
+        """
+        Returns the batch params to run this as a batch
+        """
+        if not self.pre_validate(*args, **kwargs):
+            return None
+        self.pre_call_hook(*args, **kwargs)
+        batch_params = []
+        batch = batch or [kwargs]
+        for batch_item in batch:
+            messages, model = self.prepare_function_inputs(model = model, **batch_item)
+            batch_params.append({"model": model, "messages": messages})
+        return batch_params
+
+    async def _aget_batch_params(
+        self,
+        *args,
+        batch: Optional[Iterable[Dict[str, Any]]] = None,
+        model: Optional[str] = None, 
+        **kwargs
+    ) -> List[Dict[str, Any]]:
+        """
+        Returns the batch params to run this as a batch
+        """
+        if not await self.apre_validate(*args, **kwargs):
+            return None
+        await self.apre_call_hook(*args, **kwargs)
+        batch_params = []
+        batch = batch or [kwargs]
+        for batch_item in batch:
+            messages, model = await self.aprepare_function_inputs(model = model, **batch_item)
+            batch_params.append({"model": model, "messages": messages})
+        return batch_params
+
+    def get_batch_params(
+        self,
+        *args,
+        batch: Optional[Iterable[Dict[str, Any]]] = None,
+        model: Optional[str] = None, 
+        is_async: Optional[bool] = None,
+        **kwargs
+    ):
+        """
+        Gets the batch params to run this as a batch
+        """
+        func = self._aget_batch_params if is_async else self._get_batch_params
+        return func(*args, batch = batch, model = model, **kwargs)
+
+    """
     Handle a Loop
     """
-
 
     def run_function_loop(
         self,
@@ -1072,13 +1135,6 @@ class BaseFunction(ABC):
                 last_chat_name = chat.name,
                 **kwargs,
             )
-            # raise errors.MaxRetriesExhausted(
-            #     name = self.name, 
-            #     func_name = self.name,
-            #     model = model,
-            #     attempts = attempts,
-            #     max_attempts = self.max_attempts,
-            # )
         return None
 
     async def arun_function_loop(

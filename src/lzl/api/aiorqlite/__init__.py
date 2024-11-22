@@ -17,5 +17,6 @@ Usage:
 
 from .connection import Connection
 from .logging import LogConfig
+from .cursor import Cursor
 
 connect = Connection

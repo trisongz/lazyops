@@ -10,18 +10,19 @@ pkg_name = 'lazyops'
 gitrepo = 'trisongz/lazyops'
 
 root = Path(__file__).parent
-version = root.joinpath(f'src/{pkg_name}/version.py').read_text().split('VERSION = ', 1)[-1].strip().replace('-', '').replace("'", '')
+version = root.joinpath('src/version.py').read_text().split('VERSION = ', 1)[-1].strip().replace('-', '').replace("'", '')
 
 is_builder_ci = os.getenv('BUILDER_CI', 'false').lower() in {'true', '1', 't', 'y', 'yes'}
 requirements = [
     'loguru',
     'pydantic',
-    # 'pydantic-settings',
+    'pydantic-settings',
     'frozendict',
     'async_lru',
 ] if not is_builder_ci else [
     'typer',
     'pydantic',
+    'pydantic-settings',
     'pyyaml',
 ]
 
@@ -34,7 +35,7 @@ extras = {
         'kubernetes_asyncio',
         'kopf',
         'aiocache',
-        # 'kr8s',
+        'kr8s',
     ],
     'fastapi': [
         'fastapi',
@@ -91,12 +92,12 @@ setup(
     license='MIT License',
     description='A collection of submodules/patterns that are commonly used within Internal Development',
     author='Tri Songz',
-    author_email='ts@growthengineai.com',
+    author_email='ts@songzcorp.com',
     long_description_content_type="text/markdown",
     classifiers=[
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.9',
         'Topic :: Software Development :: Libraries',
     ],
     **args

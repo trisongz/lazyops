@@ -40,6 +40,7 @@ if PYDANTIC_VERSION == 2:
         """
         Patched GenerateJsonSchema to support pydantic v2
         """
+        _allow_examples: bool = True
 
         def int_schema(self, schema: 'core_schema.IntSchema') -> 'JsonSchemaValue':
             """Generates a JSON schema that matches an int value.
@@ -58,6 +59,8 @@ if PYDANTIC_VERSION == 2:
             for key in {'minimum', 'maximum', 'multipleOf'}:
                 if key in json_schema:
                     _ = json_schema.pop(key)
+            if not self._allow_examples:
+                _ = json_schema.pop('examples', None)
             return json_schema
         
 
@@ -78,6 +81,8 @@ if PYDANTIC_VERSION == 2:
             for key in {'unevaluatedItems', 'contains', 'minContains', 'maxContains', 'minItems', 'maxItems', 'uniqueItems'}:
                 if key in json_schema:
                     _ = json_schema.pop(key)
+            if not self._allow_examples:
+                _ = json_schema.pop('examples', None)
             return json_schema
         
 
@@ -97,6 +102,8 @@ if PYDANTIC_VERSION == 2:
             for key in {'minLength', 'maxLength', 'pattern', 'format'}:
                 if key in json_schema:
                     _ = json_schema.pop(key)
+            if not self._allow_examples:
+                _ = json_schema.pop('examples', None)
             return json_schema
 
 
@@ -132,6 +139,8 @@ if PYDANTIC_VERSION == 2:
                     _ = json_schema.pop('description')
             if 'title' in json_schema:
                 _ = json_schema.pop('title')
+            if not self._allow_examples:
+                _ = json_schema.pop('examples', None)
             return json_schema
 
         def field_is_required(
@@ -188,6 +197,7 @@ if PYDANTIC_VERSION == 2:
     _excluded_fields = ['function_name', 'function_model', 'function_duration', 'function_client_name', 'function_usage']
     
     class FunctionGenerateJsonSchema(GenerateJsonSchema):
+        _allow_examples: bool = False
 
         def _named_required_fields_schema(
             self, named_required_fields: Sequence[tuple[str, bool, 'CoreSchemaField']]

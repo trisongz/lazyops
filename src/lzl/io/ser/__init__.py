@@ -11,7 +11,7 @@ from ._json import JsonSerializer
 from ._pickle import PickleSerializer
 from ._msgpack import MsgPackSerializer
 from types import ModuleType
-from typing import Any, Dict, Optional, Union, Type, List
+from typing import Any, Dict, Optional, Union, Type, List, Literal, overload
 
 SerT = Union[JsonSerializer, PickleSerializer, MsgPackSerializer, BaseSerializer, BinaryBaseSerializer]
 
@@ -101,6 +101,49 @@ def register_serializer_lib(
 _initialized_sers: Dict[str, SerT] = {}
 
 
+@overload
+def get_serializer(
+    serializer: Literal['json'] = ...,
+    jsonlib: Optional[Union[str, Any]] = ...,
+    compression: Optional[str] = ...,
+    compression_level: int | None = ..., 
+    encoding: str | None = ..., 
+    serialization_obj: Optional[Type] = ...,
+    serialization_obj_kwargs: Optional[Dict[str, Any]] = ...,
+    disable_object_serialization: Optional[bool] = ...,
+    disable_nested_values: Optional[bool] = ...,
+    verbosity: Optional[int] = ...,
+    raise_errors: bool = ...,
+    enforce_string_value: Optional[bool] = ...,
+    enforce_byte_value: Optional[bool] = ...,
+    ser_mode: Optional[SerMode] = ...,
+    deprecated_compression: Optional[str] = ...,
+    schema_map: Optional[Dict[str, str]] = ...,
+    **kwargs
+) -> JsonSerializer:
+    """
+    Returns a JSON Serializer
+
+    Args:
+        serializer: The serializer to use. Options are ``json``, ``pickle``, ``msgpack``, or ``auto``.
+        jsonlib: The JSON library to use. This is ignored if ``serializer`` is set.
+        compression: The compression to use. Options are ``gzip``, ``lz4``, ``zlib``, or ``auto``.
+        compression_level: The compression level to use.
+        encoding: The encoding to use. Defaults to ``utf-8``.
+        serialization_obj: The serialization object to use. Defaults to ``lzl.io.serialization.DefaultSerializationObject``.
+        serialization_obj_kwargs: The serialization object kwargs to use.
+        disable_object_serialization: Whether to disable object serialization. Defaults to ``False``.
+        disable_nested_values: Whether to disable nested values. Defaults to ``False``.
+        verbosity: The verbosity level to use. Defaults to ``None``.
+        raise_errors: Whether to raise errors. Defaults to ``True``.
+        enforce_string_value: Whether to enforce string values. Defaults to ``False``.
+        enforce_byte_value: Whether to enforce byte values. Defaults to ``False``.
+        ser_mode: The serialization mode to use. Defaults to ``auto``.
+        deprecated_compression: The deprecated compression to use. This is ignored if ``compression`` is set.
+        schema_map: The schema map to use. Defaults to ``None``.
+    """
+
+        
 def get_serializer(
     serializer: Optional[str] = None,
     **kwargs

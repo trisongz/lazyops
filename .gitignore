@@ -42,3 +42,5 @@ src/lzl/api/hatchet/patches/context.j2.py
 src/lzl/api/hatchet/patches/worker.j2.py
 tests/lzl/hatchet.py
 src/lzl/ext/fast/tests
+src/lzl/.data/lzl.tmp.json
+tests/lzl/exts/fastapi_oauth2.py

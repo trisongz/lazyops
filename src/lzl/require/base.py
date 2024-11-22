@@ -12,7 +12,6 @@ import typing
 import functools
 import importlib
 import subprocess
-import pkg_resources
 from lzl.logging import default_logger as logger
 from typing import List, Type, Any, Union, Dict
 from types import ModuleType
@@ -108,6 +107,11 @@ class LazyLibType(type):
     @classmethod
     def is_available(cls, library: str) -> bool:
         """ Checks whether a Python Library is available."""
+        try:
+            import pkg_resources
+        except ImportError:
+            cls.install_pip_package('setuptools')
+            import pkg_resources
         try:
             _ = pkg_resources.get_distribution(library)
             return True

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>{| src.title |}</title>
+<!-- needed for adaptive design -->
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="shortcut icon" href="{| src.scalar_favicon_url |}">
+<style>
+    body {{
+    margin: 0;
+    padding: 0;
+    }}
+</style>
+<style>
+{%- if src.scalar_theme -%}
+{| src.scalar_theme |}
+{%- else -%}
+{% include "theme.css" %}
+{%- endif -%}
+</style>
+</head>
+<body>
+<noscript>
+    Scalar requires Javascript to function. Please enable it to browse the documentation.
+</noscript>
+<script
+    id="api-reference"
+    data-url="{| src.openapi_url |}"
+    data-proxy-url="{| src.scalar_proxy_url |}">
+</script>
+<script>
+    var configuration = {{
+        layout: "{| src.layout.value |}",
+        showSidebar: {| src.show_sidebar | to_json |},
+        hideDownloadButton: {| src.hide_download_button | to_json |},
+        hideModels: {| src.hide_models | to_json |},
+        darkMode: {| src.dark_mode | to_json |},
+        searchHotKey: "{| src.search_hot_key.value |}",
+        hiddenClients: {| src.hidden_clients | to_json |},
+        servers: {| src.servers | to_json |},
+        defaultOpenAllTags: {| src.default_open_all_tags | to_json |},
+    }}
+
+    document.getElementById('api-reference').dataset.configuration =
+        JSON.stringify(configuration)
+</script>
+<script src="{| src.scalar_js_url |}"></script>
+</body>
+</html>

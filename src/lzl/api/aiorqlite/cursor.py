@@ -50,6 +50,7 @@ class Cursor:
         read_consistency: Literal["none", "weak", "strong"],
         freshness: str,
         default_mode: Literal["sync", "async"],
+        default_return: Literal["result", "cursor"]
     ):
         self.connection = connection
         """The underlying connection to the rqlite cluster."""
@@ -69,6 +70,7 @@ class Cursor:
         self.last_insert_id: Optional[int] = None
         """The last insert id after the last query"""
         self.default_mode = default_mode
+        self.default_return = default_return
 
     @property
     def rowcount(self) -> int:
@@ -78,6 +80,10 @@ class Cursor:
     @property
     def _is_async_default(self) -> bool:
         return self.default_mode == "async"
+            
+    @property
+    def _is_result_default(self) -> bool:
+        return self.default_return == "result"
 
     def _execute(
         self,
@@ -86,7 +92,8 @@ class Cursor:
         raise_on_error: bool = True,
         read_consistency: Optional[Literal["none", "weak", "strong"]] = None,
         freshness: Optional[str] = None,
-    ) -> ResultItem:
+        return_type: Optional[Literal["result", "cursor"]] = None,
+    ) -> t.Union[ResultItem, "ResultItemCursor"]:
         """Executes a single query and returns the result. This will also
         update this object so that fetchone() and related functions can be used
         to fetch the results instead.
@@ -110,6 +117,7 @@ class Cursor:
         if parameters is None: parameters = ()
         if read_consistency is None: read_consistency = self.read_consistency
         if freshness is None: freshness = self.freshness
+        if return_type is None: return_type = self.default_return
         self.cursor = None
         self.rows_affected = None
         self.last_insert_id = None
@@ -222,7 +230,7 @@ class Cursor:
 
         self.rows_affected = result.rows_affected
         self.last_insert_id = result.last_insert_id
-        return result
+        return result if return_type == "result" else self.cursor
     
     
     async def aexecute(
@@ -232,7 +240,8 @@ class Cursor:
         raise_on_error: bool = True,
         read_consistency: Optional[Literal["none", "weak", "strong"]] = None,
         freshness: Optional[str] = None,
-    ) -> ResultItem:
+        return_type: Optional[Literal["result", "cursor"]] = None,
+    ) -> t.Union[ResultItem, "ResultItemCursor"]:
         """Executes a single query and returns the result. This will also
         update this object so that fetchone() and related functions can be used
         to fetch the results instead.
@@ -256,6 +265,7 @@ class Cursor:
         if parameters is None: parameters = ()
         if read_consistency is None: read_consistency = self.read_consistency
         if freshness is None: freshness = self.freshness
+        if return_type is None: return_type = self.default_return
         self.cursor = None
         self.rows_affected = None
         self.last_insert_id = None
@@ -367,7 +377,7 @@ class Cursor:
             self.cursor = result.cursor()
         self.rows_affected = result.rows_affected
         self.last_insert_id = result.last_insert_id
-        return result
+        return result if return_type == "result" else self.cursor
     
 
     def execute(
@@ -378,6 +388,7 @@ class Cursor:
         read_consistency: Optional[Literal["none", "weak", "strong"]] = None,
         freshness: Optional[str] = None,
         is_async: bool = None,
+        return_type: Optional[Literal["result", "cursor"]] = None,
     ) -> t.Union[ResultItem, t.Awaitable[ResultItem]]:
         """Executes a single query and returns the result. This will also
         update this object so that fetchone() and related functions can be used
@@ -400,6 +411,7 @@ class Cursor:
             ResultItem: The result of the query.
         """
         if is_async is None: is_async = self._is_async_default
+        if return_type is None: return_type = self.default_return
         _func = self.aexecute if is_async else self._execute
         return _func(
             operation,
@@ -407,8 +419,123 @@ class Cursor:
             raise_on_error = raise_on_error,
             read_consistency = read_consistency,
             freshness = freshness,
+            return_type = return_type,
         )
 
+
+    def _executemany(
+        self,
+        base_path: str,
+        operation: str,
+        /,
+        *,
+        seq_of_parameters: Optional[Iterable[Any]] = None,
+        transaction: bool = True,
+        raise_on_error: bool = True,
+        request_type: Union[QueryInfoRequestType, Callable[[], QueryInfoRequestType]],
+        read_consistency: Optional[str],
+        freshness: Optional[str],
+        queue: Optional[bool] = False,
+        wait: Optional[bool] = False,
+    ) -> BulkResult:
+        """Executes multiple operations within a single request and, by default, within
+        a transaction.
+
+        Unlike the standard DB-API executemany(), this method accepts different
+        operations and parameters for each operation.
+
+        Regardless of what type of operations are passed in, they will executed
+        as if they are updates, i.e., no result rows will be returned.
+
+        Args:
+            operations (Iterable[str]): The operations to execute.
+            seq_of_parameters (Iterable[Iterable[Any]]): The parameters to pass to each operation.
+            transaction (bool): If True, execute the operations within a transaction.
+            raise_on_error (bool): If True, raise an error if any of the operations fail. If
+                False, you can check the result item's error property to see if the
+                operation failed.
+            request_type (Union[QueryInfoRequestType, Callable[[], QueryInfoRequestType]]):
+                The type of request to log. If a callable, it will be called with no
+                arguments to get the request type only if needed for slow query logging
+            read_consistency ("none", "weak", "strong", None): The read consistency to use
+                if the request type is not executemany. If None, use the default read
+                consistency for this cursor.
+            freshness (Optional[str]): The freshness to use when executing
+                none read consistency queries. If None, use the default freshness
+                for this cursor.
+
+        Returns:
+            BulkResult: The result of the query.
+
+        Raises:
+            ValueError: If the number of operations and parameters do not match.
+        """
+        if read_consistency is None: read_consistency = self.read_consistency
+        if freshness is None: freshness = self.freshness
+        if seq_of_parameters is None: seq_of_parameters = ()
+
+        qargs: List[str] = []
+        if transaction: qargs.append("transaction")
+        if request_type != "executemany":
+            qargs.append(f"level={read_consistency}")
+            if read_consistency == "none": qargs.append(f"freshness={freshness}")
+        if queue: qargs.append("queue")
+        if wait: qargs.append("wait")
+        path = f"{base_path}?" + "&".join(qargs)
+        
+        cleaned_query, parameters = clean_nulls(operation, seq_of_parameters)
+
+        request_id = secrets.token_hex(4)
+
+        def msg_supplier_1(max_length: Optional[int]) -> str:
+            abridged_request = repr(cleaned_request)
+            if max_length is not None and len(abridged_request) > max_length:
+                abridged_request = f"{abridged_request[:max_length]}..."
+
+            return f"  [RQLITE BULK {path} {{{request_id}}}] - {abridged_request}"
+
+        log(self.connection.log_config.write_start, msg_supplier_1)
+
+        request_started_at = time.perf_counter()
+        response = self.connection.io.fetch_response(
+            "POST",
+            path,
+            json=cleaned_request,
+            headers={"Content-Type": "application/json; charset=UTF-8"},
+            query_info=QueryInfoLazy(
+                operations=operations,
+                params=seq_of_parameters,
+                request_type=request_type,
+                consistency="strong",
+                freshness="",
+            ),
+        )
+        payload = response.json()
+        request_time = time.perf_counter() - request_started_at
+
+        def msg_supplier_2(max_length: Optional[int]) -> str:
+            abridged_payload = response.text
+            if max_length is not None and len(abridged_payload) > max_length:
+                abridged_payload = f"{abridged_payload[:max_length]}..."
+
+            return f"    {{{request_id}}} in {request_time:.3f}s -> {abridged_payload}"
+
+        log(
+            self.connection.log_config.write_response,
+            msg_supplier_2,
+        )
+
+        result = BulkResult.parse(payload)
+        if raise_on_error: result.raise_on_error(f"{request_id=}; {operations=}; {seq_of_parameters=}")
+        return result
+
+
+
+
+
+
+
+            
     def _executemany2(
         self,
         base_path: str,

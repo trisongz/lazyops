@@ -1,0 +1,10 @@
+refs:
+  - name: server
+    refs:
+      - server
+      - app
+  - name: services
+    refs:
+      - services
+      - worker
+      - tasks
