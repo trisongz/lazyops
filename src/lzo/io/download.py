@@ -10,12 +10,12 @@ from .resolver import get_http_download_headers, normalize_url
 from typing import Optional, List, Dict, Tuple, Union, TYPE_CHECKING
 
 if load.TYPE_CHECKING:
-    import aiohttpx
     import aiofiles
-    from aiohttpx import Response
+    from lzl.api import aiohttpx
+    from lzl.api.aiohttpx import Response
 else:
-    aiohttpx = load.LazyLoad("aiohttpx", install_missing=True)
     aiofiles = load.LazyLoad("aiofiles", install_missing=True)
+    aiohttpx = load.lazy_load('lzl.api.aiohttpx', install_missing = False)
 
 def download_url_to_bytes(
     url: str,

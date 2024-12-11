@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import datetime
-import aiohttpx
 import contextlib
 import functools
+from lzl.api import aiohttpx
 from lzo.types import (
     BaseModel,
     eproperty,

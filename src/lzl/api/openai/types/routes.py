@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 import time
 import asyncio
-import aiohttpx
 import backoff
 import functools
+from lzl.api import aiohttpx
 from lzo.types import (
     BaseModel,
     eproperty,

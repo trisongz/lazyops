@@ -74,17 +74,22 @@ class SerializedPayloadConverter(CompositePayloadConverter):
             *DefaultPayloadConverter.default_encoding_payload_converters,
         )
 
+if t.TYPE_CHECKING:
+    from lzl.ext.temporal.configs import TemporalSettings
 
 def get_serialized_data_converter(
     jsonlib: t.Optional[str] = None,
     compression: t.Optional[str] = None,
     compression_level: t.Optional[int] = None,
+    config: t.Optional['TemporalSettings'] = None,
     **kwargs
 ) -> DataConverter:
     """
     Creates a data converter that uses the serialized payload converter
     """
-    from lzl.ext.temporal.settings import config
+    if config is None: 
+        from lzl.ext.temporal.configs import get_temporal_settings
+        config = get_temporal_settings()
     if config.data_jsonlib is not None and jsonlib is None: jsonlib = config.data_jsonlib
     if config.data_compression is not None and compression is None: compression = config.data_compression
     if config.data_compression_level is not None and compression_level is None: compression_level = config.data_compression_level

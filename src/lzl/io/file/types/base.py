@@ -8,8 +8,8 @@ import pathlib
 import typing as t
 import anyio
 from pydantic.types import ByteSize
-from aiopath.selectors import _make_selector
-from aiopath.scandir import EntryWrapper, scandir_async
+# from aiopath.selectors import _make_selector
+# from aiopath.scandir import EntryWrapper, scandir_async
 from stat import S_ISDIR, S_ISLNK, S_ISREG, S_ISSOCK, S_ISBLK, S_ISCHR, S_ISFIFO
 from aiopath.wrap import (
     func_to_async_func,
@@ -21,7 +21,8 @@ from aiopath.wrap import (
 )
 from aiopath.handle import (
     IterableAIOFile,
-    get_handle
+    get_handle,
+    AsyncFile,
 )
 from lzl import load
 from ..path import *
@@ -49,7 +50,8 @@ from .utils import (
 if t.TYPE_CHECKING:
     from fsspec import AbstractFileSystem
     from fsspec.asyn import AsyncFileSystem
-    from aiopath.scandir import EntryWrapper
+    from ..compat._aiopath.scandir import EntryWrapper
+    # from aiopath.scandir import EntryWrapper
     from ..main import FileLike, PathLike
 
 
@@ -146,16 +148,17 @@ class _FileAccessor(NormalAccessor):
 
         except ImportError as e: raise NotImplementedError("Path.group() is unsupported on this system") from e
 
-    def scandir(self, *args, **kwargs) -> t.Iterable[EntryWrapper]:
+    def scandir(self, *args, **kwargs) -> t.Iterable['EntryWrapper']:
         """
         Synchronous scandir
         """
         yield from scandir_sync(*args, **kwargs)
 
-    async def ascandir(self, *args, **kwargs) -> t.AsyncIterable[EntryWrapper]:
+    async def ascandir(self, *args, **kwargs) -> t.AsyncIterable['EntryWrapper']:
         """
         Asynchronous scandir
         """
+        from ..compat._aiopath.scandir import scandir_async
         async for entry in scandir_async(*args, **kwargs):
             yield entry
 
@@ -419,7 +422,7 @@ class FilePath(Path, FilePurePath):
             return io.open(self, mode = mode, buffering = buffering, opener=self._opener)
         return io.open(self, mode, buffering, encoding, errors, newline, opener=self._opener)
 
-    def aopen(self, mode: FileMode = 'r', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, **kwargs) -> IterableAIOFile:
+    def aopen(self, mode: FileMode = 'r', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, **kwargs) -> AsyncFile:
         """
         Asyncronously Open the file pointed by this path and return a file object, as
         the built-in open() function does.
@@ -436,7 +439,7 @@ class FilePath(Path, FilePurePath):
         if self._closed: self._raise_closed()
         return io.open(self, mode, buffering, encoding, errors, newline, opener=self._opener)
     
-    def async_reader(self, mode: FileMode = 'r', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, **kwargs) -> IterableAIOFile:
+    def async_reader(self, mode: FileMode = 'r', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, **kwargs) -> AsyncFile:
         """
         Asyncronously Open the file pointed by this path and return a file object, as
         the built-in open() function does.
@@ -451,7 +454,7 @@ class FilePath(Path, FilePurePath):
         if self._closed: self._raise_closed()
         return io.open(self, mode, buffering, encoding, errors, newline, opener=self._opener)
     
-    def aappender(self, mode: FileMode = 'a', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, **kwargs) -> IterableAIOFile:
+    def aappender(self, mode: FileMode = 'a', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, **kwargs) -> AsyncFile:
         """
         Asyncronously Open the file pointed by this path and return a file object, as
         the built-in open() function does.
@@ -466,7 +469,7 @@ class FilePath(Path, FilePurePath):
         if self._closed: self._raise_closed()
         return io.open(self, mode, buffering, encoding, errors, newline, opener=self._opener)
     
-    def awriter(self, mode: FileMode = 'w', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, **kwargs) -> IterableAIOFile:
+    def awriter(self, mode: FileMode = 'w', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, **kwargs) -> AsyncFile:
         """
         Asyncronously Open the file pointed by this path and return a file object, as
         the built-in open() function does.
@@ -475,14 +478,18 @@ class FilePath(Path, FilePurePath):
 
     def read(self, mode: FileMode = 'rb', size: t.Optional[int] = -1, offset: t.Optional[int] = 0, **kwargs) -> t.Union[str, bytes]:
         with self.open(mode=mode, **kwargs) as file:
-            return file.read(size, offset)
+            if offset: file.seek(offset)
+            return file.read(size)
+            # return file.read(size, offset)
 
     async def aread(self, mode: FileMode = 'rb', size: t.Optional[int] = -1, offset: t.Optional[int] = 0, **kwargs):
         """
         Read and return the file's contents.
         """
         async with self.aopen(mode=mode, **kwargs) as file:
-            return await file.read(size, offset)
+            if offset: await file.seek(offset)
+            return await file.read(size)
+            # return await file.read(size, offset)
 
     def read_text(self, encoding: str | None = DEFAULT_ENCODING, errors: str | None = ON_ERRORS) -> str:
         with self.open('r', encoding=encoding, errors=errors) as file:
@@ -1160,6 +1167,7 @@ class FilePath(Path, FilePurePath):
         """Iterate over this subtree and yield all existing files (of any
         kind, including directories) matching the given relative pattern.
         """
+        from ..compat._aiopath.selectors import _make_selector
         if not pattern: raise ValueError("Unacceptable pattern: {!r}".format(pattern))
 
         drv, root, pattern_parts = self._flavour.parse_parts((pattern,))
@@ -1190,6 +1198,7 @@ class FilePath(Path, FilePurePath):
         directories) matching the given relative pattern, anywhere in
         this subtree.
         """
+        from ..compat._aiopath.selectors import _make_selector
         drv, root, pattern_parts = self._flavour.parse_parts((pattern,))
         if drv or root: raise NotImplementedError("Non-relative patterns are unsupported")
         parts = ("**", *pattern_parts)

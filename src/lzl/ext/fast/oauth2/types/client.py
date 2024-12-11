@@ -4,8 +4,9 @@ import os
 import abc
 import base64
 import hashlib
-import aiohttpx
+
 from lzl import load
+from lzl.api import aiohttpx
 from lzl.types import eproperty
 from lzl.logging import logger, Logger
 from urllib.parse import urljoin, urlencode

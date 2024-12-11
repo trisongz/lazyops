@@ -5,6 +5,7 @@ import typing as t
 from temporalio.converter import DataConverter
 from temporalio.client import Client, KeepAliveConfig
 from .utils import logger
+from . import patches
 
 if t.TYPE_CHECKING:
     from temporalio.common import QueryRejectCondition
@@ -20,14 +21,16 @@ if t.TYPE_CHECKING:
 
     )
     from temporalio.worker import Worker
-    from lzl.ext.temporal.settings import TemporalSettings
+    from lzl.ext.temporal.configs import TemporalSettings
 
 
 class TemporalClient(Client):
 
     
-    @staticmethod
+    # @staticmethod
+    @classmethod
     async def connect(
+        cls: t.Type['TemporalClient'],
         target_host: t.Optional[str] = None,
         namespace: t.Optional[str] = None,
         api_key: t.Optional[str] = None,
@@ -95,7 +98,7 @@ class TemporalClient(Client):
             config: The configuration for this client.
         """
         if config is None:
-            from lzl.ext.temporal.settings import get_temporal_settings
+            from lzl.ext.temporal.configs import get_temporal_settings
             config = get_temporal_settings()
         
         if not target_host: target_host = config.host
@@ -121,7 +124,7 @@ class TemporalClient(Client):
             runtime=runtime,
             http_connect_proxy_config=http_connect_proxy_config,
         )
-        new = TemporalClient(
+        new = cls(
             await ServiceClient.connect(connect_config),
             namespace=namespace,
             data_converter=data_converter,
@@ -136,13 +139,14 @@ class TemporalClient(Client):
         Some post-init config
         """
         if config is None:
-            from lzl.ext.temporal.settings import get_temporal_settings
+            from lzl.ext.temporal.configs import get_temporal_settings
             config = get_temporal_settings()
-        
         self.tmprl_config = config
         self.tmprl_registry = self.tmprl_config.registry
         self._extra: t.Dict[str, t.Any] = {}
-        self.tmprl_registry.client = self
+        self.tmprl_registry.register_client(self)
+        # self.tmprl_registry.clients[self.namespace] = self
+        # self.tmprl_registry.client = self
     
     async def run_worker(
         self,
@@ -185,6 +189,7 @@ class TemporalClient(Client):
     #     finally:
     #         event.set()
     #         loop.run_until_complete(loop.shutdown_asyncgens())
+    # if t.TYPE_CHECKING:
 
 
         

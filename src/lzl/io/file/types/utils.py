@@ -3,13 +3,14 @@ from __future__ import annotations
 import os
 import inspect
 import typing as t
-import aiopath.selectors
-import aiopath.scandir
+# import aiopath.selectors
+# import aiopath.scandir
 from aiopath.wrap import func_to_async_func
 from hashlib import md5
 
 if t.TYPE_CHECKING:
-    from aiopath.scandir import EntryWrapper
+    from ..compat._aiopath.scandir import EntryWrapper
+    # from aiopath.scandir import EntryWrapper
     from .base import FilePath
 
 
@@ -17,7 +18,8 @@ def scandir_sync(*args, **kwargs) -> t.Iterable['EntryWrapper']:
     """
     Sync version of scandir
     """
-    yield from aiopath.scandir._scandir_results(*args, **kwargs)
+    from ..compat._aiopath.scandir import _scandir_results
+    yield from _scandir_results(*args, **kwargs)
 
 
 close = func_to_async_func(os.close)

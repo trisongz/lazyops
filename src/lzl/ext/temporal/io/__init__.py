@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import typing as t
 from ._pydantic import pydantic_data_converter
+from ._pydantic_json import pydantic_data_converter as pydantic_json_data_converter
 from ._serialized import serialized_data_converter, get_serialized_data_converter
 
 if t.TYPE_CHECKING:
@@ -22,7 +23,8 @@ def get_default_data_converter(
         return get_serialized_data_converter(jsonlib = jsonlib, compression = compression, compression_level = compression_level, **kwargs)
     if converter == "pydantic":
         return pydantic_data_converter
-    
+    if converter == "pydantic_json":
+        return pydantic_json_data_converter
     from temporalio.converter import DataConverter
     return DataConverter.default
     # raise ValueError(f"Invalid converter: {converter}")

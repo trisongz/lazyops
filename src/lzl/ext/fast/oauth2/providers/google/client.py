@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-import aiohttpx
+
+from lzl.api import aiohttpx
 from ...types.client import BaseOAuth2Client, eproperty, jwt
 from ...types import errors
 from .config import GoogleOAuth2Config

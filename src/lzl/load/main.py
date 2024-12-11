@@ -27,7 +27,7 @@ class LazyLoad(Generic[_M]):
         self._lzlinstall = install_missing
         if install_missing:
             install_options = install_options or {}
-            if 'package' not in install_options: install_options['package'] = package
+            if 'package' not in install_options: install_options['package'] = package or name
             self._lzlinstall_options = install_options
         self.__module__: ModuleType | None = None
 

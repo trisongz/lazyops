@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import random
-import aiohttpx
+from lzl.api import aiohttpx
 from lzl.types import BaseModel, Field
 from typing import Optional, Dict, Union, Any, TYPE_CHECKING
 

@@ -40,6 +40,7 @@ class Registered(abc.ABC):
     Registers this as the module settings
     """
     _rmodule: Optional[str] = None
+    _rsubmodule: Optional[str] = None
     _rxtra: Dict[str, Any] = {}
 
     def __init_subclass__(cls, **kwargs: ConfigDict):

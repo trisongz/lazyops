@@ -25,7 +25,7 @@ def get_http(url: str, headers: Optional[Dict[str, str]] = None, timeout: Option
     """
     Returns the HTTP Response
     """
-    import aiohttpx
+    from lzl.api import aiohttpx
     return aiohttpx.get(url, headers = headers, timeout = timeout, **kwargs).text
 
 def load_file(path: str) -> str:

@@ -161,18 +161,37 @@ StringList: ARRAY = ARRAY(types.Text, dimensions = 1)
 DateTimeUTCList: ARRAY = ARRAY(DateTimeUTC, dimensions = 1)
 # AutoSequence: types.BigInteger = 
 
-with contextlib.suppress(ImportError):
-    from sqlalchemy_json import NestedMutableContainer, MutableContainer, TrackedDict
-    from sqlalchemy_json import NestedMutableJson, MutableDict, mutable_json_type
+if load.TYPE_CHECKING:
+    import sqlalchemy_json as sqla_json
+    from sqlalchemy_json import NestedMutableJson, MutableDict
+
+    JsonStringField: Type[MutableDict]
+    JsonStringNestedField: Type[NestedMutableJson]
+
+    JSONBField: Type[MutableDict] 
+    JSONBNestedField: Type[NestedMutableJson]
+
+else:
+    sqla_json = load.lazy_load("sqlalchemy_json", install_missing=True)
+
+    JsonStringField: Type[sqla_json.MutableDict] = sqla_json.mutable_json_type(dbtype = JsonString, nested=True)
+    JsonStringNestedField: Type[sqla_json.NestedMutableJson] = sqla_json.mutable_json_type(dbtype = JsonString, nested = True) # type: ignore
 
 
+    JSONBField: Type[sqla_json.MutableDict] = sqla_json.mutable_json_type(dbtype = JSONB)
+    JSONBNestedField: Type[sqla_json.NestedMutableJson] = sqla_json.mutable_json_type(dbtype = JSONB, nested = True) # type: ignore
 
-    JsonStringField: Type[MutableDict] = mutable_json_type(dbtype = JsonString, nested=True)
-    JsonStringNestedField: Type[NestedMutableJson] = mutable_json_type(dbtype = JsonString, nested = True) # type: ignore
+
+# with contextlib.suppress(ImportError):
+#     from sqlalchemy_json import NestedMutableContainer, MutableContainer, TrackedDict
+#     from sqlalchemy_json import NestedMutableJson, MutableDict, mutable_json_type
+
+#     JsonStringField: Type[MutableDict] = mutable_json_type(dbtype = JsonString, nested=True)
+#     JsonStringNestedField: Type[NestedMutableJson] = mutable_json_type(dbtype = JsonString, nested = True) # type: ignore
 
 
-    JSONBField: Type[MutableDict] = mutable_json_type(dbtype = JSONB)
-    JSONBNestedField: Type[NestedMutableJson] = mutable_json_type(dbtype = JSONB, nested = True) # type: ignore
+#     JSONBField: Type[MutableDict] = mutable_json_type(dbtype = JSONB)
+#     JSONBNestedField: Type[NestedMutableJson] = mutable_json_type(dbtype = JSONB, nested = True) # type: ignore
 
 
 # for reflection
@@ -185,64 +204,72 @@ try:
     from pgvector.sqlalchemy import Vector
 
 except ImportError:
-    import numpy as np
+    try:
+        import numpy as np
 
-    def from_db(value):
-        # could be ndarray if already cast by lower-level driver
-        if value is None or isinstance(value, np.ndarray):
-            return value
-        return np.array(value[1:-1].split(','), dtype=np.float32)
-        
-    def to_db(value, dim=None):
-        if value is None: return value
-        if isinstance(value, np.ndarray):
-            if value.ndim != 1:
-                raise ValueError('expected ndim to be 1')
-            if not np.issubdtype(value.dtype, np.integer) and not np.issubdtype(value.dtype, np.floating):
-                raise ValueError('dtype must be numeric')
-            value = value.tolist()
-        if dim is not None and len(value) != dim:
-            raise ValueError('expected %d dimensions, not %d' % (dim, len(value)))
-        return '[' + ','.join([str(float(v)) for v in value]) + ']'
+        def from_db(value):
+            # could be ndarray if already cast by lower-level driver
+            if value is None or isinstance(value, np.ndarray):
+                return value
+            return np.array(value[1:-1].split(','), dtype=np.float32)
+            
+        def to_db(value, dim=None):
+            if value is None: return value
+            if isinstance(value, np.ndarray):
+                if value.ndim != 1:
+                    raise ValueError('expected ndim to be 1')
+                if not np.issubdtype(value.dtype, np.integer) and not np.issubdtype(value.dtype, np.floating):
+                    raise ValueError('dtype must be numeric')
+                value = value.tolist()
+            if dim is not None and len(value) != dim:
+                raise ValueError('expected %d dimensions, not %d' % (dim, len(value)))
+            return '[' + ','.join([str(float(v)) for v in value]) + ']'
 
 
-    class Vector(types.UserDefinedType):
-        cache_ok = True
-        _string = types.String()
+        class Vector(types.UserDefinedType):
+            cache_ok = True
+            _string = types.String()
 
-        def __init__(self, dim=None):
-            super(types.UserDefinedType, self).__init__()
-            self.dim = dim
+            def __init__(self, dim=None):
+                super(types.UserDefinedType, self).__init__()
+                self.dim = dim
 
-        def get_col_spec(self, **kw):
-            return "VECTOR" if self.dim is None else "VECTOR(%d)" % self.dim
+            def get_col_spec(self, **kw):
+                return "VECTOR" if self.dim is None else "VECTOR(%d)" % self.dim
 
-        def bind_processor(self, dialect):
-            def process(value):
-                return to_db(value, self.dim)
-            return process
+            def bind_processor(self, dialect):
+                def process(value):
+                    return to_db(value, self.dim)
+                return process
 
-        def literal_processor(self, dialect):
-            string_literal_processor = self._string._cached_literal_processor(dialect)
-            def process(value):
-                return string_literal_processor(to_db(value, self.dim))
-            return process
+            def literal_processor(self, dialect):
+                string_literal_processor = self._string._cached_literal_processor(dialect)
+                def process(value):
+                    return string_literal_processor(to_db(value, self.dim))
+                return process
 
-        def result_processor(self, dialect, coltype):
-            def process(value):
-                return from_db(value)
-            return process
+            def result_processor(self, dialect, coltype):
+                def process(value):
+                    return from_db(value)
+                return process
 
-        class comparator_factory(types.UserDefinedType.Comparator):
-            def l2_distance(self, other):
-                return self.op('<->', return_type=types.Float)(other)
+            class comparator_factory(types.UserDefinedType.Comparator):
+                def l2_distance(self, other):
+                    return self.op('<->', return_type=types.Float)(other)
 
-            def max_inner_product(self, other):
-                return self.op('<#>', return_type=types.Float)(other)
+                def max_inner_product(self, other):
+                    return self.op('<#>', return_type=types.Float)(other)
 
-            def cosine_distance(self, other):
-                return self.op('<=>', return_type=types.Float)(other)
+                def cosine_distance(self, other):
+                    return self.op('<=>', return_type=types.Float)(other)
 
-    ischema_names['vector'] = Vector
+        ischema_names['vector'] = Vector
+    except ImportError:
+        class Vector(types.UserDefinedType):
+            cache_ok = True
+            _string = types.String()
+
+            def __init__(self, dim=None):
+                raise NotImplementedError('Vector is not available for without numpy')
 
 # from pgvector.asyncpg import Vector

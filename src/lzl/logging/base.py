@@ -275,7 +275,7 @@ class Logger(_Logger, LoggingMixin):
         self, 
         message: 'MsgItem',
         *args, 
-        colored: Optional[bool] = False, 
+        colored: Optional[bool] = None, 
         prefix: Optional[str] = None,
         max_length: Optional[int] = None,
         hook: Optional[Union[Callable, List[Callable]]] = None,
@@ -284,6 +284,7 @@ class Logger(_Logger, LoggingMixin):
         """
         Log ``message.format(*args, **kwargs)`` with severity ``'INFO'``.
         """
+        if colored is None and isinstance(message, str) and '|e|' in message: colored = True
         message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored, level = 'INFO')
         try:
             self._log("INFO", False, self._get_opts(colored = colored), message, args, kwargs)

@@ -1,0 +1,64 @@
+
+default:
+  workerConfig:
+    task_queue: str,
+    activities: Sequence[Callable] = [],
+    workflows: Sequence[Type] = [],
+    activity_executor: Optional[concurrent.futures.Executor] = None,
+    workflow_task_executor: Optional[concurrent.futures.ThreadPoolExecutor] = None,
+    workflow_runner: WorkflowRunner = SandboxedWorkflowRunner(),
+    unsandboxed_workflow_runner: WorkflowRunner = UnsandboxedWorkflowRunner(),
+    interceptors: Sequence[Interceptor] = [],
+    build_id: Optional[str] = None,
+    identity: Optional[str] = None,
+    max_cached_workflows: int = 1000,
+    max_concurrent_workflow_tasks: int = 100,
+    max_concurrent_activities: int = 100,
+    max_concurrent_local_activities: int = 100,
+    max_concurrent_workflow_task_polls: int = 5,
+    nonsticky_to_sticky_poll_ratio: float = 0.2,
+    max_concurrent_activity_task_polls: int = 5,
+    no_remote_activities: bool = False,
+    sticky_queue_schedule_to_start_timeout: timedelta = timedelta(seconds=10),
+    max_heartbeat_throttle_interval: timedelta = timedelta(seconds=60),
+    default_heartbeat_throttle_interval: timedelta = timedelta(seconds=30),
+    max_activities_per_second: Optional[float] = None,
+    max_task_queue_activities_per_second: Optional[float] = None,
+    graceful_shutdown_timeout: timedelta = timedelta(),
+    debug_mode: bool = False,
+    disable_eager_activity_execution: bool = False,
+workers:
+  - name: a
+    factory: false
+    queue: girofunnel-proxy
+
+
+    workerConfig:
+      behavior: merge
+      config:
+
+logging:
+  version: 1
+  disable_existing_loggers: False
+  formatters:
+      default:
+          (): "temporalloop.logging.DefaultFormatter"
+          fmt: "%(levelprefix)s %(message)s"
+          use_colors: true
+  handlers:
+      default:
+          formatter: default
+          class: logging.StreamHandler
+          stream: ext://sys.stdout
+          level: INFO
+  loggers:
+      temporalio:
+        handlers: [default]
+        level: INFO
+        propagate: False
+      temporalloop:
+        handlers: [default]
+        level: INFO
+        propagate: False
+      temporalloop.error:
+        level: INFO

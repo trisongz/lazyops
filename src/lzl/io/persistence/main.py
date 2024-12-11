@@ -338,14 +338,14 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         """
         return self.get(key, _raw = _raw, **kwargs) if self.contains(key) else None
     
-    def set(self, key: KT, value: Any, ex: Optional[Union[float, int]] = None, _raw: Optional[bool] = None, **kwargs) -> None:
+    def set(self, key: KT, value: Any, ex: Optional[Union[float, int]] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[KT]:
         """
         Saves a Value to the DB
         """
         if self.base.async_enabled and is_in_async_loop():
             ThreadPool.create_background_task(self.base.aset(key, value, ex = ex, _raw = _raw, **kwargs))
         else:
-            self.base.set(key, value, ex = ex, _raw = _raw, **kwargs)
+            return self.base.set(key, value, ex = ex, _raw = _raw, **kwargs)
     
     def set_batch(self, data: Dict[str, Any], **kwargs) -> None:
         """
@@ -400,11 +400,11 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         """
         return await self.aget(key, _raw = _raw, **kwargs) if await self.acontains(key) else None
 
-    async def aset(self, key: KT, value: VT, ex: Optional[Union[float, int]] = None, _raw: Optional[bool] = None, **kwargs) -> None:
+    async def aset(self, key: KT, value: VT, ex: Optional[Union[float, int]] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[KT]:
         """
         Saves a Value to the DB
         """
-        await self.base.aset(key, value, ex = ex, _raw = _raw, **kwargs)
+        return await self.base.aset(key, value, ex = ex, _raw = _raw, **kwargs)
 
     async def aset_batch(self, data: Dict[KT, VT], **kwargs) -> None:
         """

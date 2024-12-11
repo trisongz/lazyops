@@ -6,8 +6,8 @@ that have OpenAI-compatible endpoints.
 """
 
 import abc
-import aiohttpx
 import contextlib
+from lzl.api import aiohttpx
 from typing import Optional, Callable, Dict, Union, List
 
 from lzl.api.openai.schemas import *

@@ -17,7 +17,11 @@ import typing as t
 from lzl import load
 from lzl.pool import ThreadPool
 from lzo.types import eproperty
-from pydantic.networks import MultiHostUrl, UrlConstraints, Annotated
+from pydantic.networks import UrlConstraints, Annotated
+try:
+    from pydantic_core import MultiHostUrl
+except ImportError:
+    from pydantic.networks import MultiHostUrl
 from ..base import logger
 from .utils import dict_diff
 from typing import TypeVar, Generic, Any, Dict, Optional, Union, Tuple, Iterable, List, Type, Callable, Generator, AsyncGenerator, TYPE_CHECKING

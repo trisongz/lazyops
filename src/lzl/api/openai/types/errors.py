@@ -1,7 +1,7 @@
 
 import json
-import aiohttpx
 import contextlib
+from lzl.api import aiohttpx
 from pydantic import PrivateAttr
 from typing import Any, Optional, Union, Dict
 from lzo.types import BaseModel, eproperty

@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import json
 import pathlib
-import aiohttpx
 import random
-
+from lzl.api import aiohttpx
 from lzl.types import BaseModel, Field, eproperty, model_validator, field_validator, validator, root_validator, PYDANTIC_VERSION
 from lzl.proxied import proxied, ProxyObject
 # from lzo.types import AppEnv

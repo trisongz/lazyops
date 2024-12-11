@@ -44,3 +44,5 @@ tests/lzl/hatchet.py
 src/lzl/ext/fast/tests
 src/lzl/.data/lzl.tmp.json
 tests/lzl/exts/fastapi_oauth2.py
+src/lazyops/*
+/tests/lzl/exts/tmprl

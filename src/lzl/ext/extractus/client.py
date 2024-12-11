@@ -4,27 +4,14 @@ import abc
 import typing as t
 from io import BytesIO, BufferedReader # type: ignore
 from lzl import load
-from lzl.types import BaseModel, Field, Literal
+from .types import ExtractorMode, ExtractorResult, PDFOCRStrategy, ExtractousResult
 
 if load.TYPE_CHECKING:
     import extractous
     from lzl.io import FileLike
 else:
-    extractous = load.lazy_load('extractous')
+    extractous = load.lazy_load('extractous', install_missing=True)
 
-
-class ExtractousResult(BaseModel):
-    """
-    Extractous Result
-    """
-    result: str = Field(None, description = "The extracted result")
-    metadata: t.Dict[str, t.Union[t.List[str], t.Any]] = Field(default_factory=dict, description = "The extracted metadata")
-
-
-ExtractorMode = Literal['raw', 'dict', 'string', 'object']
-ExtractorResult = t.Tuple[BufferedReader | t.Dict[str, t.Union[t.List[str], t.Any]]] |  str | t.Dict[str, t.Union[t.Dict[str, t.Any], t.List[str], t.Any]] | ExtractousResult
-
-PDFOCRStrategy = Literal['NO_OCR', 'OCR_ONLY', 'OCR_AND_TEXT_EXTRACTION', 'AUTO']
 
 # https://github.com/yobix-ai/extractous/blob/336857d55920c81026936252270e46ec87ba0969/extractous-core/src/config.rs#L18
 # 500_000

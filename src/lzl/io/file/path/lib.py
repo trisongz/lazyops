@@ -1684,6 +1684,7 @@ class Path(PurePath):
         return self
 
 
+
 class PosixPath(Path, PurePosixPath):
     """Path subclass for non-Windows systems.
 

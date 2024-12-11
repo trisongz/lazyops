@@ -1,10 +1,9 @@
 
 import random
 import inspect
-import aiohttpx
 import bisect
 import itertools
-
+from lzl.api import aiohttpx
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Iterator, AsyncIterator, Union, List, Tuple
 from lzo.utils import timer, is_coro_func

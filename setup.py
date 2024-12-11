@@ -19,6 +19,7 @@ requirements = [
     'pydantic-settings',
     'frozendict',
     'async_lru',
+    'pyyaml',
 ] if not is_builder_ci else [
     'typer',
     'pydantic',
@@ -57,7 +58,7 @@ extras = {
         'python-jose',
     ],
     'openai': [
-        'aiohttpx',
+        'httpx',
         'backoff',
         'tiktoken',
         'jinja2',

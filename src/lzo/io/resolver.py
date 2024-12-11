@@ -4,6 +4,7 @@ from __future__ import annotations
 HTTP / DNS Resolver Utilities
 """
 
+import time
 import socket
 import functools
 import contextlib
@@ -13,12 +14,12 @@ from typing import Optional, List, Dict, TYPE_CHECKING
 
 if load.TYPE_CHECKING:
     import pythonping
-    import aiohttpx
     import tldextract
     import async_lru
+    from lzl.api import aiohttpx
 else:
     pythonping = load.LazyLoad("pythonping")
-    aiohttpx = load.LazyLoad("aiohttpx")
+    aiohttpx = load.lazy_load('lzl.api.aiohttpx', install_missing = False)
     tldextract = load.LazyLoad("tldextract")
     async_lru = load.LazyLoad("async_lru")
 
@@ -160,9 +161,11 @@ def validate_hostname(url: str) -> bool:
     Validates the hostname
     """    
     hostname = urlparse(url).hostname if '://' in url else url
-    with contextlib.suppress(Exception):
-        socket.gethostbyname(hostname)
-        return True
+    for _attempts in range(5):
+        with contextlib.suppress(Exception):
+            socket.gethostbyname(hostname)
+            return True
+        time.sleep(1.5)
     return False
 
 

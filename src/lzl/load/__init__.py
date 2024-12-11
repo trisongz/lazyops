@@ -39,5 +39,5 @@ sometimes_called()
 
 from .main import LazyLoad, lazy_load, load
 from .wrappers import lazy_function_wrapper
-from .utils import lazy_import, lazy_function, is_coro_func, import_string, import_function, validate_callable
+from .utils import lazy_import, lazy_function, is_coro_func, import_string, import_function, validate_callable, import_from_string
 from typing import TYPE_CHECKING

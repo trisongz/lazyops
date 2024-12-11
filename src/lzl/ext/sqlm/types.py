@@ -12,7 +12,7 @@ from pydantic._internal._repr import Representation
 from sqlmodel.main import SQLModelMetaclass, Field, FieldInfo, SQLModelConfig, SQLModel as BaseSQLModel
 from sqlmodel.main import default_registry
 from lzl.types import eproperty, PrivateAttr
-from typing import Any, ClassVar, Coroutine, List, Dict, Tuple, TypeVar, Type, Awaitable, Callable, Optional, Union, ClassVar, TYPE_CHECKING
+from typing import Any, ClassVar, Coroutine, List, Dict, Tuple, TypeVar, Type, Awaitable, Callable, Set, Optional, Union, ClassVar, TYPE_CHECKING
 from sqlalchemy.util.concurrency import greenlet_spawn
 
 
@@ -43,6 +43,21 @@ class SQLModel(BaseSQLModel):
         _extra: Dict[str, Any] = PrivateAttr(default_factory = dict)
         model_config = SQLModelConfig(from_attributes = True, arbitrary_types_allowed = True, json_schema_extra = schema_extra)
 
+
+_sql_model_init_hooks: Set[Callable[..., Any]] = set()
+
+def add_sql_model_init_hook(func: Callable[..., Any]) -> None:
+    """
+    Adds an SQLModel Init Hook
+    """
+    _sql_model_init_hooks.add(func)
+
+def run_sql_model_init_hooks(model: Type['SQLModel']) -> None:
+    """
+    Runs the SQLModel Init Hooks
+    """
+    for hook in _sql_model_init_hooks:
+        hook(model)
 
 # Adding AsyncSQLModel to the list of SQLModels
 # https://github.com/fastapi/sqlmodel/pull/872/files
@@ -100,8 +115,9 @@ class AsyncSQLModelMetaclass(SQLModelMetaclass):
                 return greenlet_spawn(getattr, self, field)
 
             setattr(cls, field_name, property(get_awaitable_field))
-
+        
         SQLModelMetaclass.__init__(cls, classname, bases, dict_, **kw)
+        run_sql_model_init_hooks(cls)
 
 class AsyncSQLModel(SQLModel, metaclass=AsyncSQLModelMetaclass):
     

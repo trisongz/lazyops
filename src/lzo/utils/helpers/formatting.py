@@ -249,3 +249,10 @@ def parse_duration(duration: str) -> float:
         elif ' hours' in part: total += float(part.split(' ')[0]) * 3600
         elif ' days' in part: total += float(part.split(' ')[0]) * 86400
     return total
+
+
+def combine_parts(*parts: Optional[str], sep: Optional[str] = '.') -> str:
+    """
+    Combines the parts into a single string
+    """
+    return sep.join(p for p in parts if p)

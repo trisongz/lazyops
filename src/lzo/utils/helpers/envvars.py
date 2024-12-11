@@ -7,6 +7,7 @@ Env Var Helpers
 import os
 import re
 import json
+import subprocess
 from pathlib import Path
 from .formatting import build_dict_from_str
 from typing import Any, Dict, List, Optional, Tuple, Union, Type, TypeVar, TYPE_CHECKING
@@ -58,7 +59,7 @@ def parse_envvars_from_text(
     """
 
     # Create a pattern that would match env/ENVVAR_NAME and capture the ENVVAR_NAME
-    _prefix = envvar_prefix.replace('/', '\/')
+    _prefix = envvar_prefix.replace('/', '|/')
     pattern = re.compile(rf'({_prefix}\w+)')
 
     # Find all
@@ -82,6 +83,78 @@ def parse_envvars_from_text(
 
     return text, values
 
+# _envvar_pattern = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+# _envvar_pattern = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*(?:\:[A-Za-z_][A-Za-z0-9_]*)*)\}")
+# _envvar_pattern = re.compile(r"\$\{([A-Za-z_][\w\.]*(?:\:[A-Za-z_][\w]*)*)\}")
+_envvar_pattern = re.compile(r"\$\{([^}]*)\}")
+_envkey_getters = {
+    'HOST': (lambda: os.uname().nodename), 
+    'HOSTNAME': (lambda: os.uname().nodename),
+}
+
+def dummy_sample(t: str, *args) -> str:
+    return f'{t}-1'
+
+def get_cmd_output(cmd: str, *args) -> str:
+    """
+    Runs a command and returns the output
+    """
+    cmd = cmd.lstrip('$(').rstrip(')')
+    with os.popen(cmd) as pipe:
+        return pipe.read().strip()
+
+        
+def replace_envvars_in_text(
+    text: str,
+    enable_function_calls: Optional[bool | str] = 'auto',
+    enable_shell_commands: Optional[bool | str] = 'auto',
+) -> str:
+    """
+    Replaces all envvars in a text with their values
+
+    All env vars need to be wrapped in ${} to be replaced.
+
+    If `enable_function_calls` is True, then any envvars that are prefixed with
+    `func:` will be treated as a function call and the result will be used as the value.
+
+    If `enable_shell_commands` is True, then any envvars that are prefixed with
+    `cmd:` will be treated as a shell command and the result will be used as the value.
+
+    Example:
+        >>> replace_envvars_in_text("Hello, ${NAME}!")
+        "Hello, John!"
+
+        >>> replace_envvars_in_text("Hello, ${func:get_name:John}!")
+        "Hello, John!"
+
+        >>> replace_envvars_in_text("Hello, ${cmd:$(echo 'John')}!")
+        "Hello, John!"
+
+    """
+    from lzl.load import lazy_import
+    if enable_function_calls == 'auto': enable_function_calls = '${func:' in text
+    if enable_shell_commands == 'auto': enable_shell_commands = '${cmd:' in text
+    for match in _envvar_pattern.finditer(text):
+        envvar = match.group(1)
+        _default = ''
+        # print(envvar)
+        if enable_function_calls and envvar.startswith('func:'):
+            parts = envvar.split(':')
+            args = parts[2:] or []
+            func = lazy_import(parts[1])
+            value = func(*args)
+        elif enable_shell_commands and envvar.startswith('cmd:'):
+            parts = envvar.split(':')
+            args = parts[2:] or []
+            value = get_cmd_output(parts[1], *args)
+        elif envvar in _envkey_getters: value = _envkey_getters[envvar]()
+        else: 
+            if ':-' in envvar:
+                envvar, _default = envvar.split(':-')
+            value = os.getenv(envvar)
+        value = value or _default
+        text = text.replace(match.group(0), value)
+    return text
 
 
 def load_env_vars(

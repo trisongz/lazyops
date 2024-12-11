@@ -13,7 +13,7 @@ from temporalio.converter import (
 from .utils import get_json_meta, _json
 
 
-class PydanticJSONPayloadConverter(JSONPlainPayloadConverter):
+class PydanticSerializedPayloadConverter(JSONPlainPayloadConverter):
     """Pydantic JSON payload converter.
 
     This extends the :py:class:`JSONPlainPayloadConverter` to override
@@ -52,7 +52,7 @@ class PydanticPayloadConverter(CompositePayloadConverter):
     def __init__(self) -> None:
         super().__init__(
             *(
-                PydanticJSONPayloadConverter() if isinstance(c, JSONPlainPayloadConverter) else c
+                PydanticSerializedPayloadConverter() if isinstance(c, JSONPlainPayloadConverter) else c
                 for c in DefaultPayloadConverter.default_encoding_payload_converters
             )
         )

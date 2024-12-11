@@ -160,6 +160,7 @@ class BaseFileSystemAccessor(NormalAccessor):
 
 
     info: t.Callable = create_staticmethod(CloudFileSystem, 'info')
+    metadata: t.Callable = create_staticmethod(CloudFileSystem, 'metadata')
     stat: t.Callable = create_staticmethod(CloudFileSystem, 'stat')
     size: t.Callable = create_staticmethod(CloudFileSystem, 'size')
     exists: t.Callable = create_staticmethod(CloudFileSystem, 'exists')
@@ -232,6 +233,7 @@ class BaseFileSystemAccessor(NormalAccessor):
     areplace: t.Callable = create_async_coro(CloudFileSystem, 'rename')
 
     ainfo: t.Callable = create_async_method_fs(CloudFileSystem, 'ainfo')
+    ametadata: t.Callable = create_async_method_fs(CloudFileSystem, 'ametadata')
     aexists: t.Callable = create_async_method_fs(CloudFileSystem, 'aexists')
     aglob: t.Callable = create_async_method_fs(CloudFileSystem, 'aglob')
     afind: t.Callable = create_async_method_fs(CloudFileSystem, 'afind')
@@ -248,7 +250,7 @@ class BaseFileSystemAccessor(NormalAccessor):
     
     aput: t.Callable = create_async_method_fs(CloudFileSystem, 'aput')
     aput_file: t.Callable = create_async_method_fs(CloudFileSystem, 'aput_file')
-    ametadata: t.Callable = create_async_method_fs(CloudFileSystem, 'ainfo')
+    # ametadata: t.Callable = create_async_method_fs(CloudFileSystem, 'ametadata')
     aopen: t.Callable = create_async_method_fs(CloudFileSystem, '_open')
     amkdir: t.Callable = create_async_method_fs(CloudFileSystem, 'amkdir')
     amakedirs: t.Callable = create_async_method_fs(CloudFileSystem, 'amakedirs')
@@ -359,7 +361,7 @@ class BaseFileSystemAccessor(NormalAccessor):
         cls.aget_file: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'aget_file')
         cls.aput: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'aput')
         cls.aput_file: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'aput_file')
-        cls.ametadata: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'ainfo')
+        cls.ametadata: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'ametadata')
         cls.aopen: t.Callable = create_async_method_fs(cls.CloudFileSystem, '_open')
         cls.amkdir: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'amkdir')
         cls.amakedirs: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'amakedirs')

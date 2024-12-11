@@ -28,7 +28,7 @@ except ImportError:
 
 
 if TYPE_CHECKING:
-    from aiohttpx import Response
+    from lzl.api.aiohttpx import Response
 
 class ApiType(str, Enum):
     openai = "openai"

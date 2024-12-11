@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import aiohttpx
 
+from lzl.api import aiohttpx
 from typing import Optional, Dict, Callable, List, Type, TYPE_CHECKING
 from lzl.api.openai.schemas import *
 from lzl.api.openai.types.routes import BaseRoute

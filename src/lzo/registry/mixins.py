@@ -95,6 +95,7 @@ class RegisteredClient(abc.ABC):
 
     _rxtra: Dict[str, Any] = {}
     _rmodule: Optional[str] = None
+    _rsubmodule: Optional[str] = None
 
     def __init_subclass__(cls, **kwargs: Dict[str, Any]):
         if not hasattr(cls, 'enable_registration') or cls.enable_registration is True:
@@ -110,6 +111,7 @@ class RegisteredClient(abc.ABC):
         """
         new = copy.deepcopy(cls)
         if kwargs.get('module'): new._rmodule = kwargs.pop('module')
+        if kwargs.get('submodule'): new._rsubmodule = kwargs.pop('submodule')
         if kwargs.get('name'): new.name = kwargs.pop('name')
         if kwargs: new._rxtra.update(kwargs)
         return new
@@ -148,6 +150,7 @@ class RegisteredSettings(abc.ABC):
     Registers this as the module settings
     """
     _rmodule: Optional[str] = None
+    _rsubmodule: Optional[str] = None
     _rxtra: Dict[str, Any] = {}
 
     def __init_subclass__(cls, **kwargs: 'ConfigDict'):
@@ -162,6 +165,7 @@ class RegisteredSettings(abc.ABC):
         """
         new = copy.deepcopy(cls)
         if kwargs.get('module'): new._rmodule = kwargs.pop('module')
+        if kwargs.get('submodule'): new._rsubmodule = kwargs.pop('submodule')
         if kwargs: new._rxtra.update(kwargs)
         return new
 

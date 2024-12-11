@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import json
 import pathlib
-import aiohttpx
 import contextlib
-
+from lzl.api import aiohttpx
 from lzl.types import BaseSettings, validator, eproperty, Field
 from lzo.utils import create_unique_id
 from typing import Optional, Dict, Union, Any, Type

@@ -3,9 +3,8 @@ from __future__ import annotations
 import json
 import logging
 import pathlib
-import aiohttpx
 import contextlib
-
+from lzl.api import aiohttpx
 from pydantic import PrivateAttr
 from lzl.types import BaseSettings, validator, eproperty, Field, field_validator
 from lzl.proxied import proxied, ProxyObject

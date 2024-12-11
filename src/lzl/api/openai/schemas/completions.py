@@ -5,8 +5,8 @@ import enum
 import json
 import time
 import asyncio
-import aiohttpx
 import contextlib
+from lzl.api import aiohttpx
 from typing import Optional, Type, Any, Union, List, Dict, Iterator, AsyncIterator, Generator, AsyncGenerator, TYPE_CHECKING
 
 from lzo.types import (

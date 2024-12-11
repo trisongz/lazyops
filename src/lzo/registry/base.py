@@ -12,7 +12,11 @@ from typing import Dict, TypeVar, Optional, Type, Union, Any, Generic, Callable,
 
 RT = TypeVar('RT')
 
-
+def combine_parts(*parts: Optional[str], sep: Optional[str] = '.') -> str:
+    """
+    Combines the parts into a single string
+    """
+    return sep.join(p for p in parts if p)
 
 class MRegistry(Generic[RT]):
     """

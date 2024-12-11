@@ -18,7 +18,13 @@ import atexit
 from lzl import load
 from lzl.pool import ThreadPool
 from lzo.types import eproperty
-from pydantic.networks import MultiHostUrl, UrlConstraints, Annotated
+from pydantic.networks import UrlConstraints, Annotated
+from pydantic.networks import UrlConstraints, Annotated
+try:
+    from pydantic_core import MultiHostUrl
+except ImportError:
+    from pydantic.networks import MultiHostUrl
+
 from pydantic.alias_generators import to_camel
 from ..base import logger
 from .utils import dict_diff

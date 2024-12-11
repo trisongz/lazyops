@@ -22,10 +22,11 @@ if TYPE_CHECKING:
     from .base import DataSchema, ResultSchema
 
 if load.TYPE_CHECKING:
-    import aiohttpx
-    from aiohttpx import Response, Client as HTTPClient
+    from lzl.api import aiohttpx
+    from lzl.api.aiohttpx import Response, Client as HTTPClient
+
 else:
-    aiohttpx = load.LazyLoad("aiohttpx", install_missing=True)
+    aiohttpx = load.lazy_load('lzl.api.aiohttpx', install_missing = False)
 
 
 ResponseDataType = Literal['json', 'text', 'bytes']
@@ -286,6 +287,7 @@ class BaseHTTPClientMixin(abc.ABC):
         """
         Configures the HTTP Client
         """
+        from lzl.api import aiohttpx
         limits = aiohttpx.Limits(**self.http_client_limits)
         return aiohttpx.Client(
             base_url = self.endpoint,

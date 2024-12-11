@@ -1,45 +1,31 @@
 from __future__ import annotations
 
 """
-Temporal Workflow Mixins
+Temporal Workflow Mixins: Base
 """
 
 import abc
 import uuid
 import copy
-import functools
-import contextlib
-import dataclasses
 import typing as t
-from .utils import logger, null_logger
+from ..utils import logger, null_logger
+from .utils import default_id_gen_function
 from lzl.types import eproperty, BaseModel, Field, field_validator
 
 if t.TYPE_CHECKING:
     from lzl.types import AppEnv
     from lzl.logging import Logger
-    from .registry import TemporalRegistry
     from lzl.io.file import FileLike
+    from ..registry import TemporalRegistry, RegistryItem
+    from ..client import TemporalClient
     from temporalio.types import ParamType, ReturnType
+    from lzl.ext.temporal.mixins import TemporalWorkflowT, TemporalActivityT, TemporalDispatchT, TemporalObjT
 
-MixinKinds = t.Literal['activity', 'workflow']
 
-def default_id_gen_function(obj: 'BaseTemporalMixin', *args, prefix: t.Optional[str] = None, **kwargs) -> str:
-    """
-    Default ID Generator Function
-    """
-    # logger.info(f'ID Generator Options: {obj}', prefix = 'Temporal')
-    base = prefix or obj.id_gen.prefix or ''
-    if obj.id_gen.func: id_gen = obj.id_gen.func(*args, **kwargs)
-    else: id_gen = str(uuid.uuid4().int)
-    # id_gen = str(uuid.uuid4().int)
-    if obj.id_gen.id_length: id_gen = id_gen[:obj.id_gen.id_length]
-    base += f'{obj.id_gen.joiner}{id_gen}'
-    if obj.id_gen.suffix: base += f'{obj.id_gen.joiner}{obj.id_gen.suffix}'
-    base = base.lstrip(obj.id_gen.joiner).rstrip(obj.id_gen.joiner)
-    base = base.replace(" ", obj.id_gen.joiner).replace(f'{obj.id_gen.joiner}{obj.id_gen.joiner}', obj.id_gen.joiner)
-    if obj.id_gen.lower: base = base.lower()
-    if obj.id_gen.max_length and len(base) > obj.id_gen.max_length: base = base[:obj.id_gen.max_length]
-    return base
+MixinKinds = t.Literal['activity', 'workflow', 'dispatch']
+TemporalInputT = t.TypeVar('TemporalInputT')
+TemporalReturnT = t.TypeVar('TemporalReturnT')
+
 
 class IDGenOptions(BaseModel):
     """
@@ -49,8 +35,8 @@ class IDGenOptions(BaseModel):
     suffix: t.Optional[str] = None
     func: t.Optional[t.Callable[[], str]] = None
     # Field(default = default_id_gen_function, description = "The ID Generator Function")
-    max_length: t.Optional[int] = 24
-    id_length: t.Optional[int] = 8
+    max_length: t.Optional[int] = 48
+    id_length: t.Optional[int] = 24
     joiner: t.Optional[str] = '-'
     lower: t.Optional[bool] = True
 
@@ -97,9 +83,7 @@ class IDGenOptions(BaseModel):
                 else: new.suffix = config['suffix']
             if new.suffix: new.suffix.lstrip(new.joiner)
         return new
-
-TemporalInputT = t.TypeVar('TemporalInputT')
-TemporalReturnT = t.TypeVar('TemporalReturnT')
+    
 
 class BaseTemporalMixin(abc.ABC):
     """
@@ -107,9 +91,16 @@ class BaseTemporalMixin(abc.ABC):
     """
 
     name: t.Optional[str] = None
+    full_name: t.Optional[str] = None # if full_name is defined, this will override everything.
+
     display_name: t.Optional[str] = None
     mixin_kind: t.Optional[MixinKinds] = None
+
+    # We don't want to use namespace as it is reserved for the Temporal namespace
+    # instead we'll use workspace
     namespace: t.Optional[str] = None
+    workspace: t.Optional[str] = None
+    task_queue: t.Optional[str] = None
 
     id_gen: t.Optional[IDGenOptions] = None
     config: t.Optional[t.Dict[str, t.Union[t.Dict[str, t.Any], t.Any], t.Any]] = {}
@@ -129,14 +120,37 @@ class BaseTemporalMixin(abc.ABC):
             cls.config = update_dict(cls.config, cls.merge_configs)
             cls.merge_configs = {}
         
-        if cls.mixin_kind is not None and not cls.disable_registration: #  and cls.name is not None: 
-            if cls._is_subclass_: 
-                cls._is_subclass_ = False
-            else:
-                from lzl.ext.temporal.registry import registry
-                registry.register_mixin(cls)
+        if cls._is_subclass_: 
+            cls._is_subclass_ = False
+            cls = copy.deepcopy(cls)
+            cls._configure_subclass_(**kwargs)
+        
+        elif cls.mixin_kind is not None and not cls.disable_registration: #  and cls.name is not None: 
+            cls._rxtra = {}
+            cls._configure_subclass_(**kwargs)
+            from lzl.ext.temporal.registry import registry
+            registry.register_mixin(cls)
         return super().__init_subclass__(**kwargs)
     
+    # def __new__(cls, *args, **kwargs):
+    #     print(cls._rxtra)
+    #     # cls._rxtra = {}
+    #     return super().__new__(cls, *args, **kwargs)
+
+        
+    @classmethod
+    def _configure_subclass_(cls, parent_cls: t.Optional[t.Type['BaseTemporalMixin']] = None, **kwargs):
+        """
+        Configures the subclass
+        """
+        pass
+
+    @classmethod
+    def _configure_cls_(cls, **kwargs):
+        """
+        Configures the class
+        """
+        pass
 
     @classmethod
     def configure_registered(cls, **kwargs):
@@ -145,7 +159,10 @@ class BaseTemporalMixin(abc.ABC):
         """
         new = copy.deepcopy(cls)
         if kwargs.get('name'): new.name = kwargs.pop('name')
+        if kwargs.get('full_name'): new.full_name = kwargs.pop('full_name')
         if 'namespace' in kwargs: new.namespace = kwargs.pop('namespace')
+        if 'workspace' in kwargs: new.workspace = kwargs.pop('workspace')
+        if 'task_queue' in kwargs: new.task_queue = kwargs.pop('task_queue')
         if 'mixin_kind' in kwargs: new.mixin_kind = kwargs.pop('mixin_kind')
         if 'config' in kwargs: new.config = kwargs.pop('config')
         if 'disable_registration' in kwargs: new.disable_registration = kwargs.pop('disable_registration')
@@ -160,6 +177,9 @@ class BaseTemporalMixin(abc.ABC):
         Allows for more flexible customization of the display name
         """
         if cls.display_name: return cls.display_name
+        if cls.full_name: 
+            cls.display_name = cls.full_name
+            return cls.display_name
         name_opts: t.Dict[str, bool] = cls.config.get('name_options', {})
         # logger.info(name_opts, prefix = 'Temporal')
         # logger.info(cls._rxtra, prefix = 'Temporal')
@@ -181,7 +201,8 @@ class BaseTemporalMixin(abc.ABC):
             else:
                 name += f'{cls._rxtra["module"]}.'
         # logger.info(f'Pre Name {name}', prefix = 'Temporal')
-        if name_opts.get('include_namespace', bool(cls.namespace)) and cls.namespace: name += f'{cls.namespace}.'
+        if name_opts.get('include_namespace', bool(cls.namespace and not cls.workspace)) and cls.namespace: name += f'{cls.namespace}.'
+        if name_opts.get('include_workspace', bool(cls.workspace)) and cls.workspace: name += f'{cls.workspace}.'
         if name_opts.get('name_extra'): name += f'{name_opts["name_extra"]}.'
         if name_opts.get('use_class_name', not cls.name):
             if cls._rxtra['module'] not in name:
@@ -218,6 +239,7 @@ class BaseTemporalMixin(abc.ABC):
         """
         Generates the ID
         """
+        if not self.id_gen: self.id_gen = IDGenOptions(**self.config.get('id_gen_opts', {}))
         return default_id_gen_function(self, *args, **kwargs)
 
     @classmethod
@@ -283,6 +305,7 @@ class BaseTemporalMixin(abc.ABC):
         - _post_init_(*args, **kwargs)
         - _finalize_init_(*args, **kwargs)
         - _show_init_(*args, **kwargs)
+        - _on_start_()
         """
         from lzo.utils import Timer
         self._extra: t.Dict[str, t.Any] = {}
@@ -296,8 +319,14 @@ class BaseTemporalMixin(abc.ABC):
         self._post_init_(*args, **kwargs)
         self._finalize_init_(*args, **kwargs)
         self._show_init_(*args, **kwargs)
-        logger.info(f'Initialized {self.name}', prefix = self.display_name, colored = True)
+        self.registry.register_mixin(self)
+        self._on_start_()
 
+    def _on_start_(self):
+        """
+        Runs the on-start hook
+        """
+        logger.info(f'Initialized {self.name}', prefix = self.display_name, colored = True)
 
     def _pre_init_(self, *args, **kwargs):
         """
@@ -359,7 +388,7 @@ class BaseTemporalMixin(abc.ABC):
         """
         Returns the Temporal registry
         """
-        from .registry import registry
+        from ..registry import registry
         return registry
     
     @property
@@ -369,6 +398,22 @@ class BaseTemporalMixin(abc.ABC):
         """
         return self._rxtra['registry_name']
     
+    @property
+    def _reg_item_(self) -> 'RegistryItem':
+        """
+        Returns the registry item
+        """
+        return self._rxtra['reg_item']
+
+    @eproperty
+    def client(self) -> t.Optional['TemporalClient']:
+        """
+        Returns the Temporal Client
+        """
+        return self._extra.get('client')
+    
+    
+
     """
     Common Class Methods
     """
@@ -386,15 +431,16 @@ class BaseTemporalMixin(abc.ABC):
         registry_name: t.Optional[str] = None,
         module: t.Optional[str] = None,
         namespace: t.Optional[str] = None,
+        workspace: t.Optional[str] = None,
         name: t.Optional[str] = None,
         display_name: t.Optional[str] = None,
         as_type: t.Optional[bool] = None,
         kind: t.Optional['MixinKinds'] = 'workflow',
-    ) -> t.Union['TemporalWorkflowT', 'TemporalActivityT']:
+    ) -> 'TemporalObjT':
         """
         Gets a Temporal Object
         """
-        from .registry import registry
+        from ..registry import registry
         return registry.get_ref(
             registry_name = registry_name,
             module = module,
@@ -438,7 +484,7 @@ class BaseTemporalMixin(abc.ABC):
             next_unit = "mins"
         if colored: msg = f'Next Scheduled Run in |g|{next_interval:.2f} {next_unit}|e| at |g|{next_date}|e|'
         else: msg = f'Next Scheduled Run in {next_interval:.2f} {next_unit} at {next_date}'
-        if verbose: self.logger.info(f'Next Scheduled Run in |g|{next_interval:.2f} {next_unit}|e| at |g|{next_date}|e| ({self.workflow_name})', colored = True, hook = log_hook)
+        if verbose: self.logger.info(f'Next Scheduled Run in |g|{next_interval:.2f} {next_unit}|e| at |g|{next_date}|e| ({self.display_name})', colored = True)
         return {
             'next_date': next_date,
             'next_interval': next_interval,
@@ -453,78 +499,4 @@ class BaseTemporalMixin(abc.ABC):
             Runs the Temporal Object
             """
             ...
-
-
-
-class TemporalWorkflowMixin(BaseTemporalMixin):
-    """
-    [Temporal] Workflow Mixin that will automatically registered
-    """
-
-    mixin_kind: t.Optional[MixinKinds] = 'workflow'
-    _is_subclass_: t.Optional[bool] = True
-
-    # These will be passed to the workflow defn decorator
-    sandboxed: t.Optional[bool] = None
-    dynamic: t.Optional[bool] = None
-    failure_exception_types: t.Optional[t.Sequence[t.Type[BaseException]]] = None
-    enable_init: t.Optional[bool] = None
-
-    @classmethod
-    def configure_registered(cls, **kwargs):
-        """
-        Configures the registered workflow
-        """
-        _kws = {k: kwargs.pop(k) for k in kwargs if k in {'sandboxed', 'dynamic', 'failure_exception_types'}}
-        new = super().configure_registered(**kwargs)
-        if 'sandboxed' in _kws: new.sandboxed = _kws.pop('sandboxed')
-        if 'dynamic' in _kws: new.dynamic = _kws.pop('dynamic')
-        if _kws.get('failure_exception_types'): new.failure_exception_types = _kws.pop('failure_exception_types')
-        return new
-
-    @classmethod
-    def _on_register_hook_(cls):
-        """
-        Runs the workflow hook
-        """
-        pass
-
-class TemporalActivityMixin(BaseTemporalMixin):
-    """
-    [Temporal] Activity Mixin that will automatically registered
-    """
-
-    mixin_kind: t.Optional[MixinKinds] = 'activity'
-    _is_subclass_: t.Optional[bool] = True
-
-    # These will be passed to the activity defn decorator
-    no_thread_cancel_exception: t.Optional[bool] = None
-    dynamic: t.Optional[bool] = None
-
-    @classmethod
-    def configure_registered(cls, **kwargs):
-        """
-        Configures the registered activity
-        """
-        _kws = {k: kwargs.pop(k) for k in kwargs if k in {'no_thread_cancel_exception', 'dynamic'}}
-        new = super().configure_registered(**kwargs)
-        if 'no_thread_cancel_exception' in _kws: new.no_thread_cancel_exception = _kws.pop('no_thread_cancel_exception')
-        if 'dynamic' in _kws: new.dynamic = _kws.pop('dynamic')
-        return new
-
-    @classmethod
-    def _on_register_hook_(cls):
-        """
-        Runs the activity hook
-        """
-        pass
-
-
-
-TemporalMixinT = t.TypeVar('TemporalMixinT', bound = BaseTemporalMixin)
-TmpMixinT = t.TypeVar('TmpMixinT')
-
-TemporalWorkflowT = t.TypeVar('TemporalWorkflowT', bound = TemporalWorkflowMixin)
-TemporalActivityT = t.TypeVar('TemporalActivityT', bound = TemporalActivityMixin)
-
 

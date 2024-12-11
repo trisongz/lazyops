@@ -28,7 +28,7 @@ from ..path import PurePath, Path, FileMode, DEFAULT_ENCODING, ON_ERRORS, NEWLIN
 from ..path.flavours import _pathz_windows_flavour, _pathz_posix_flavour, _pathz_default_flavor
 from .static.content_types import CONTENT_TYPE_BY_EXTENSION
 # from .providers.main import AccessorLike, FileSystemLike, ProviderManager
-from .utils import get_async_file, get_fsspec_file
+from .utils import get_async_file, get_fsspec_file, AsyncFile
 
 
 
@@ -425,7 +425,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         """
         return self._accessor.open(self.fspath_, mode=mode, buffering=buffering, encoding=encoding, errors=errors, newline=newline)
 
-    def aopen(self, mode: FileMode = 'r', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, block_size: int = 5242880, compression: str = None, **kwargs: t.Any) -> IterableAIOFile:
+    def aopen(self, mode: FileMode = 'r', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, block_size: int = 5242880, compression: str = None, **kwargs: t.Any) -> AsyncFile:
         """
         Asyncronously Open the file pointed by this path and return a file object, as
         the built-in open() function does.
@@ -441,7 +441,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         """
         return self._accessor.open(self.fspath_, mode=mode, buffering=buffering, encoding=encoding, errors=errors, block_size=block_size, compression=compression, newline=newline, **kwargs)
 
-    def areader(self, mode: FileMode = 'r', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, block_size: int = 5242880, compression: str = None, **kwargs: t.Any) -> IterableAIOFile:
+    def areader(self, mode: FileMode = 'r', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, block_size: int = 5242880, compression: str = None, **kwargs: t.Any) -> AsyncFile:
         """
         Asyncronously Open the file pointed by this path and return a file object, as
         the built-in open() function does.
@@ -593,14 +593,16 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         Read and return the file's contents.
         """
         with self.open(mode=mode, **kwargs) as file:
-            return file.read(size, offset)
+            if offset: file.seek(offset)
+            return file.read(size)
         
     async def aread(self, mode: FileMode = 'rb', size: t.Optional[int] = -1, offset: t.Optional[int] = 0, **kwargs):
         """
         Read and return the file's contents.
         """
         async with self.aopen(mode=mode, **kwargs) as file:
-            return await file.read(size, offset)
+            if offset: await file.seek(offset)
+            return await file.read(size = size)
 
     def read_text(self, encoding: str | None = DEFAULT_ENCODING, errors: str | None = ON_ERRORS, **kwargs) -> str:
         """
@@ -1462,6 +1464,18 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         os.stat() does.
         """
         return await self._accessor.ainfo(self.fspath_)
+
+    def metadata(self, refresh: t.Optional[bool] = False, **kwargs) -> t.Dict[str, t.Union[str, int, float, datetime.datetime, datetime.timedelta, t.List[str], t.Any]]:
+        """
+        Returns the metadata for the file
+        """
+        return self._accessor.metadata(self.fspath_, refresh = refresh, **kwargs)
+
+    async def ametadata(self, refresh: t.Optional[bool] = False, **kwargs) -> t.Dict[str, t.Union[str, int, float, datetime.datetime, datetime.timedelta, t.List[str], t.Any]]:
+        """
+        Returns the metadata for the file
+        """
+        return await self._accessor.ametadata(self.fspath_, refresh = refresh, **kwargs)
 
     def size(self) -> int:
         """

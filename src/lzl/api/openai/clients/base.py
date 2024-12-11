@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import aiohttpx
+# import aiohttpx
 import contextlib
+from lzl.api import aiohttpx
 from typing import Optional, Callable, Dict, Union, List
 from lzo.utils import timed_cache
 from lzl.api.openai.schemas import *
