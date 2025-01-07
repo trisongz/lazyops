@@ -3,7 +3,7 @@ import random
 import inspect
 import backoff
 import functools
-import aiohttpx
+from lzl.api import aiohttpx
 from typing import Callable, List, Optional, TypeVar, TYPE_CHECKING
 
 try:

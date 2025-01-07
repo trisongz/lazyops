@@ -11,7 +11,7 @@ from lazyops.utils.times import Timer
 from lazyops.utils.logs import Logger
 from lazyops.utils.helpers import create_timestamp, adeferred_task
 from lazyops.utils.pooler import ThreadPooler
-from proposalflow.utils.logs import logger, null_logger
+from lazyops.utils.logs import logger, null_logger
 from typing import Any, Dict, List, Optional, Type, TypeVar, Tuple, Union, Set, TYPE_CHECKING
 
 
