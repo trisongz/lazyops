@@ -62,6 +62,9 @@ class ProxyDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         """
         Initializes the Proxy Dict
         """
+        # self._dict.clear()
+        # self._initialized.clear()
+        
         self.cls_init(**kwargs)
         if initialize_objects is not None: self.initialize_objects = initialize_objects
         if module is not None: self.module = module
@@ -108,6 +111,9 @@ class ProxyDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         Subclass Hook to add defined attributes to the excluded list
         """
         # from lzl.logging import logger
+        # print(f'Clearing ProxyDict: {cls.__name__} - {cls._dict} - {cls._initialized}')
+        cls._dict = {}
+        cls._initialized = {}
         for attr in dir(cls):
             # if attr in cls._excluded_attrs or attr in cls._pdict_attrs: continue
             if attr in cls._pdict_attrs: continue
@@ -179,7 +185,11 @@ class ProxyDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
             name in self._excluded_attrs or \
             name in self._pdict_attrs:
             # print(f'Getting Attribute: {name}')
+            # return getattr(self, name)
+            # try:
             return super().__getattr__(name)
+            # except AttributeError:
+            #     return getattr(self, name)
             # return getattr(self, name)
         return self.get_or_init(name, None)
     

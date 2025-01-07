@@ -9,10 +9,11 @@ import copy
 import pathlib
 import random
 from typing import Optional, List, Callable, Dict, Union, Any, overload, Tuple, TYPE_CHECKING, Literal
+from lzl.types import eproperty
 from lzl.proxied import proxied, ProxyObject
 from lzl.api.openai.schemas import *
 from lzl.api.openai.types.base import ApiType, Usage
-from lzl.api.openai.types.handlers import ModelContextHandler
+# from lzl.api.openai.types.handlers import ModelContextHandler
 from lzl.api.openai.configs import get_settings, OpenAISettings
 from lzl.api.openai.configs.external import ExternalProviderSettings
 from lzl.api.openai.utils import logger, weighted_choice
@@ -33,6 +34,8 @@ if TYPE_CHECKING:
     from .base import OpenAIClient
     from .external import ExternalOpenAIClient
     from .functions import FunctionManager
+    from lzl.api.openai.types.handlers import ModelCostHandler
+    # from ..types.handlers import ModelCostHandler
     from lzl.pool import ThreadPool
     from lzl.api.openai.schemas.chat import Function
     # from async_openai.client import OpenAIClient
@@ -88,6 +91,7 @@ class OpenAIManager(abc.ABC):
         """
         Initializes the OpenAI API Client
         """
+        self._extra: Dict[str, Any] = {}
         self.client_weights: Optional[Dict[str, float]] = {}
         self.client_ping_timeouts: Optional[Dict[str, float]] = {}
         self.client_model_exclusions: Optional[Dict[str, Dict[str, Union[bool, List[str]]]]] = {}
@@ -95,9 +99,9 @@ class OpenAIManager(abc.ABC):
 
         self.no_proxy_client_names: Optional[List[str]] = []
         self.client_callbacks: Optional[List[Callable]] = []
-        from .functions import OpenAIFunctions
-        self.functions: 'FunctionManager' = OpenAIFunctions
-        self.ctx = ModelContextHandler
+        # from .functions import OpenAIFunctions
+        # self.functions: 'FunctionManager' = OpenAIFunctions
+        # self.ctx = ModelContextHandler
         if self.auto_loadbalance_clients is None: self.auto_loadbalance_clients = self.settings.auto_loadbalance_clients
         if self.auto_healthcheck is None: self.auto_healthcheck = self.settings.auto_healthcheck
 
@@ -135,6 +139,23 @@ class OpenAIManager(abc.ABC):
         if self._settings is None:
             self._settings = get_settings()
         return self._settings
+    
+    @eproperty
+    def functions(self) -> 'FunctionManager':
+        """
+        Returns the global functions manager
+        """
+        from .functions import OpenAIFunctions
+        return OpenAIFunctions
+
+    @eproperty
+    def ctx(self) -> 'ModelCostHandler':
+        """
+        Returns the global model context handler
+        """
+        from lzl.api.openai.types.handlers import ModelContextHandler
+        return ModelContextHandler
+
     
     # Changing the behavior to become proxied through settings
 
@@ -1025,11 +1046,11 @@ class OpenAIManager(abc.ABC):
         Truncates the text to the max length
         """
         if max_length is None:
-            model_ctx = ModelContextHandler.get(model)
+            model_ctx = self.ctx.get(model)
             max_length = model_ctx.context_length
         if buffer_length is not None: max_length -= buffer_length
         
-        encoder = ModelContextHandler.get_tokenizer(model)
+        encoder = self.ctx.get_tokenizer(model)
         tokens = encoder.encode(text)
         if len(tokens) > max_length:
             tokens = tokens[-max_length:] # type: ignore
@@ -1048,10 +1069,10 @@ class OpenAIManager(abc.ABC):
         Truncates the text to the max length
         """
         if max_length is None:
-            model_ctx = ModelContextHandler.get(model)
+            model_ctx = self.ctx.get(model)
             max_length = model_ctx.context_length
         if buffer_length is not None: max_length -= buffer_length
-        encoder = ModelContextHandler.get_tokenizer(model)
+        encoder = self.ctx.get_tokenizer(model)
         truncated_texts = []
         for text in texts:
             tokens = encoder.encode(text)
@@ -1733,5 +1754,5 @@ class OpenAIManager(abc.ABC):
         if azure_model_mapping is not None: 
             self.azure_model_mapping = azure_model_mapping
             for key, val in azure_model_mapping.items():
-                ModelContextHandler.add_model(key, val)
+                self.ctx.add_model(key, val)
         self.settings.configure(auto_loadbalance_clients = auto_loadbalance_clients, auto_healthcheck = auto_healthcheck, **kwargs)

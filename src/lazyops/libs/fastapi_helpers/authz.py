@@ -8,7 +8,6 @@ FastAPI AuthZ Client
 
 import abc
 import xxhash
-import aiohttpx
 from fastapi import Request, FastAPI
 from urllib.parse import urlencode, urljoin, urlparse
 from pydantic import BaseModel, Field, PrivateAttr
@@ -19,6 +18,7 @@ from lazyops.utils.helpers import create_unique_id
 from lazyops.utils.system import is_in_kubernetes
 from lazyops.libs.abcs.configs.types import AppEnv
 from typing import Optional, List, Dict, Any, Union, Callable, TYPE_CHECKING, Awaitable
+from lzl.api import aiohttpx
 
 
 class AuthZClientSettings(BaseSettings):

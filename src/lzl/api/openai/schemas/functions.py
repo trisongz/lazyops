@@ -943,7 +943,12 @@ class BaseFunction(ABC):
         Prepare the Function Inputs for the function
         """
         model = model or self.default_model_func
-        prompt = self.template.render(**kwargs)
+        # self.autologger.info(kwargs)
+        try:
+            prompt = self.template.render(**kwargs)
+        except Exception as e:
+            self.autologger.error(f'Error Rendering Prompt: {e}: {kwargs}')
+            raise e
         prompt = await self.api.atruncate_to_max_length(prompt, model = model, buffer_length = self.result_buffer)
         messages = []
         if self.system_template:

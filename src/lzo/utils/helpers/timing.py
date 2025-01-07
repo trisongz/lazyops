@@ -657,3 +657,53 @@ def timer(
         verbose = verbose,
     )
 
+
+class DynamicInterval:
+    """
+    Dynamically adjusts the interval to approach a maximum value.    
+    """
+    def __init__(
+        self, 
+        start_value: int | float = 0.0, 
+        max_value: int | float = 10.0, 
+        initial_interval: int | float = 0.5, 
+        interval_adjustment_factor: float = 1.2, 
+        min_interval: float = 0.1
+    ):
+        """
+        Dynamically adjusts the interval to approach a maximum value.
+
+        Args:
+            start_value: The initial value.
+            max_value: The maximum value to reach.
+            initial_interval: The starting interval.
+            interval_adjustment_factor: Factor to adjust the interval.
+            min_interval: Minimum allowed interval.
+        """
+        self.start_value = start_value
+        self.max_value = max_value
+        self.initial_interval = initial_interval
+        self.interval_adjustment_factor = interval_adjustment_factor
+        self.min_interval = min_interval
+        self.current_value = start_value
+        self.current_interval = initial_interval
+    
+    def _adjust_(self):
+        """
+        Adjusts the interval dynamically.
+        """
+        self.current_value += self.current_interval
+        distance_to_max = self.max_value - self.current_value
+        if distance_to_max < self.current_interval and self.current_interval > self.min_interval:
+            self.current_interval = max(distance_to_max, self.min_interval) # Reduce interval if overshoot is possible
+        elif distance_to_max > self.current_interval * 5:
+            self.current_interval *= self.interval_adjustment_factor # Increase interval if far from max
+
+    @property
+    def value(self) -> float:
+        """
+        Returns the current value.
+        """
+        if self.current_value < self.max_value:
+            self._adjust_()
+        return self.current_value

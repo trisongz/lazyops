@@ -17,6 +17,8 @@ except ImportError:
 
 HookT = t.Callable[[], t.Awaitable[None]]
 _init_hooks: t.Set[HookT] = set()
+_finalize_hooks: t.Set[HookT] = set()
+_added_tasks: t.Set[asyncio.Task] = set()
 
 def add_init_hook(func: HookT | t.Sequence[HookT]):
     """
@@ -24,6 +26,34 @@ def add_init_hook(func: HookT | t.Sequence[HookT]):
     """
     if isinstance(func, list): _init_hooks.update(func)
     else: _init_hooks.add(func)
+        
+def add_finalize_hook(func: HookT | t.Sequence[HookT]):
+    """
+    Adds a finalize hook(s)
+    """
+    if isinstance(func, list): _finalize_hooks.update(func)
+    else: _finalize_hooks.add(func)
+
+def create_task(coro: t.Callable[..., t.Awaitable[t.Any]] | t.Awaitable[t.Any], *args, _task_list: t.Optional[t.Set[asyncio.Task]] = None, **kwargs) -> asyncio.Task:
+    """
+    Adds a task to the finalize hooks
+    """
+    if not inspect.isawaitable(coro): coro = coro(*args, **kwargs)
+    task = asyncio.create_task(coro)
+    _added_tasks.add(task)
+    if _task_list is not None: 
+        _task_list.add(task)
+        task.add_done_callback(_task_list.discard)
+    # Remove the task  from _added_tasks
+    task.add_done_callback(_added_tasks.discard)
+    return task
+
+async def complete_added_tasks(task_list: t.Optional[t.Set[asyncio.Task]] = None):
+    """
+    Completes all current tasks
+    """
+    if task_list is not None: await asyncio.gather(*task_list)
+    elif _added_tasks: await asyncio.gather(*_added_tasks)
 
 async def runtime(
     func: t.Callable[..., t.Awaitable[t.Any]] | t.Awaitable[t.Any],
@@ -35,7 +65,13 @@ async def runtime(
     """
     for hook in _init_hooks:
         await hook(*args, **kwargs)
-    return await func if inspect.isawaitable(func) else await func(*args, **kwargs)
+    try:
+        return await func if inspect.isawaitable(func) else await func(*args, **kwargs)
+    finally:
+        if _added_tasks: await asyncio.gather(*_added_tasks)
+        for hook in _finalize_hooks:
+            await hook(*args, **kwargs)
+        
 
 def run(
     func: t.Callable[..., t.Awaitable[t.Any]] | t.Awaitable[t.Any],

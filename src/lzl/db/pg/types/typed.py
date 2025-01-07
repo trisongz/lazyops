@@ -202,6 +202,7 @@ ischema_names['serializedbinary'] = SerializedBinary
 # Try to import pgvector
 try:
     from pgvector.sqlalchemy import Vector
+    _vector_available = True
 
 except ImportError:
     try:
@@ -264,12 +265,22 @@ except ImportError:
                     return self.op('<=>', return_type=types.Float)(other)
 
         ischema_names['vector'] = Vector
+        _vector_available = True
     except ImportError:
+        _vector_available = False
         class Vector(types.UserDefinedType):
             cache_ok = True
             _string = types.String()
 
             def __init__(self, dim=None):
                 raise NotImplementedError('Vector is not available for without numpy')
+
+# if _vector_available:
+
+class HalfVector(Vector):
+    def get_col_spec(self, **kw):
+        return "HALFVEC" if self.dim is None else f"HALFVEC({self.dim})"
+
+ischema_names['halfvec'] = HalfVector
 
 # from pgvector.asyncpg import Vector

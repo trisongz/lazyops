@@ -162,7 +162,7 @@ class Extractor(abc.ABC):
         result = ''
         buffer = reader.read(chunk_size)
         while len(buffer) > 0:
-            result += buffer.decode(encoding)
+            result += buffer.decode(encoding, errors = 'ignore')
             buffer = reader.read(chunk_size)
         return result
 

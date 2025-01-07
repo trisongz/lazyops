@@ -46,3 +46,12 @@ src/lzl/.data/lzl.tmp.json
 tests/lzl/exts/fastapi_oauth2.py
 src/lazyops/*
 /tests/lzl/exts/tmprl
+tests/wrapping_v3.py
+tests/wrapping_v2.py
+tests/test_aiohttpx.py
+tests/match_env_pattern.py
+tests/lzl/test_psqla.py
+tests/lzl/test_psql.py
+tests/lzl/test_abcs.py
+tests/lzl/settings.py
+tests/lzl/db_sql_model.py

@@ -125,7 +125,7 @@ class BaseTemporalMixin(abc.ABC):
             cls = copy.deepcopy(cls)
             cls._configure_subclass_(**kwargs)
         
-        elif cls.mixin_kind is not None and not cls.disable_registration: #  and cls.name is not None: 
+        elif cls.mixin_kind is not None and not cls.disable_registration and cls._should_register_mixin_(): #  and cls.name is not None: 
             cls._rxtra = {}
             cls._configure_subclass_(**kwargs)
             from lzl.ext.temporal.registry import registry
@@ -136,6 +136,14 @@ class BaseTemporalMixin(abc.ABC):
     #     print(cls._rxtra)
     #     # cls._rxtra = {}
     #     return super().__new__(cls, *args, **kwargs)
+
+    @classmethod
+    def _should_register_mixin_(cls) -> bool:
+        """
+        Returns whether the mixin should be registered
+        """
+        return True
+        
 
         
     @classmethod

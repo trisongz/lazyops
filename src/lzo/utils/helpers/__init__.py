@@ -46,4 +46,5 @@ from .formatting import (
 from .timing import (
     Timer,
     timer,
+    DynamicInterval,
 )

@@ -53,8 +53,9 @@ class ClientParams(BaseModel):
         """
         data = self.model_dump(
             exclude_none = True, 
-            exclude = {'async_transport', 'async_mounts', 'async_event_hooks', 'soup_enabled', 'debug', 'retries'}
+            exclude = {'async_transport', 'async_mounts', 'async_event_hooks', 'soup_enabled', 'debug', 'retries', 'proxies'}
         )
+        if self.proxies: data['proxy'] = self.proxies
         kwargs = data.pop('kwargs', None)
         if kwargs: data.update(kwargs)
         return data
@@ -66,8 +67,9 @@ class ClientParams(BaseModel):
         """
         data = self.model_dump(
             exclude_none = True, 
-            exclude = {'soup_enabled', 'debug', 'retries'}
+            exclude = {'soup_enabled', 'debug', 'retries', 'proxies'}
         )
+        if self.proxies: data['proxy'] = self.proxies
         if data.get('async_transport'):
             data['transport'] = data.pop('async_transport', None)
         if data.get('async_mounts'):

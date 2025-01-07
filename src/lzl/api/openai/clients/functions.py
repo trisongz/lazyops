@@ -8,6 +8,7 @@ import functools
 from abc import ABC
 from lzl.proxied import ProxyObject
 from lzo.utils import Timer
+from lzl.types import eproperty
 from lzl.api.openai.schemas.functions import (
     FunctionSchemaT,
     BaseFunction,
@@ -17,6 +18,7 @@ from lzl.api.openai.schemas.functions import (
 )
 from typing import Optional, Any, Set, Dict, List, Union, Type, Tuple, Awaitable, Generator, AsyncGenerator, TypeVar, TYPE_CHECKING
 if TYPE_CHECKING:
+    from lzl.api.openai.configs import OpenAISettings
     from lzl.api.openai.clients import OpenAIManager as OpenAISessionManager
     from lzl.logging import Logger
     from lazyops.libs.persistence import PersistentDict
@@ -36,13 +38,14 @@ class FunctionManager(ABC):
         self,
         **kwargs,
     ):
-        from lzl.api.openai.configs import settings
-        from lzl.api.openai.utils.logs import logger, null_logger
-        self.logger = logger
-        self.null_logger = null_logger
-        self.settings = settings
-        self.debug_enabled = self.settings.debug_enabled
-        self.cache_enabled = self.settings.function_cache_enabled
+        self._extra: Dict[str, Any] = {}
+        # from lzl.api.openai.configs import settings
+        # from lzl.api.openai.utils.logs import logger, null_logger
+        # self.logger = logger
+        # self.null_logger = null_logger
+        # self.settings = settings
+        # self.debug_enabled = self.settings.debug_enabled
+        # self.cache_enabled = self.settings.function_cache_enabled
 
         self._api: Optional['OpenAISessionManager'] = None
         self._cache: Optional['PersistentDict'] = None
@@ -65,6 +68,52 @@ class FunctionManager(ABC):
             import pickle
             self._pickle = pickle
 
+    @eproperty
+    def logger(self) -> 'Logger':
+        """
+        Returns the logger
+        """
+        from lzl.api.openai.utils.logs import logger
+        return logger
+            
+    @eproperty
+    def null_logger(self) -> 'Logger':
+        """
+        Returns the null logger
+        """
+        from lzl.api.openai.utils.logs import null_logger
+        return null_logger
+
+    @property
+    def autologger(self) -> 'Logger':
+        """
+        Returns the logger
+        """
+        return self.logger if \
+            (self.debug_enabled or self.settings.is_development_env) else self.null_logger
+
+    @eproperty
+    def settings(self) -> 'OpenAISettings':
+        """
+        Returns the settings
+        """
+        from lzl.api.openai.configs import settings
+        return settings
+
+    @eproperty
+    def debug_enabled(self) -> bool:
+        """
+        Returns the debug enabled
+        """
+        return self.settings.debug_enabled
+
+    @eproperty
+    def cache_enabled(self) -> bool:
+        """
+        Returns the cache enabled
+        """
+        return self.settings.function_cache_enabled
+
     @property
     def api(self) -> 'OpenAISessionManager':
         """
@@ -76,14 +125,6 @@ class FunctionManager(ABC):
             self._api = OpenAI
         return self._api
     
-    @property
-    def autologger(self) -> 'Logger':
-        """
-        Returns the logger
-        """
-        return self.logger if \
-            (self.debug_enabled or self.settings.is_development_env) else self.null_logger
-
     @property
     def cache(self) -> 'PersistentDict':
         """
@@ -147,7 +188,7 @@ class FunctionManager(ABC):
         Gets the function
         """
         func = self.functions.get(name)
-        if not func: return None
+        if func is None: return None
         if isinstance(func, type):
             func = func(**self._kwargs)
             self.functions[name] = func

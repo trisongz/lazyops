@@ -8,6 +8,8 @@ import os
 import re
 import json
 import subprocess
+import warnings
+warnings.filterwarnings("ignore", message = "invalid escape sequence")
 from pathlib import Path
 from .formatting import build_dict_from_str
 from typing import Any, Dict, List, Optional, Tuple, Union, Type, TypeVar, TYPE_CHECKING
@@ -59,7 +61,7 @@ def parse_envvars_from_text(
     """
 
     # Create a pattern that would match env/ENVVAR_NAME and capture the ENVVAR_NAME
-    _prefix = envvar_prefix.replace('/', '|/')
+    _prefix = envvar_prefix.replace('/', '\/')
     pattern = re.compile(rf'({_prefix}\w+)')
 
     # Find all

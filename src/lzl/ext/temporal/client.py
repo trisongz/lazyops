@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import typing as t
+import dataclasses
 from temporalio.converter import DataConverter
-from temporalio.client import Client, KeepAliveConfig
+from temporalio.client import Client, KeepAliveConfig, WorkflowExecutionStatus
 from .utils import logger
 from . import patches
 
@@ -24,6 +25,8 @@ if t.TYPE_CHECKING:
     from lzl.ext.temporal.configs import TemporalSettings
 
 
+
+    
 class TemporalClient(Client):
 
     
@@ -189,7 +192,28 @@ class TemporalClient(Client):
     #     finally:
     #         event.set()
     #         loop.run_until_complete(loop.shutdown_asyncgens())
-    # if t.TYPE_CHECKING:
+    if t.TYPE_CHECKING:
+        def get_workflow_handle(
+            self,
+            workflow_id: str,
+            *,
+            run_id: t.Optional[str] = None,
+            first_execution_run_id: t.Optional[str] = None,
+            result_type: t.Optional[t.Type] = None,
+        ) -> patches.WorkflowHandle[t.Any, t.Any]:
+            """Get a workflow handle to an existing workflow by its ID.
+
+            Args:
+                workflow_id: Workflow ID to get a handle to.
+                run_id: Run ID that will be used for all calls.
+                first_execution_run_id: First execution run ID used for cancellation
+                    and termination.
+                result_type: The result type to deserialize into if known.
+
+            Returns:
+                The workflow handle.
+            """
+            ...
 
 
         

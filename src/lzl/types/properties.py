@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 import typing as t
+import functools
 from typing import Any, Union, Dict, TYPE_CHECKING
 
 if TYPE_CHECKING:

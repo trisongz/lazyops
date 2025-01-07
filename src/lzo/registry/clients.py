@@ -43,7 +43,9 @@ def register_initialized_client(
     registry_name = combine_parts(cls_module, cls_submodule, client_name)
     # registry_name = f'{cls_module}.{client_name}'
     if registry_name in _cregistry.init_registry:
-        raise ValueError(f'Client {registry_name} already has registered client')
+        return
+        # raise ValueError(f'Client {registry_name} already has registered client: {_cregistry.init_registry[registry_name]}')
+        # raise ValueError(f'Client {registry_name} already has registered client')
     return _cregistry._register_initialized(registry_name, client)
 
 
