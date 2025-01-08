@@ -4,13 +4,14 @@ from __future__ import annotations
 OpenAI Functions Base Class
 """
 
-import jinja2
+
 import inspect
 import random
+import jinja2
 
 from abc import ABC
 from pydantic import Field, BaseModel
-
+from lzl.ext import jinja
 from lzl.types import get_schema_extra, ConfigDict
 from lzl.types.base import PYDANTIC_VERSION
 from lzo.types import Literal
@@ -34,7 +35,7 @@ if PYDANTIC_VERSION == 2:
 
 FT = TypeVar('FT', bound = BaseModel)
 SchemaT = TypeVar('SchemaT', bound = BaseModel)
-
+j2env = jinja.Environment(include_autofilters = True, default_mode='sync')
 
 class BaseFunctionModel(BaseModel):
 
@@ -871,7 +872,9 @@ class BaseFunction(ABC):
         """
         Creates the template
         """
-        return jinja2.Template(template, enable_async = enable_async, **kwargs)
+        mode = 'async' if enable_async else 'sync'
+        return j2env.get_template(template, mode = mode, is_raw = True, **kwargs)
+        # return jinja2.Template(template, enable_async = enable_async, **kwargs)
     
     def truncate_documents(
         self, 

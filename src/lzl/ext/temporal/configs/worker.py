@@ -25,8 +25,8 @@ class TemporalWorkerConfig(BaseSettings):
     identity: t.Optional[str] = Field(None, description = "Identity for this client. If unset, a default is created based on the version of the SDK.")
     namespace: t.Optional[str] = Field(default="")
     interceptors: t.Optional[t.List[str]] = Field(default=None)
-    activities: t.Optional[t.List[str]] = Field(default=[])
-    workflows: t.Optional[t.List[str]] = Field(default=[])
+    activities: t.Optional[t.List[str]] = Field(default_factory=list)
+    workflows: t.Optional[t.List[str]] = Field(default_factory=list)
     
     converter: t.Optional[str] = Field(default=None)
     factory: t.Optional[str] = Field(default=None)
@@ -37,7 +37,25 @@ class TemporalWorkerConfig(BaseSettings):
     disable_eager_activity_execution: bool = Field(default=True) # pylint: disable=invalid-name
     metric_bind_address: str = Field(default="0.0.0.0:9000")
 
+    mapping: t.Optional[t.Dict[str, str]] = Field(default=None, description = "Mapping of workflow names to activity names")
+
     class Config(BaseSettings.Config):
         env_prefix = "TEMPORAL_WORKER_"
+
+    @model_validator(mode = 'before')
+    def validate_config_values(cls, values: t.Dict[str, t.Any]) -> t.Dict[str, t.Any]:
+        """
+        Validates the values
+        """
+        if values.get('mapping') and 'workflows' not in values and 'activities' not in values:
+            values['workflows'] = list(values['mapping'].keys())
+            values['activities'] = list(values['mapping'].values())
+        return values
+
+            
+
+
+
+    
 
 

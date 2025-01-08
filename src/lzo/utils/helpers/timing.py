@@ -339,6 +339,20 @@ class Timer(abc.ABC, dict):
         avg = self.elapsed_average_iter(count)
         return f'{avg:.2f}/sec' if unit is None else f'{avg:.2f} {unit}/sec'
 
+    def estimated_remaining(self, total: int, current: int) -> float:
+        """
+        Returns the estimated remaining time for completion
+        """
+        count = total - current
+        remaining = total - count
+        avg = self.elapsed_average_iter(count)
+        return avg * remaining
+    
+    def estimated_remaining_s(self, total: int, current: int) -> str:
+        """
+        Returns the estimated remaining time for completion as a string
+        """
+        return self.pformat(self.estimated_remaining(total, current))
 
     @property
     def average(self) -> float:

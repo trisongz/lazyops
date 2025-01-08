@@ -55,6 +55,9 @@ class TemporalDispatchMixin(BaseTemporalMixin, t.Generic[ParamT, ReturnT]):
                 'start_workflow': list(
                     self.client.start_workflow.__code__.co_varnames
                 ),
+                'create_schedule': list(
+                    self.client.create_schedule.__code__.co_varnames
+                ),
             }
 
     def _extract_func_kwargs_(self, func: str, kwargs: t.Dict[str, t.Any]) -> t.Tuple[t.Dict[str, t.Any], t.Dict[str, t.Any]]:

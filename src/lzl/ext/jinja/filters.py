@@ -35,10 +35,25 @@ def load_file(path: str) -> str:
     from lzl.io.file import File
     return File(path).read_text()
 
+def to_title(text: str) -> str:
+    """
+    Converts a string to title case
+    """
+    return text.replace('_', ' ').title()
+
+def normalize_value(value: str | list | Any) -> Any:
+    """
+    Normalizes a value
+    """
+    if isinstance(value, list): return ', '.join(value)
+    return value.strip() if isinstance(value, str) else value
+
 autofilters = {
     'to_json': to_json,
     'to_yaml': to_yaml,
     'to_base64': to_base64,
     'get_http': get_http,
     'load_file': load_file,
+    'to_title': to_title,
+    'normalize_value': normalize_value,
 }
