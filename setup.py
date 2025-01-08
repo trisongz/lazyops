@@ -20,6 +20,7 @@ requirements = [
     'frozendict',
     'async_lru',
     'pyyaml',
+    # 'setuptools '
 ] if not is_builder_ci else [
     'typer',
     'pydantic',
@@ -29,6 +30,8 @@ requirements = [
 
 if sys.version_info.minor < 8:
     requirements.append('typing_extensions')
+if sys.version_info.minor > 11:
+    requirements.append('setuptools')
 
 extras = {
     'kops': [
