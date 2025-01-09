@@ -493,7 +493,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         try:
             future.result()
         except Exception as e:
-            if 'botocore.exceptions.ClientError' in str(e):
+            if 'We encountered an internal error' in str(e):
                 logger.error(f'Error reading chunked with TMGR: {e}')
                 return self._read_chunked_default(mode = mode, start = start, end = end, encoding = encoding, errors = errors, **kwargs)
             raise e
@@ -519,7 +519,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         try:
             await ThreadPool.asyncish(future.result)
         except Exception as e:
-            if 'botocore.exceptions.ClientError' in str(e):
+            if 'We encountered an internal error' in str(e):
                 logger.error(f'Error reading chunked with TMGR: {e}')
                 return await self._aread_chunked_default(mode = mode, start = start, end = end, encoding = encoding, errors = errors, **kwargs)
             raise e
