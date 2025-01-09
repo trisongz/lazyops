@@ -490,7 +490,13 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             self.get_path_key(self.name),
             bytes_io,
         )
-        future.result()
+        try:
+            future.result()
+        except Exception as e:
+            if 'botocore.exceptions.ClientError' in str(e):
+                logger.error(f'Error reading chunked with TMGR: {e}')
+                return self._read_chunked_default(mode = mode, start = start, end = end, encoding = encoding, errors = errors, **kwargs)
+            raise e
         bytes_io.seek(0)
         if 'b' in mode: 
             if start: bytes_io.seek(start)
@@ -510,7 +516,13 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             self.get_path_key(self.name),
             bytes_io,
         )
-        await ThreadPool.asyncish(future.result)
+        try:
+            await ThreadPool.asyncish(future.result)
+        except Exception as e:
+            if 'botocore.exceptions.ClientError' in str(e):
+                logger.error(f'Error reading chunked with TMGR: {e}')
+                return await self._aread_chunked_default(mode = mode, start = start, end = end, encoding = encoding, errors = errors, **kwargs)
+            raise e
         # future.result()
         bytes_io.seek(0)
         if 'b' in mode: 
