@@ -58,15 +58,19 @@ def parse_db_config(
         user_uri_base = f'{uri_base}{user}'
         if in_cluster:
             cluster_eps = config['endpoints']['cluster']
-            if cluster_eps.get('prw'):
-                results['url'] = f'{user_uri_base}@{cluster_eps["prw"]}/{db}'
-            elif cluster_eps.get('rw'):
-                results['url'] = f'{user_uri_base}@{cluster_eps["rw"]}/{db}'
+            if isinstance(cluster_eps, str): 
+                results['url'] = f'{user_uri_base}@{cluster_eps}/{db}'
             
-            if cluster_eps.get('pro'):
-                results['readonly_url'] = f'{user_uri_base}@{cluster_eps["pro"]}/{db}'
-            elif cluster_eps.get('ro'):
-                results['readonly_url'] = f'{user_uri_base}@{cluster_eps["ro"]}/{db}'
+            else:
+                if cluster_eps.get('prw'):
+                    results['url'] = f'{user_uri_base}@{cluster_eps["prw"]}/{db}'
+                elif cluster_eps.get('rw'):
+                    results['url'] = f'{user_uri_base}@{cluster_eps["rw"]}/{db}'
+                
+                if cluster_eps.get('pro'):
+                    results['readonly_url'] = f'{user_uri_base}@{cluster_eps["pro"]}/{db}'
+                elif cluster_eps.get('ro'):
+                    results['readonly_url'] = f'{user_uri_base}@{cluster_eps["ro"]}/{db}'
         
         elif isinstance(config['endpoints']['public'], dict):
             public_eps = config['endpoints']['public']
@@ -87,7 +91,9 @@ def parse_db_config(
         superuser_uri_base = f'{uri_base}{superuser}'
         if in_cluster:
             cluster_eps = config['endpoints']['cluster']
-            if cluster_eps.get('rw'):
+            if isinstance(cluster_eps, str):
+                results['superuser_url'] = f'{superuser_uri_base}@{cluster_eps}/{db}'
+            elif cluster_eps.get('rw'):
                 results['superuser_url'] = f'{superuser_uri_base}@{cluster_eps["rw"]}/{db}'
             elif cluster_eps.get('prw'):
                 results['superuser_url'] = f'{superuser_uri_base}@{cluster_eps["prw"]}/{db}'
