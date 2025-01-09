@@ -49,7 +49,7 @@ def parse_pg_config(
     if in_cluster is None:
         from lzo.utils.system import is_in_kubernetes
         in_cluster = is_in_kubernetes()
-    
+
     uri_base = f'{config.get("adapter", "postgresql+asyncpg")}://'
     db = config['database']
     results = {}
@@ -57,39 +57,45 @@ def parse_pg_config(
         user_uri_base = f'{uri_base}{user}'
         if in_cluster:
             cluster_eps = config['endpoints']['cluster']
-            if cluster_eps.get('prw'):
-                results['url'] = f'{user_uri_base}@{cluster_eps["prw"]}/{db}'
-            elif cluster_eps.get('rw'):
-                results['url'] = f'{user_uri_base}@{cluster_eps["rw"]}/{db}'
-            
-            if cluster_eps.get('pro'):
-                results['readonly_url'] = f'{user_uri_base}@{cluster_eps["pro"]}/{db}'
-            elif cluster_eps.get('ro'):
-                results['readonly_url'] = f'{user_uri_base}@{cluster_eps["ro"]}/{db}'
-        
+            if isinstance(cluster_eps, str): 
+                results['url'] = f'{user_uri_base}@{cluster_eps}/{db}'
+            else:
+                if cluster_eps.get('prw'):
+                    results['url'] = f'{user_uri_base}@{cluster_eps["prw"]}/{db}'
+                elif cluster_eps.get('rw'):
+                    results['url'] = f'{user_uri_base}@{cluster_eps["rw"]}/{db}'
+
+                if cluster_eps.get('pro'):
+                    results['readonly_url'] = f'{user_uri_base}@{cluster_eps["pro"]}/{db}'
+                elif cluster_eps.get('ro'):
+                    results['readonly_url'] = f'{user_uri_base}@{cluster_eps["ro"]}/{db}'
+
         elif isinstance(config['endpoints']['public'], dict):
             public_eps = config['endpoints']['public']
             if public_eps.get('prw'):
                 results['url'] = f'{user_uri_base}@{public_eps["prw"]}/{db}'
             elif public_eps.get('rw'):
                 results['url'] = f'{user_uri_base}@{public_eps["rw"]}/{db}'
-            
+
             if public_eps.get('pro'):
                 results['readonly_url'] = f'{user_uri_base}@{public_eps["pro"]}/{db}'
             elif public_eps.get('ro'):
                 results['readonly_url'] = f'{user_uri_base}@{public_eps["ro"]}/{db}'
-        
+
         else:
             results['url'] = f'{user_uri_base}@{config["endpoints"]["public"]}/{db}'
-    
+
     if superuser := config['users'].get('superuser'):
         superuser_uri_base = f'{uri_base}{superuser}'
         if in_cluster:
             cluster_eps = config['endpoints']['cluster']
-            if cluster_eps.get('rw'):
+            if isinstance(cluster_eps, str):
+                results['superuser_url'] = f'{superuser_uri_base}@{cluster_eps}/{db}'
+            elif cluster_eps.get('rw'):
                 results['superuser_url'] = f'{superuser_uri_base}@{cluster_eps["rw"]}/{db}'
             elif cluster_eps.get('prw'):
                 results['superuser_url'] = f'{superuser_uri_base}@{cluster_eps["prw"]}/{db}'
+
         elif isinstance(config['endpoints']['public'], dict):
             public_eps = config['endpoints']['public']
             if public_eps.get('rw'):
