@@ -199,7 +199,7 @@ class FunctionManager(ABC):
         Gets the function
         """
         # print(name, type(name), isinstance(name, BaseFunction), issubclass(name, BaseFunction))
-        self.logger.info(f'Getting Function: {name}')
+        # self.logger.info(f'Getting Function: {name}')
         if isinstance(name, str): return self._get_function(name)
         if isinstance(name, type): return self.register_function(name, initialize = True, return_initialized = True)
         if issubclass(name, BaseFunction):
