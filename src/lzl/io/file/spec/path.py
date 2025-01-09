@@ -575,7 +575,10 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         """
         obj_size = self.get_object_size(self.size())
         if self._has_tmgr and (self.fsconfig.read_chunking_manager_default or obj_size > self.fsconfig.read_chunking_large_size):
-            return self._read_chunked_with_tmgr(mode = mode, start = start, end = end, encoding = encoding, errors = errors, newline = newline, **kwargs)
+            try:
+                return self._read_chunked_with_tmgr(mode = mode, start = start, end = end, encoding = encoding, errors = errors, newline = newline, **kwargs)
+            except Exception as e:
+                logger.error(f'Error Reading Chunked Data: {e}')
         return self._read_chunked_default(mode = mode, start = start, end = end, encoding = encoding, errors = errors, newline = newline, **kwargs)
 
     def aread_chunked_data(self, mode: str = 'rb', start: t.Optional[t.Any] = None, end: t.Optional[t.Any] = None, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, **kwargs) -> t.Union[int, ObjectSize]:
@@ -585,7 +588,10 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         """
         obj_size = self.get_object_size(self.size())
         if self._has_tmgr and (self.fsconfig.read_chunking_manager_default or obj_size > self.fsconfig.read_chunking_large_size):
-            return self._aread_chunked_with_tmgr(mode = mode, start = start, end = end, encoding = encoding, errors = errors, newline = newline, **kwargs)
+            try:
+                return self._aread_chunked_with_tmgr(mode = mode, start = start, end = end, encoding = encoding, errors = errors, newline = newline, **kwargs)
+            except Exception as e:
+                logger.error(f'Error Reading Chunked Data: {e}')
         return self._aread_chunked_default(mode = mode, start = start, end = end, encoding = encoding, errors = errors, newline = newline, **kwargs)
 
     def read(self, mode: FileMode = 'rb', size: t.Optional[int] = -1, offset: t.Optional[int] = 0, **kwargs) -> t.Union[str, bytes]:
