@@ -4,6 +4,7 @@ from __future__ import annotations
 import functools
 import typing as t
 from temporalio.api.common.v1 import Payload
+from temporalio.api.sdk.v1.workflow_metadata_pb2 import WorkflowMetadata
 # from temporalio.api.sdk.v1.enhanced_stack_trace_pb2 import EnhancedStackTrace
 from google.protobuf import reflection as _reflection
 from lzl.io.ser import get_serializer, JsonSerializer
@@ -18,6 +19,7 @@ def is_serializable(value: t.Any) -> bool:
     # if isinstance(value, EnhancedStackTrace): return False
     if isinstance(value, Exception): return False
     if isinstance(value, _reflection.GeneratedProtocolMessageType): return False
+    if isinstance(value, WorkflowMetadata): return False
     return False if value is None else not is_primitive(value)
 
     

@@ -10,7 +10,7 @@ from temporalio.converter import (
     DefaultPayloadConverter,
     JSONPlainPayloadConverter,
 )
-from .utils import get_json_meta, _json
+from .utils import get_json_meta, _json, is_serializable
 
 
 class PydanticSerializedPayloadConverter(JSONPlainPayloadConverter):
@@ -28,6 +28,8 @@ class PydanticSerializedPayloadConverter(JSONPlainPayloadConverter):
         unable to convert.
         """
         # We let JSON conversion errors be thrown to caller
+        if not is_serializable(value):
+            raise RuntimeError(f"Cannot serialize value of type {type(value)} - {value}")
         return Payload(
             metadata = get_json_meta(self.encoding, "serialized"),
             data = _json.dumps(
