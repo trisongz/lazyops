@@ -5,6 +5,7 @@ Extended Types
 """
 
 import contextlib
+from enum import Enum
 from sqlalchemy import types
 from sqlalchemy.schema import Sequence
 from sqlalchemy.engine.interfaces import Dialect
@@ -243,3 +244,71 @@ except ImportError:
     ischema_names['vector'] = Vector
 
 # from pgvector.asyncpg import Vector
+
+# https://github.com/pgvector/pgvector
+
+
+class VectorDistance(str, Enum):
+    """
+    Supported distance functions are:
+
+    <-> - L2 distance
+    <#> - (negative) inner product
+    <=> - cosine distance
+    <+> - L1 distance (added in 0.7.0)
+    <~> - Hamming distance (binary vectors, added in 0.7.0)
+    <%> - Jaccard distance (binary vectors, added in 0.7.0)
+    """
+    L2_DISTANCE = '<->'
+    INNER_PRODUCT = '<#>'
+    COSINE_DISTANCE = '<=>'
+    L1_DISTANCE = '<+>'
+    HAMMING_DISTANCE = '<~>'
+    JACCARD_DISTANCE = '<%>'
+
+    @property
+    def vector_op(self) -> str:
+        """
+        Returns the Vector Op Name
+
+        vector_l2_ops = L2 distance
+        vector_ip_ops = (Negative) Inner Product
+        vector_cosine_ops = Cosine Distance
+        vector_l1_ops = L1 distance
+        vector_hamming_ops = Hamming distance
+        vector_jaccard_ops = Jaccard distance
+        """
+        if self == VectorDistance.L2_DISTANCE:
+            return 'vector_l2_ops'
+        elif self == VectorDistance.INNER_PRODUCT:
+            return 'vector_ip_ops'
+        elif self == VectorDistance.COSINE_DISTANCE:
+            return 'vector_cosine_ops'
+        elif self == VectorDistance.L1_DISTANCE:
+            return 'vector_l1_ops'
+        elif self == VectorDistance.HAMMING_DISTANCE:
+            return 'vector_hamming_ops'
+        elif self == VectorDistance.JACCARD_DISTANCE:
+            return 'vector_jaccard_ops'
+        return 'vector_ip_ops'
+
+    
+    @classmethod
+    def parse(cls, value: str) -> 'VectorDistance':
+        """
+        Parses the Vector Distance
+        """
+        value = value.lower()
+        if value in {'euclidean', 'l2_distance', 'l2', 'vector_l2_ops', '<->'}:
+            return cls.L2_DISTANCE
+        if value in {'inner_product', 'ip', 'negative_inner_product', 'max_inner_product', 'vector_ip_ops', '<#>'}:
+            return cls.INNER_PRODUCT
+        if value in {'cosine_distance', 'cosine', 'cosine_similarity', 'vector_cosine_ops', '<=>'}:
+            return cls.COSINE_DISTANCE
+        if value in {'l1', 'vector_l1_ops', '<+>'}:
+            return cls.L1_DISTANCE
+        if value in {'hamming', 'vector_hamming_ops', '<~>'}:
+            return cls.HAMMING_DISTANCE
+        if value in {'jaccard', 'vector_jaccard_ops', '<%>'}:
+            return cls.JACCARD_DISTANCE
+        raise ValueError(f"Invalid/Unsupported Vector Distance: {value}")

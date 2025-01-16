@@ -12,6 +12,7 @@ import sys
 import anyio
 import inspect
 import asyncio
+import shlex
 import functools
 import subprocess
 import contextvars
@@ -528,6 +529,28 @@ class ThreadPool(abc.ABC):
     
     run_command = cmd
     async_run_command = acmd
+
+
+    @staticmethod
+    async def acmd_exec(
+        command: Union[str, List[str]], 
+        output_only: bool = True, 
+        stdout = asyncio.subprocess.PIPE, 
+        stderr = asyncio.subprocess.PIPE, 
+        output_encoding: str = 'UTF-8', 
+        output_errors: str = 'ignore', 
+        **kwargs
+    ) -> Union[str, asyncio.subprocess.Process]:
+        """
+        Executes a Shell command using `asyncio.subprocess.create_subprocess_shell`
+
+        Returns str if output_only else `asyncio.subprocess.Process`
+        """
+        if isinstance(command, str): command = shlex.split(command)
+        p = await asyncio.subprocess.create_subprocess_exec(*command, stdout = stdout, stderr = stderr, **kwargs)
+        if not output_only: return p
+        stdout, _ = await p.communicate()
+        return stdout.decode(encoding = output_encoding, errors = output_errors).strip()
     
 
 

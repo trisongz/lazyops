@@ -55,3 +55,4 @@ tests/lzl/test_psql.py
 tests/lzl/test_abcs.py
 tests/lzl/settings.py
 tests/lzl/db_sql_model.py
+src/lzl/api/slack/slack_context.json

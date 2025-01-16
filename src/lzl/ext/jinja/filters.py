@@ -7,7 +7,7 @@ import json
 import yaml
 import base64
 from pathlib import Path
-from typing import Dict, Any, Optional, TYPE_CHECKING
+from typing import Dict, Any, Optional, List, TYPE_CHECKING
 
 def to_yaml(data, indent: Optional[int] = None):
     return yaml.safe_dump(data, default_flow_style = False, indent = indent)
@@ -48,6 +48,14 @@ def normalize_value(value: str | list | Any) -> Any:
     if isinstance(value, list): return ', '.join(value)
     return value.strip() if isinstance(value, str) else value
 
+
+def normalize_ids_to_str(ids: List[str | int]) -> str:
+    """
+    Normalizes the ids to a string
+    """
+    if isinstance(ids[0], int): return ', '.join([str(id) for id in ids])
+    return ', '.join([f"'{id}'" for id in ids])
+
 autofilters = {
     'to_json': to_json,
     'to_yaml': to_yaml,
@@ -56,4 +64,5 @@ autofilters = {
     'load_file': load_file,
     'to_title': to_title,
     'normalize_value': normalize_value,
+    'normalize_ids_to_str': normalize_ids_to_str,
 }

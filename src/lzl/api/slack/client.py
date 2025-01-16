@@ -15,6 +15,7 @@ else:
     slack_sdk = load.LazyLoad("slack_sdk", install_missing = True)
 
 if TYPE_CHECKING:
+    from lzl.io import File
     from slack_sdk import WebClient
     from slack_sdk.web.async_client import AsyncWebClient
     from slack_sdk.models.attachments import Attachment
@@ -37,6 +38,7 @@ class SlackClient:
         default_user: Optional[str] = None,
         default_channel: Optional[str] = None,
         username_mapping: Optional[Dict[str, Union[str, List[str]]]] = None,
+        context_file: Optional['File'] = None,
         verbose: Optional[bool] = None,
         **kwargs
     ):
@@ -62,10 +64,21 @@ class SlackClient:
 
         self.default_channel = default_channel or self.settings.default_channel
         self.default_channel_id: Optional[str] = None
-        self.ctx: SlackContext = self.settings.load_context()
-        if username_mapping: 
+        self.ctx: SlackContext = self.settings.load_context(ctx_file = context_file)
+        if username_mapping: self.set_username_mapping(username_mapping)
+
+    def set_username_mapping(self, username_mapping: Dict[str, Union[str, List[str]]]):
+        """
+        Sets the username mapping
+        """
+        if self.ctx.username_mapping and username_mapping != self.ctx.username_mapping:
+            from lzo.utils import update_dict
+            self.ctx.username_mapping = update_dict(self.ctx.username_mapping, username_mapping)
+            self.init(overwrite = True)
+        else:
             self.ctx.username_mapping = username_mapping
             self.settings.save_context(self.ctx)
+
 
     @property
     def api(self) -> 'AsyncWebClient':
