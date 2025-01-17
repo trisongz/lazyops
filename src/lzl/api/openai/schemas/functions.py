@@ -754,7 +754,7 @@ class BaseFunction(ABC):
                 **kwargs,
             )
         except Exception as e:
-            self.autologger.info(f"[{current_attempt}/{self.retry_limit}] [{self.name} - {chat.name}:{model}] Unknown Error Trying to run chat function: |r|{e}|e|", colored=True)
+            self.autologger.info(f"[{current_attempt}/{self.retry_limit}] [{self.name} - {chat.name}:{model}] Unknown Error Trying to run chat function: {type(e).__name__} |r|{e}|e|", colored=True)
             return await self.arun_chat_function(
                 messages = messages,
                 cachable = cachable,
@@ -849,7 +849,7 @@ class BaseFunction(ABC):
                 result._set_values_from_response(response, name = self.name if include_name else None)
                 return result
             except Exception as e:
-                self.autologger.error(f"[{self.name} - {response.model} - {response.usage}] Failed to parse object after fixing")
+                self.autologger.error(f"[{self.name} - {response.model} - {response.usage}] Failed to parse object after fixing: {type(e).__name__} {e}")
                 return None
     
 
