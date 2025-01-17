@@ -34,12 +34,12 @@ def add_finalize_hook(func: HookT | t.Sequence[HookT]):
     if isinstance(func, list): _finalize_hooks.update(func)
     else: _finalize_hooks.add(func)
 
-def create_task(coro: t.Callable[..., t.Awaitable[t.Any]] | t.Awaitable[t.Any], *args, _task_list: t.Optional[t.Set[asyncio.Task]] = None, **kwargs) -> asyncio.Task:
+def create_task(coro: t.Callable[..., t.Awaitable[t.Any]] | t.Awaitable[t.Any], *args, _task_list: t.Optional[t.Set[asyncio.Task]] = None, _task_name: t.Optional[str] = None, **kwargs) -> asyncio.Task:
     """
     Adds a task to the finalize hooks
     """
     if not inspect.isawaitable(coro): coro = coro(*args, **kwargs)
-    task = asyncio.create_task(coro)
+    task = asyncio.create_task(coro, name = _task_name)
     _added_tasks.add(task)
     if _task_list is not None: 
         _task_list.add(task)

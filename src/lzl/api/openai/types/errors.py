@@ -185,6 +185,10 @@ class InvalidRequestError(OpenAIError):
     pass
 
 
+class InvalidAPIResourceError(OpenAIError):
+    pass
+
+
 class AuthenticationError(OpenAIError):
     pass
 
@@ -250,6 +254,10 @@ def fatal_exception(exc) -> bool:
     if isinstance(exc, (InvalidMaxTokens, InvalidRequestError, MaxRetriesExhausted)):
         return True
     
+    # Retry on invalid resource errors
+    if isinstance(exc, InvalidAPIResourceError):
+        return False
+    
     return (400 <= exc.status < 500) and exc.status not in [429, 400, 404, 415, 524] # [429, 400, 404, 415]
 
 
@@ -259,6 +267,7 @@ def error_handler(
     should_retry: Optional[bool] = False,
     **kwargs
 ):
+    # sourcery skip: assign-if-exp, hoist-similar-statement-from-if, reintroduce-else, swap-nested-ifs
 
     if response.status_code == 503:
         raise ServiceUnavailableError(
@@ -283,6 +292,14 @@ def error_handler(
                 should_retry = False,
                 **kwargs
             )
+        if 'The API deployment for this resource does not exist' in response.text:
+            return InvalidAPIResourceError(
+                response = response,
+                data = data,
+                should_retry = should_retry,
+                **kwargs
+            )
+
         return InvalidRequestError(
             response = response,
             data = data,
