@@ -348,7 +348,7 @@ class Timer(abc.ABC, dict):
         remaining = total - current
         # avg = self.elapsed_average_iter(count)
         # avg = self.elapsed_average_iter(current)
-        avg = self.elapsed_average(current)
+        avg = self.total_average(current)
         return avg * remaining
     
     def estimated_remaining_s(self, total: int, current: int) -> str:
