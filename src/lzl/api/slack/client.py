@@ -245,6 +245,21 @@ class SlackClient:
             return user_or_channel
         return self.ctx.lookup_id(user_or_channel) or user_or_channel
 
+    def _validate(self) -> bool:
+        """
+        Validates the client
+        """
+        if self.disabled: return False
+        if not self.ctx.initialized: self.init()
+        return True
+    
+    async def _avalidate(self) -> bool:
+        """
+        Validates the client
+        """
+        if self.disabled: return False
+        if not self.ctx.initialized: await self.ainit()
+        return True
 
     def join_channel(self, channel_id: str, **kwargs):
         """
@@ -272,7 +287,8 @@ class SlackClient:
         """
         Send a message
         """
-        if self.disabled: return
+        if not self._validate(): return
+        # if self.disabled: return
         if user_or_channel:
             channel_id = self.lookup(user_or_channel)
         elif channel_id is None:
@@ -293,7 +309,8 @@ class SlackClient:
         """
         Send a message
         """
-        if self.disabled: return
+        if not await self._avalidate(): return
+        # if self.disabled: return
         if user_or_channel:
             channel_id = self.lookup(user_or_channel)
         elif channel_id is None:
@@ -319,7 +336,8 @@ class SlackClient:
         """
         Upload a file
         """
-        if self.disabled: return
+        if not self._validate(): return
+        # if self.disabled: return
         channels = channels or [self.default_id]
         if not isinstance(channels, (list, tuple)): channels = [channels]
         if channels: channels = [self.lookup(channel) for channel in channels]
@@ -350,7 +368,8 @@ class SlackClient:
         """
         Upload a file
         """
-        if self.disabled: return
+        if not await self._avalidate(): return
+        # if self.disabled: return
         channels = channels or [self.default_id]
         if not isinstance(channels, (list, tuple)): channels = [channels]
         if channels: channels = [self.lookup(channel) for channel in channels]
@@ -378,7 +397,8 @@ class SlackClient:
         """
         Send a temporary message
         """
-        if self.disabled: return
+        if not self._validate(): return
+        # if self.disabled: return
         user = self.lookup(user)
         channel = self.lookup(channel) if channel else self.default_id
         return self.sapi.chat_postEphemeral(
@@ -402,7 +422,8 @@ class SlackClient:
         """
         Send a temporary message
         """
-        if self.disabled: return
+        if not await self._avalidate(): return
+        # if self.disabled: return
         user = self.lookup(user)
         channel = self.lookup(channel) if channel else self.default_id
         return await self.api.chat_postEphemeral(
@@ -419,7 +440,8 @@ class SlackClient:
         """
         Return the ID of a user or channel
         """
-        if self.disabled: return
+        if not self._validate(): return
+        # if self.disabled: return
         return SlackProxy(name = name_or_id, uid = self.lookup(name_or_id) or name_or_id, client = self)
 
     def create_slash_command_endpoint(
