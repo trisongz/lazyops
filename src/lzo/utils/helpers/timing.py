@@ -343,9 +343,10 @@ class Timer(abc.ABC, dict):
         """
         Returns the estimated remaining time for completion
         """
-        count = total - current
-        remaining = total - count
-        avg = self.elapsed_average_iter(count)
+        # count = total - current
+        remaining = total - current
+        # avg = self.elapsed_average_iter(count)
+        avg = self.elapsed_average_iter(current)
         return avg * remaining
     
     def estimated_remaining_s(self, total: int, current: int) -> str:
