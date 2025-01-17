@@ -754,7 +754,10 @@ class BaseFunction(ABC):
                 **kwargs,
             )
         except Exception as e:
-            self.autologger.info(f"[{current_attempt}/{self.retry_limit}] [{self.name} - {chat.name}:{model}] Unknown Error Trying to run chat function: {type(e).__name__} |r|{e}|e|", colored=True)
+            if current_attempt == self.retry_limit:
+                self.autologger.trace(f"[{current_attempt}/{self.retry_limit}] [{self.name} - {chat.name}:{model}] Unknown Error Trying to run chat function", e)
+            else:
+                self.autologger.info(f"[{current_attempt}/{self.retry_limit}] [{self.name} - {chat.name}:{model}] Unknown Error Trying to run chat function: {type(e).__name__} |r|{e}|e|", colored=True)
             return await self.arun_chat_function(
                 messages = messages,
                 cachable = cachable,
