@@ -278,7 +278,7 @@ class TemporalSettings(BaseSettings):
     
     def get_runtime_config(
         self, 
-        config_file: t.Optional[str] = None,
+        config_file: t.Optional[str | t.List[str]] = None,
         host: t.Optional[str] = None,
         name: t.Optional[str] = None,
         queue: t.Optional[str] = None,
@@ -298,7 +298,9 @@ class TemporalSettings(BaseSettings):
         """
         if config_file is not None: 
             logger.info(f'Loading Runtime Config from Config File: {config_file}')
-            self._load_from_config_file_(config_file)
+            if not isinstance(config_file, list): config_file = [config_file]
+            for cf in config_file:
+                self._load_from_config_file_(cf)
         if activities and workflows:
             _worker_config = dict(
                 name = name or 'default-worker',
