@@ -7,7 +7,7 @@ Timing Utils
 import abc
 import time
 from lzl.logging import logger, null_logger
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any, Union, Callable, overload
 
 
 class Timer(abc.ABC, dict):
@@ -22,6 +22,7 @@ class Timer(abc.ABC, dict):
         format_pretty: Optional[bool] = True,
         format_short: Optional[int] = 0,
         verbose: bool = None,
+        **kwargs,
     ):
         """
         Timer class for timing code
@@ -346,7 +347,8 @@ class Timer(abc.ABC, dict):
         # count = total - current
         remaining = total - current
         # avg = self.elapsed_average_iter(count)
-        avg = self.elapsed_average_iter(current)
+        # avg = self.elapsed_average_iter(current)
+        avg = self.elapsed_average(current)
         return avg * remaining
     
     def estimated_remaining_s(self, total: int, current: int) -> str:
@@ -626,6 +628,38 @@ class Timer(abc.ABC, dict):
         Returns the hash of the timer
         """
         return hash(self.start or self.total)
+    
+    @overload
+    @classmethod
+    def factory(
+        cls,
+        start: Optional[float] = None,
+        auto_checkpoint: Optional[bool] = True,
+        format_ms: Optional[bool] = False,
+        format_pretty: Optional[bool] = True,
+        format_short: Optional[int] = 0,
+        verbose: bool = None,
+        **kwargs,
+    ) -> Callable[..., 'Timer']:
+        """
+        Returns a timer factory
+        """
+        ...
+
+    @classmethod
+    def factory(
+        cls,
+        **kwargs,
+    ) -> Callable[..., 'Timer']:
+        """
+        Returns a timer factory
+        """
+        import functools
+        kwargs = {k:v for k,v in kwargs.items() if v is not None}
+        return functools.partial(
+            cls,
+            **kwargs,
+        )
     
 
 def timer(
