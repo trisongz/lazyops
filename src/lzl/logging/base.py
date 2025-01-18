@@ -24,7 +24,7 @@ from loguru._logger import Core as _Core
 from loguru._logger import Logger as _Logger
 from .static import DEFAULT_STATUS_COLORS, QUEUE_STATUS_COLORS, STATUS_COLOR, FALLBACK_STATUS_COLOR, DEFAULT_FUNCTION_COLOR, DEFAULT_CLASS_COLOR, RESET_COLOR, LOGLEVEL_MAPPING, REVERSE_LOGLEVEL_MAPPING, COLORED_MESSAGE_MAP
 from .utils import format_item, format_message, get_logging_level
-from .state import is_registered_logger_module
+from .state import is_registered_logger_module, is_global_muted
 from .formatters import LoggerFormatter
 from .mixins import LoggingMixin
 from typing import Type, Union, Optional, Any, List, Dict, Tuple, Callable, Set, TYPE_CHECKING
@@ -286,11 +286,12 @@ class Logger(_Logger, LoggingMixin):
         """
         if colored is None and isinstance(message, str) and '|e|' in message: colored = True
         message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored, level = 'INFO')
-        try:
-            self._log("INFO", False, self._get_opts(colored = colored), message, args, kwargs)
-        except TypeError:
-            # Compatibility with < 0.6.0
-            self._log("INFO", 20, False, self._get_opts(colored = colored), message, args, kwargs)
+        if not is_global_muted():
+            try:
+                self._log("INFO", False, self._get_opts(colored = colored), message, args, kwargs)
+            except TypeError:
+                # Compatibility with < 0.6.0
+                self._log("INFO", 20, False, self._get_opts(colored = colored), message, args, kwargs)
         self.run_logging_hooks(message, hook = hook)
 
     def success(
@@ -305,11 +306,12 @@ class Logger(_Logger, LoggingMixin):
     ):  # noqa: N805
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'SUCCESS'``."""
         message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored, level = 'SUCCESS')
-        try:
-            self._log("SUCCESS", False, self._get_opts(colored = colored), message, args, kwargs)
-        except TypeError:
-            # Compatibility with < 0.6.0
-            self._log("SUCCESS", 20, False, self._get_opts(colored = colored), message, args, kwargs)
+        if not is_global_muted():
+            try:
+                self._log("SUCCESS", False, self._get_opts(colored = colored), message, args, kwargs)
+            except TypeError:
+                # Compatibility with < 0.6.0
+                self._log("SUCCESS", 20, False, self._get_opts(colored = colored), message, args, kwargs)
         self.run_logging_hooks(message, hook = hook)
 
     def warning(
@@ -324,6 +326,7 @@ class Logger(_Logger, LoggingMixin):
     ):  # noqa: N805
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'WARNING'``."""
         message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored, level = 'WARNING')
+    
         try:
             self._log("WARNING", False, self._get_opts(colored = colored), message, args, kwargs)
         except TypeError:
@@ -345,6 +348,7 @@ class Logger(_Logger, LoggingMixin):
         Log ``message.format(*args, **kwargs)`` with severity ``'ERROR'``.
         """
         message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored, level = 'ERROR')
+    
         try:
             self._log("ERROR", False, self._get_opts(colored = colored), message, args, kwargs)
         except TypeError:
@@ -375,6 +379,7 @@ class Logger(_Logger, LoggingMixin):
         # pprint.pformat(msg)
         _msg += f"\n{traceback.format_exc(chain = chain, limit = limit)}"
         if error: _msg += f" - {error}"
+        
         try:
             self._log(level, False, self._get_opts(colored = colored), _msg, (), {})
         except TypeError:

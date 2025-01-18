@@ -3,7 +3,7 @@ from __future__ import annotations
 import threading
 import functools
 import typing
-
+import contextlib
 from .utils import extract_module_name
 from typing import Set, Dict, Union, Any, TYPE_CHECKING, Optional
 
@@ -14,6 +14,26 @@ if TYPE_CHECKING:
 _registered_logger_modules: Set[str] = set()
 _module_name_mapping: Dict[str, str] = {}
 _module_name_mapping_relative: Dict[str, bool] = {}
+
+_is_global_muted: Optional[bool] = None
+
+def set_global_muted(muted: bool):
+    """
+    Sets the global muted state
+    """
+    global _is_global_muted
+    # print(f'Setting Global Muted: {muted}')
+    _is_global_muted = muted
+
+
+def is_global_muted() -> bool:
+    """
+    Returns the global muted state
+    """
+    return bool(_is_global_muted)
+
+
+
 
 def register_logger_module(module: str):
     """

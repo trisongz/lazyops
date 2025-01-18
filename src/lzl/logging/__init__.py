@@ -19,6 +19,7 @@ from .state import (
     register_logger_module,
     is_registered_logger_module,
     add_api_log_filters,
+    set_global_muted,
 )
 from .main import (
     NullLogger,

@@ -3,6 +3,7 @@ from __future__ import annotations
 """
 Base Registry Objects
 """
+import os
 import inspect
 import collections.abc
 from pathlib import Path
@@ -58,6 +59,7 @@ class MRegistry(Generic[RT]):
         self.mregistry[key] = value
         if key in self.uninit_registry:
             self.uninit_registry.pop(key)
+        if os.getenv('MUTE_LZ_REGISTRY', 'false').lower() in {'true', '1'}: return
         if not isinstance(value, str) and getattr(value, '_rverbose', self.verbose):
             self.logger.info(f'Registered: {key}', colored = True, prefix = self.name)
 

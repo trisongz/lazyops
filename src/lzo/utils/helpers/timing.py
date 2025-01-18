@@ -57,7 +57,10 @@ class Timer(abc.ABC, dict):
             # If we're starting from a duration, we need to subtract the duration
             # from the current time
             curr_ts = time.time()
-            if len(str(start)) == len(str(curr_ts)):
+            # This is likely a duration
+            if isinstance(start, float) and start < (curr_ts // 10):
+                self.start = curr_ts - start
+            elif len(str(start)) == len(str(curr_ts)):
                 self.start = float(start)
             else:
                 self.start = curr_ts - float(start)
