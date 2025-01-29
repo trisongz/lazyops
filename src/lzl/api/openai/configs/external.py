@@ -52,6 +52,7 @@ class ExternalProviderConfig(BaseModel):
     proxy_url: Optional[str] = Field(None, description="The Proxy URL")
     proxy_headers: Optional[Dict[str, str]] = Field(None, description="Proxy Headers")
     hf_compatible: Optional[bool] = Field(None, description="Whether the provider is HuggingFace Compatible for Tokenization")
+    supports_tokenization: Optional[bool] = Field(True, description="Whether the provider supports tokenization")
 
     # @validator("custom_headers", "proxy_headers", pre=True)
     @field_validator("custom_headers", "proxy_headers", mode = 'before')
@@ -181,6 +182,7 @@ class ExternalProviderRoutes(BaseModel):
     completions: Optional[ProviderRoute] = Field(None, description="The Completion Route")
     chat: Optional[ProviderRoute] = Field(None, description="The Chat Route")
     embeddings: Optional[ProviderRoute] = Field(None, description="The Embedding Route")
+    rerankings: Optional[ProviderRoute] = Field(None, description="The Reranking Route")
     # if TYPE_CHECKING:
 
     if PYDANTIC_VERSION == 2:
@@ -193,6 +195,7 @@ class ExternalProviderRoutes(BaseModel):
                 ChatRoute, ChatResponse, ChatObject,
                 CompletionRoute, CompletionResponse, CompletionObject,
                 EmbeddingRoute, EmbeddingResponse, EmbeddingObject,
+                RerankingRoute, RerankingResponse, RerankingObject,
                 # TODO - Add the rest of the routes
             )
             # from async_openai.schemas import (
@@ -249,6 +252,23 @@ class ExternalProviderRoutes(BaseModel):
                 self.embeddings.object_class = EmbeddingObject
             if self.embeddings.response_class is None:
                 self.embeddings.response_class = EmbeddingResponse
+            
+            if self.rerankings is None:
+                self.rerankings = ProviderRoute(
+                    name = "rerankings",
+                    route_class = RerankingRoute,
+                    object_class = RerankingObject,
+                    response_class = RerankingResponse,
+                )
+            if not self.rerankings.name:
+                self.rerankings.name = "rerankings"
+            if self.rerankings.route_class is None:
+                self.rerankings.route_class = RerankingRoute
+            if self.rerankings.object_class is None:
+                self.rerankings.object_class = RerankingObject
+            if self.rerankings.response_class is None:
+                self.rerankings.response_class = RerankingResponse
+            
             return self
 
     else:
@@ -261,6 +281,7 @@ class ExternalProviderRoutes(BaseModel):
                 ChatRoute, ChatResponse, ChatObject,
                 CompletionRoute, CompletionResponse, CompletionObject,
                 EmbeddingRoute, EmbeddingResponse, EmbeddingObject,
+                RerankingRoute, RerankingResponse, RerankingObject,
                 # TODO - Add the rest of the routes
             )
             # from async_openai.schemas import (
@@ -322,6 +343,24 @@ class ExternalProviderRoutes(BaseModel):
                 values['embeddings'].object_class = EmbeddingObject
             if values['embeddings'].response_class is None:
                 values['embeddings'].response_class = EmbeddingResponse
+
+            if values.get('rerankings') is None:
+                values['rerankings'] = ProviderRoute(
+                    name = "rerankings",
+                    route_class = RerankingRoute,
+                    object_class = RerankingObject,
+                    response_class = RerankingResponse,
+                )
+            else:
+                values['rerankings'] = ProviderRoute.parse_obj(values['rerankings'])
+            if not values['rerankings'].name:
+                values['rerankings'].name = "rerankings"
+            if values['rerankings'].route_class is None:
+                values['rerankings'].route_class = RerankingRoute
+            if values['rerankings'].object_class is None:
+                values['rerankings'].object_class = EmbeddingObject
+            if values['rerankings'].response_class is None:
+                values['rerankings'].response_class = RerankingResponse
             return values
         
     @property
@@ -333,17 +372,9 @@ class ExternalProviderRoutes(BaseModel):
             "chat": self.chat.route_class,
             "completions": self.completions.route_class,
             "embeddings": self.embeddings.route_class,
+            "rerankings": self.rerankings.route_class,
         }
     
-    # def configure_retry(self, max_retries: Optional[int] = None):
-    #     """
-    #     Configures the retry logic
-    #     """
-    #     if max_retries is None: return
-    #     if hasattr(self.chat.route_class, 'max_retries'): self.chat.route_class.max_retries = max_retries
-    #     if hasattr(self.completions.route_class, 'max_retries'): self.completions.route_class.max_retries = max_retries
-    #     if hasattr(self.embeddings.route_class, 'max_retries'): self.embeddings.route_class.max_retries = max_retries
-
             
 
 class ExternalProviderSettings(BaseModel):
@@ -365,35 +396,7 @@ class ExternalProviderSettings(BaseModel):
         """
         Loads the Provider Settings from a Preset
         """
-        # assert name or path, "You must provide either a name or a path to the preset"
-        # if path:
-        #     preset_file = pathlib.Path(path)
-        #     assert preset_file.exists(), f"Could not find the preset path: {preset_file}"
-        # else:
-            
-        #     preset_file = preset_path.joinpath(f"{name}.yaml")
-        #     if not preset_file.exists():
-        #         raise FileNotFoundError(f"Could not find the preset file: {preset_file} for {name}")
-        
-        # assert preset_file.suffix in {
-        #     ".yaml", ".yml", ".json"
-        # }, f"The preset file must be a YAML or JSON file: {preset_file}"
-        # from lzo.utils import parse_envvars_from_text
-        
-        # text = preset_file.read_text()
-        # text, _ = parse_envvars_from_text(text)
-        # if preset_file.suffix == ".json":
-        #     data = json.loads(text)
-        # else:
-        #     import yaml
-        #     data = yaml.safe_load(text)
-        # data = load_preset_config(name, path, **overrides)
-        # if overrides: 
-        #     from lzo.utils import update_dict
-        #     data = update_dict(data, overrides)
-        # from lazyops.utils import logger
         data = load_preset_config(name, path, **overrides)
-        # logger.info(data)
         provider_settings = cls.model_validate(data)
         ModelContextHandler.add_provider(provider_settings)
         return provider_settings

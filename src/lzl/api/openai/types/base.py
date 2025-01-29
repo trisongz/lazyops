@@ -19,7 +19,7 @@ from typing import Optional, Union, Dict, List, Any, Type, Tuple, Iterator, Asyn
 
 
 try:
-    from fileio import File, FileType
+    from lzl.io import File, FileLike as FileType
     _has_fileio = True
 except ImportError:
     from pathlib import Path as File
@@ -138,6 +138,9 @@ class ModelCostItem(BaseModel):
     batch_costs: Optional[ModelCosts] = None
     endpoints: Optional[List[str]] = None
 
+    # Adding new properties
+    data: Optional[Dict[str, Any]] = Field(default_factory=dict)
+
     def get_costs(
         self, 
         input_tokens: Optional[int] = None,
@@ -166,6 +169,11 @@ class ModelCostItem(BaseModel):
         if cost_ref.total and total_tokens is not None: cost += cost_ref.total * total_tokens / cost_ref.unit
         return cost
 
+    def supports(self, endpoint: str) -> bool:
+        """
+        Returns True if the endpoint is supported
+        """
+        return endpoint in self.endpoints if self.endpoints else False
 
 
 class BaseResource(BaseModel):

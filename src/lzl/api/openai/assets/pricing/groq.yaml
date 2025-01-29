@@ -1,0 +1,11 @@
+- name: deepseek-r1-distill-llama-70b
+  aliases:
+  - deepseek-r1-70b
+  - deepseek-r1-llama-70b
+  context_length: 128000
+  costs: 
+    unit: 1_000_000
+    input: 0.6
+    output: 0.6
+  endpoints:
+  - chat

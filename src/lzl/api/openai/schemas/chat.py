@@ -82,12 +82,19 @@ class FunctionCall(BaseResource):
             with contextlib.suppress(Exception):
                 return json.loads(v)
         return v
-    
+
+class ToolCall(BaseResource):
+    id: Optional[str] = None
+    type: Optional[str] = None
+    function: Optional[FunctionCall] = None
+
+
 # TODO Add support for name
 class ChatMessage(BaseResource):
     content: Optional[str] = None
     role: Optional[str] = "user"
     function_call: Optional[FunctionCall] = None
+    tool_calls: Optional[List[ToolCall]] = None
     name: Optional[str] = None
 
     def dict(self, *args, exclude_none: bool = True, **kwargs):
@@ -183,8 +190,6 @@ class JSONSchema(BaseResource):
                 # logger.warning(f'Invalid parameters: {params}. Must be a dict or pydantic BaseModel.')
                 raise ValueError(f'Schema must be a dict or pydantic BaseModel. Provided: {type(schema)}')
         return values
-
-
 
 
 class Tool(BaseResource):
@@ -404,6 +409,13 @@ class ChatResponse(BaseResponse):
         return bool(self.input_object.json_schema)
     
     @eproperty
+    def has_tools(self) -> bool:
+        """
+        Returns whether the response has tools
+        """
+        return bool(self.input_object.tools)
+    
+    @eproperty
     def function_results(self) -> List[FunctionCall]:
         """
         Returns the function results for the completions
@@ -460,6 +472,8 @@ class ChatResponse(BaseResponse):
         """
         Returns the tool results for the completions
         """
+        # if self.has_tools:
+        #     return [msg.tool_calls[0].function for msg in self.messages if msg.tool_calls]
         return [msg.function_call for msg in self.messages if msg.function_call]
     
     @eproperty

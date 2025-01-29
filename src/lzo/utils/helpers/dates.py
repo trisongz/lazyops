@@ -155,7 +155,7 @@ def is_expired_datetime(
     """
     Checks if the datetime is expired
     """
-    if not now: now = get_current_datetime(tz = tz)
+    if not now: now = get_current_datetime(tz = tz or dt.tzinfo)
     if not delta_days: return now > dt
     dt = dt + datetime.timedelta(days = delta_days)
     return now > dt

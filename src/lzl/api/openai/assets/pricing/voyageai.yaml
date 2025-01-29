@@ -1,0 +1,113 @@
+# https://docs.voyageai.com/docs/embeddings
+# https://docs.voyageai.com/docs/pricing
+
+- name: voyage-3-large
+  context_length: 32768
+  costs: 
+    unit: 1_000_000
+    input: 0.18
+  endpoints:
+  - embeddings
+  data:
+    dims:
+    - 1024
+    - 256
+    - 512
+    - 2048
+
+- name: voyage-3
+  context_length: 32768
+  costs: 
+    unit: 1_000_000
+    input: 0.06
+  endpoints:
+  - embeddings
+  data:
+    dims:
+    - 1024
+
+- name: voyage-3-lite
+  context_length: 32768
+  costs: 
+    unit: 1_000_000
+    input: 0.02
+  endpoints:
+  - embeddings
+  data:
+    dims:
+    - 512
+
+- name: voyage-code-3
+  context_length: 32768
+  costs: 
+    unit: 1_000_000
+    input: 0.18
+  endpoints:
+  - embeddings
+  data:
+    dims:
+    - 1024
+    - 256
+    - 512
+    - 2048
+
+- name: voyage-finance-2
+  context_length: 32768
+  costs: 
+    unit: 1_000_000
+    input: 0.12
+  endpoints:
+  - embeddings
+  data:
+    dims:
+    - 1024
+
+- name: voyage-law-2
+  context_length: 16384
+  costs: 
+    unit: 1_000_000
+    input: 0.12
+  endpoints:
+  - embeddings
+  data:
+    dims:
+    - 1024
+
+- name: voyage-code-2
+  context_length: 16384
+  costs: 
+    unit: 1_000_000
+    input: 0.12
+  endpoints:
+  - embeddings
+  data:
+    dims:
+    - 1536
+
+
+## Reranking
+- name: rerank-2
+  context_length: 16384
+  aliases:
+  - voyage-rerank-2
+  costs: 
+    unit: 1_000_000
+    input: 0.05
+  endpoints:
+  - rerankings
+  data:
+    supports_reranking: true
+
+- name: rerank-2-lite
+  context_length: 8192
+  aliases:
+  - voyage-rerank-2-lite
+  costs: 
+    unit: 1_000_000
+    input: 0.02
+  endpoints:
+  - rerankings
+  data:
+    supports_reranking: true
+    is_default_for_rerankings: true
+    

@@ -431,6 +431,92 @@ class FilePath(Path, FilePurePath):
             return get_handle(self.path_, mode = mode, buffering = buffering)
         return get_handle(self.path_, mode, encoding=encoding, errors=errors, newline=newline)
     
+
+    def iter_raw(self, chunk_size: t.Optional[int] = None) -> t.Iterator[bytes]:
+        """
+        Iterates over the bytes of a file
+        """
+        if self._closed: self._raise_closed()
+        from lzl.io.file.utils.decoders import ByteChunker
+        chunker = ByteChunker(chunk_size = chunk_size)
+        chunk_size = chunk_size if chunk_size is not None else -1
+        with self.open(mode = 'rb', buffering = chunk_size) as stream:
+            for raw_stream_bytes in stream:
+                yield from chunker.decode(raw_stream_bytes)
+        yield from chunker.flush()
+
+    def iter_text(self, chunk_size: int | None = None, encoding: str | None = None) -> t.Iterator[str]:
+        """
+        A str-iterator over the content
+        """
+        from lzl.io.file.utils.decoders import TextChunker, TextDecoder
+        decoder = TextDecoder(encoding = encoding or "utf-8")
+        chunker = TextChunker(chunk_size = chunk_size)
+        for byte_content in self.iter_raw():
+            text_content = decoder.decode(byte_content)
+            yield from chunker.decode(text_content)
+
+            text_content = decoder.flush()
+            yield from chunker.decode(text_content)
+            yield from chunker.flush()
+
+    def iter_lines(self, chunk_size: int | None = None, encoding: str | None = None) -> t.Iterator[str]:
+        """
+        A line-by-line iterator over the file content.
+        """
+        from lzl.io.file.utils.decoders import LineDecoder
+        decoder = LineDecoder()
+        for text in self.iter_text(chunk_size = chunk_size, encoding = encoding):
+            yield from decoder.decode(text)
+        yield from decoder.flush()
+
+
+    async def aiter_raw(self, chunk_size: t.Optional[int] = None) -> t.AsyncIterator[bytes]:
+        """
+        Iterates over the bytes of a file
+        """
+        if self._closed: self._raise_closed()
+        from lzl.io.file.utils.decoders import ByteChunker
+        chunker = ByteChunker(chunk_size = chunk_size)
+        chunk_size = chunk_size if chunk_size is not None else -1
+        async with self.aopen(mode = 'rb', buffering = chunk_size) as stream:
+            for raw_stream_bytes in stream:
+                for chunk in chunker.decode(raw_stream_bytes):
+                    yield chunk
+        for chunk in chunker.flush():
+            yield chunk
+
+    async def aiter_text(self, chunk_size: int | None = None, encoding: str | None = None) -> t.AsyncIterator[str]:
+        """
+        A str-iterator over the content
+        """
+        from lzl.io.file.utils.decoders import TextChunker, TextDecoder
+        decoder = TextDecoder(encoding = encoding or "utf-8")
+        chunker = TextChunker(chunk_size = chunk_size)
+        async for byte_content in self.aiter_raw():
+            text_content = decoder.decode(byte_content)
+            for chunk in chunker.decode(text_content):
+                yield chunk
+            text_content = decoder.flush()
+            for chunk in chunker.decode(text_content):
+                yield chunk
+        
+            for chunk in chunker.flush():
+                yield chunk
+
+    async def aiter_lines(self, chunk_size: int | None = None, encoding: str | None = None) -> t.AsyncIterator[str]:
+        """
+        A line-by-line iterator over the file content.
+        """
+        from lzl.io.file.utils.decoders import LineDecoder
+        decoder = LineDecoder()
+        async for text in self.aiter_text(chunk_size = chunk_size, encoding = encoding):
+            for line in decoder.decode(text):
+                yield line
+        for line in decoder.flush():
+            yield line
+
+
     def reader(self, mode: FileMode = 'r', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, **kwargs) -> t.IO[t.Union[str, bytes]]:
         """
         Open the file pointed by this path and return a file object, as

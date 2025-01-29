@@ -1,0 +1,23 @@
+# Configuration for voyageai External Provider
+name: voyageai
+config:
+  api_base: https://api.voyageai.com
+  api_path: /v1
+  api_key_header: Authorization
+  api_key_scheme: Bearer 
+  api_keys: env/VOYAGEAI_API_KEYS
+  api_key: env/VOYAGEAI_API_KEY
+  max_retries: env/VOYAGEAI_MAX_RETRIES
+  hf_compatible: false
+  supports_tokenization: false
+routes:
+  embeddings: 
+    object_class: lzl.api.openai.schemas.external.voyageai.embeddings.EmbeddingObject
+    response_class: lzl.api.openai.schemas.external.voyageai.embeddings.EmbeddingResponse
+    route_class: lzl.api.openai.schemas.external.voyageai.embeddings.EmbeddingRoute
+  rerankings: 
+    object_class: lzl.api.openai.schemas.external.voyageai.rerankings.RerankingObject
+    response_class: lzl.api.openai.schemas.external.voyageai.rerankings.RerankingResponse
+    route_class: lzl.api.openai.schemas.external.voyageai.rerankings.RerankingRoute
+
+models: voyageai

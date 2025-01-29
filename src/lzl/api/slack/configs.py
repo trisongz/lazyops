@@ -21,6 +21,7 @@ class SlackSettings(BaseSettings):
 
     webhook_url: Optional[str] = None
     bot_token: Optional[str] = None
+    signing_secret: Optional[str] = None
     app_token: Optional[str] = None
 
     default_user: Optional[str] = None

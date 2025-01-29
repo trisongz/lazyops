@@ -129,6 +129,14 @@ class OpenAIClient:
             self.configure_routes()
         return self._routes
 
+    
+    @property
+    def supports_tokenization(self) -> bool:
+        """
+        Returns True if the provider supports tokenization
+        """
+        return True
+
     def configure_params(
         self, 
         api_key: Optional[str] = None,
@@ -374,6 +382,15 @@ class OpenAIClient:
         Doc: `https://beta.openai.com/docs/api-reference/embeddings`
         """
         return self.routes.embeddings
+    
+    @property
+    def rerankings(self) -> RerankingRoute:
+        """
+        Returns the `RerankingRoute` class for interacting with `Rerankings`.
+        
+        Doc: `https://beta.openai.com/docs/api-reference/rerankings`
+        """
+        return self.routes.rerankings
     
     # @property
     # def images(self) -> ImageRoute:

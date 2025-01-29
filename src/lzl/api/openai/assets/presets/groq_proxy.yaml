@@ -1,0 +1,22 @@
+# Configuration for groq.com External Provider
+name: groq
+config:
+  api_base: https://api.groq.com
+  api_path: /openai/v1
+  api_key_header: Authorization
+  api_key_scheme: Bearer 
+  api_keys: env/GROQ_API_KEYS
+  api_key: env/GROQ_API_KEY
+  max_retries: env/GROQ_MAX_RETRIES
+  hf_compatible: false
+  supports_tokenization: false
+  proxy_url: https://groq.helicone.ai/openai/v1
+  proxy_headers:
+    Helicone-Auth: Bearer env/HELICONE_API_KEY
+routes:
+  chat:
+    object_class: lzl.api.openai.schemas.external.groq.chat.ChatObject
+    response_class: lzl.api.openai.schemas.external.groq.chat.ChatResponse
+    route_class: lzl.api.openai.schemas.external.groq.chat.ChatRoute
+
+models: groq

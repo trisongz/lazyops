@@ -11,8 +11,10 @@ from .configs import SlackSettings
 if load.TYPE_CHECKING:
     import slack_sdk
     import slack_sdk.web.async_client
+    import slack_bolt
 else:
     slack_sdk = load.LazyLoad("slack_sdk", install_missing = True)
+    slack_bolt = load.LazyLoad("slack_bolt", install_missing = True)
 
 if TYPE_CHECKING:
     from lzl.io import File
@@ -20,6 +22,8 @@ if TYPE_CHECKING:
     from slack_sdk.web.async_client import AsyncWebClient
     from slack_sdk.models.attachments import Attachment
     from slack_sdk.models.blocks import Block
+
+    from slack_bolt import App as SlackBoltApp, BoltContext, BoltRequest, BoltResponse
     from fastapi import APIRouter, FastAPI
 
 logger.set_module_name(__name__, 'slack.client')
@@ -57,6 +61,10 @@ class SlackClient:
         self._api: Optional['AsyncWebClient'] = None
         self._sapi: Optional['WebClient'] = None
         self._kwargs: Optional[Dict[str, Any]] = kwargs
+
+        # Add Bolt handler
+        self._bolt_app: Optional['SlackBoltApp'] = None
+
         if verbose is not None: self.verbose = verbose
         self.logger = logger
         self.default_user = default_user or self.settings.default_user
@@ -88,7 +96,8 @@ class SlackClient:
         if self._api is None and not self.disabled:
             slack_sdk.__do_import__()
             from slack_sdk.web.async_client import AsyncWebClient
-            self._api = AsyncWebClient(token = self.token, **self._kwargs)
+            kwargs = {k:v for k,v in self._kwargs.items() if k in AsyncWebClient.__init__.__code__.co_varnames and v is not None}
+            self._api = AsyncWebClient(token = self.token, **kwargs)
         return self._api
     
     @property
@@ -99,8 +108,23 @@ class SlackClient:
         if self._sapi is None and not self.disabled:
             slack_sdk.__do_import__()
             from slack_sdk import WebClient
-            self._sapi = WebClient(token = self.token, **self._kwargs)
+            kwargs = {k:v for k,v in self._kwargs.items() if k in WebClient.__init__.__code__.co_varnames and v is not None}
+            self._sapi = WebClient(token = self.token, **kwargs)
+            # self._sapi = WebClient(token = self.token, **self._kwargs)
         return self._sapi
+    
+    @property
+    def bolt_app(self) -> 'SlackBoltApp':
+        """
+        Returns the Bolt App
+        """
+        if self._bolt_app is None and not self.disabled:
+            slack_bolt.__do_import__()
+            from slack_bolt import App
+            kwargs = {k:v for k,v in self._kwargs.items() if k in App.__init__.__code__.co_varnames and v is not None}
+            if 'signing_secret' not in kwargs and self.settings.signing_secret: kwargs['signing_secret'] = self.settings.signing_secret
+            self._bolt_app = App(token = self.token, **kwargs)
+        return self._bolt_app
 
     def get_users(self, **kwargs) -> List[Dict[str, Any]]:
         """

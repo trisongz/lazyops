@@ -433,6 +433,90 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         """
         return get_async_file(self._accessor.open(self.fspath_, mode=mode, encoding=encoding, errors=errors, block_size=block_size, compression=compression, newline=newline, buffering=buffering, **kwargs))
 
+    def iter_raw(self, chunk_size: t.Optional[int] = None) -> t.Iterator[bytes]:
+        """
+        Iterates over the bytes of a file
+        """
+        from lzl.io.file.utils.decoders import ByteChunker
+        chunker = ByteChunker(chunk_size = chunk_size)
+        with self._accessor.open(self.fspath_, 'rb', block_size = chunk_size) as stream:
+            for raw_stream_bytes in stream:
+                yield from chunker.decode(raw_stream_bytes)
+        yield from chunker.flush()
+
+    def iter_text(self, chunk_size: int | None = None, encoding: str | None = None) -> t.Iterator[str]:
+        """
+        A str-iterator over the content
+        """
+        from lzl.io.file.utils.decoders import TextChunker, TextDecoder
+        decoder = TextDecoder(encoding = encoding or "utf-8")
+        chunker = TextChunker(chunk_size = chunk_size)
+        for byte_content in self.iter_raw():
+            text_content = decoder.decode(byte_content)
+            yield from chunker.decode(text_content)
+
+            text_content = decoder.flush()
+            yield from chunker.decode(text_content)
+            yield from chunker.flush()
+
+    def iter_lines(self, chunk_size: int | None = None, encoding: str | None = None) -> t.Iterator[str]:
+        """
+        A line-by-line iterator over the file content.
+        """
+        from lzl.io.file.utils.decoders import LineDecoder
+        decoder = LineDecoder()
+        for text in self.iter_text(chunk_size = chunk_size, encoding = encoding):
+            yield from decoder.decode(text)
+        yield from decoder.flush()
+
+
+    async def aiter_raw(self, chunk_size: t.Optional[int] = None) -> t.AsyncIterator[bytes]:
+        """
+        Iterates over the bytes of a file
+        """
+        from lzl.io.file.utils.decoders import ByteChunker
+        chunker = ByteChunker(chunk_size = chunk_size)
+        chunk_size = chunk_size if chunk_size is not None else -1
+        async with await self.afilesys.open_async(self.fspath_, 'rb', block_size = chunk_size) as stream:
+            raw_stream_bytes = await stream.read(chunk_size)
+            while raw_stream_bytes:
+                for chunk in chunker.decode(raw_stream_bytes):
+                    yield chunk
+                raw_stream_bytes = await stream.read(chunk_size)
+        for chunk in chunker.flush():
+            yield chunk
+
+    async def aiter_text(self, chunk_size: int | None = None, encoding: str | None = None) -> t.AsyncIterator[str]:
+        """
+        A str-iterator over the content
+        """
+        from lzl.io.file.utils.decoders import TextChunker, TextDecoder
+        decoder = TextDecoder(encoding = encoding or "utf-8")
+        chunker = TextChunker(chunk_size = chunk_size)
+        async for byte_content in self.aiter_raw():
+            text_content = decoder.decode(byte_content)
+            for chunk in chunker.decode(text_content):
+                yield chunk
+            text_content = decoder.flush()
+            for chunk in chunker.decode(text_content):
+                yield chunk
+        
+            for chunk in chunker.flush():
+                yield chunk
+
+    async def aiter_lines(self, chunk_size: int | None = None, encoding: str | None = None) -> t.AsyncIterator[str]:
+        """
+        A line-by-line iterator over the file content.
+        """
+        from lzl.io.file.utils.decoders import LineDecoder
+        decoder = LineDecoder()
+        async for text in self.aiter_text(chunk_size = chunk_size, encoding = encoding):
+            for line in decoder.decode(text):
+                yield line
+        for line in decoder.flush():
+            yield line
+
+
 
     def reader(self, mode: FileMode = 'r', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, block_size: int = 5242880, compression: str = None, **kwargs: t.Any) -> t.IO[t.Union[str, bytes]]:
         """
@@ -667,6 +751,29 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         Guess the content type of the file
         """
         return CONTENT_TYPE_BY_EXTENSION.get(self.suffix, None)
+    
+    # def iter_bytes(self, chunk_size: int | None = None) -> t.Iterator[bytes]:
+    #     """
+    #     A byte-iterator over the decoded response content.
+    #     """
+    #     # _open_kwargs = {
+    #     #     'encoding': encoding,
+    #     #     'errors': errors,
+    #     #     'newline': newline,
+    #     # } if 'b' not in mode else {}
+        
+    #     # io_obj = io.BytesIO() if 'b' in mode else io.StringIO()
+    #     # _default = b'' if 'b' in mode else ''
+    #     chunk_size = chunk_size or self._accessor.fsconfig.read_chunking_size
+    #     with self.open(mode = 'rb',) as f:
+    #         for chunk in iter(lambda: f.read(chunk_size), b''):
+    #             yield chunk
+
+    # def iter_text(self, chunk_size: t.Optional[int] = None, **kwargs) -> t.Iterator[str]:
+    #     """
+    #     Iterates over the text in the file
+    #     """
+
 
     @property
     def _has_tmgr(self) -> bool:

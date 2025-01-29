@@ -77,6 +77,13 @@ class ExternalOpenAIClient(abc.ABC):
             self.configure_routes()
         return self._routes
 
+    @property
+    def supports_tokenization(self) -> bool:
+        """
+        Returns True if the provider supports tokenization
+        """
+        return self.provider.config.supports_tokenization
+
     def configure_params(
         self, 
         debug_enabled: Optional[bool] = None,
@@ -233,6 +240,15 @@ class ExternalOpenAIClient(abc.ABC):
         Doc: `https://beta.openai.com/docs/api-reference/embeddings`
         """
         return self.routes.embeddings
+    
+    @property
+    def rerankings(self) -> RerankingRoute:
+        """
+        Returns the `RerankingRoute` class for interacting with `Rerankings`.
+        
+        Doc: `https://beta.openai.com/docs/api-reference/rerankings`
+        """
+        return self.routes.rerankings
     
     # @property
     # def images(self) -> ImageRoute:

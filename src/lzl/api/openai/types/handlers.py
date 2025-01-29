@@ -48,6 +48,7 @@ class ModelCostHandler(abc.ABC):
         self.external_models: Optional[Dict[str, 'ProviderModel']] = {}
         self.external_model_aliases: Optional[Dict[str, str]] = {}
         self.external_tokenizers: Optional[Dict[str, 'PreTrainedTokenizer']] = {}
+        self.default_for_routes: Optional[Dict[str, str]] = {}
 
     @staticmethod
     def load_models() -> Dict[str, ModelCostItem]:
@@ -142,6 +143,11 @@ class ModelCostHandler(abc.ABC):
                 self.external_model_aliases[model_alias] = model_name
                 if alias not in self.external_model_aliases:
                     self.external_model_aliases[alias] = model_name
+            if not self.default_for_routes.get('rerankings') and model.supports('rerankings'):
+                self.default_for_routes['rerankings'] = model_name
+            elif model.data.get('is_default_for_rerankings', False):
+                self.default_for_routes['rerankings'] = model_name
+            
         
     def add_model(self, model: str, source_model: str):
         """

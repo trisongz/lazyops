@@ -4,7 +4,7 @@ from __future__ import annotations
 OpenAI Functions Base Class
 """
 
-
+import json
 import inspect
 import random
 import jinja2
@@ -162,7 +162,7 @@ class BaseFunction(ABC):
     schema: Optional[Type[FunctionSchemaT]] = None
     schemas: Optional[Dict[str, Dict[str, Union[str, Type[FunctionSchemaT]]]]] = None
 
-    mode: Optional[Literal['function_call', 'json_schema']] = 'function_call'
+    mode: Optional[Literal['function_call', 'json_schema', 'tool_call', 'compat']] = 'function_call'
     default_schema: Optional[str] = None
 
     prompt_template: Optional[str] = None
@@ -176,6 +176,7 @@ class BaseFunction(ABC):
     retry_limit: Optional[int] = 5
     max_attempts: Optional[int] = 2
     version: Optional[str] = None # Can be used as a cache buster
+    supports_tokenization: Optional[bool] = True
 
     default_model_local: Optional[str] = None
     default_model_develop: Optional[str] = None
@@ -213,13 +214,7 @@ class BaseFunction(ABC):
         from ..utils.logs import logger, null_logger
         from lzl.api.openai.types.handlers import ModelContextHandler
         self.ctx = ModelContextHandler
-
-        if api is None:
-            from lzl.api.openai.clients import OpenAI
-            # from async_openai.client import OpenAIManager
-            api = OpenAI
-        
-        self.api: 'OpenAISessionManager' = api
+        self._setup_api_(api = api)
         self.pool = self.api.pooler
         self.kwargs = kwargs
         self.logger = logger
@@ -268,6 +263,14 @@ class BaseFunction(ABC):
             return self.default_model_func not in self.default_model
         return self.default_model_func != self.default_model
 
+    def _setup_api_(self, api: Optional['OpenAISessionManager'] = None):
+        """
+        Setup the API
+        """
+        if api is None:
+            from lzl.api.openai.clients import OpenAI
+            api = OpenAI
+        self.api: 'OpenAISessionManager' = api
 
     def build_templates(self, **kwargs):
         """
@@ -283,42 +286,62 @@ class BaseFunction(ABC):
         Builds the functions
         """
         # Handles multi functions
+        self.tools = []
+        self.functions = []
+        self.json_schemas = {}
+        self.compat_schemas = {}
+        from lzl.api.openai.utils.schemas import generate_json_schema
         if self.schemas:
-            self.functions = []
-            self.functions.extend(
-                {
+            for name, data in self.schemas.items():
+                self.functions.append({
                     "name": name,
                     "description": data.get('description', self.description),
                     "parameters": data.get('schema', self.schema),
-                }
-                for name, data in self.schemas.items()
-            )
-            self.json_schemas = {
-                name: {
+                })
+                self.tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": name,
+                        "description": data.get('description', self.description),
+                        "parameters": data.get('schema', self.schema),
+                    },
+                })
+                self.json_schemas[name] = {
                     "name": name,
                     "description": data.get('description', self.description),
                     "schema": data.get('schema', self.schema),
                     "strict": True,
                     "from_function": True,
-                } for name, data in self.schemas.items()
-            }
-            
+                }
+                self.compat_schemas[name] = {
+                    "description": data.get('description', self.description),
+                    "parameters": generate_json_schema(data.get('schema', self.schema)), # .model_json_schema(),
+                }
         else:
-            self.functions = [
-                {
+            self.functions.append({
+                "name": self.function_name or self.name,
+                "description": self.description,
+                "parameters": self.schema,
+            })
+            self.tools.append({
+                "type": "function",
+                "function": {
                     "name": self.function_name or self.name,
                     "description": self.description,
                     "parameters": self.schema,
                 }
-            ]
-            self.json_schemas = {
-                self.function_name or self.name: {
-                    "name": self.function_name or self.name,
-                    "description": self.description,
-                    "schema": self.schema,
-                    "strict": True,
-                    "from_function": True,
-                }
+            })
+            self.json_schemas[self.function_name or self.name] = {
+                "name": self.function_name or self.name,
+                "description": self.description,
+                "schema": self.schema,
+                "strict": True,
+                "from_function": True,
+            }
+            self.compat_schemas[self.function_name or self.name] = {
+                "description": self.description,
+                "parameters": generate_json_schema(self.schema), # .model_json_schema(),
+                # "schema": self.schema.model_json_schema(),
             }
         if not self.default_schema: self.default_schema = list(self.json_schemas.keys())[0]
 
@@ -415,10 +438,12 @@ class BaseFunction(ABC):
         max_attempts: int,
         functions: Optional[List[Dict[str, Any]]] = None,
         function_name: Optional[str] = None,
+        tool_name: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         json_schema: Optional[Union['JSONSchema', Dict[str, Any]]] = None,
         schema_name: Optional[str] = None,
         last_chat_name: Optional[str] = None,
-        mode: Optional[Literal['function_call', 'json_schema']] = None,
+        mode: Optional[Literal['function_call', 'json_schema', 'tool_call']] = None,
         **kwargs,
     ):
         """
@@ -430,8 +455,13 @@ class BaseFunction(ABC):
                 json_schema.get('name', self.default_schema) if \
                 json_schema else self.default_schema
             )
+        elif mode == 'tool_call':
+            func_name = tool_name or (
+                tools[0]['function']['name']
+            ) if tools else self.default_schema
         else:
             func_name = function_name or self.name
+        
         func_name = f'[{mode}] {func_name}'
         raise errors.MaxRetriesExhausted(
             name = last_chat_name,
@@ -487,6 +517,79 @@ class BaseFunction(ABC):
         }
     
 
+
+    def get_create_func_kwargs_for_compat_function_call(
+        self,
+        messages: List[Dict[str, Any]],
+        chat: 'ChatRoute', 
+        disable_cache: Optional[bool] = None,
+        functions: Optional[List[Dict[str, Any]]] = None,
+        function_name: Optional[str] = None,
+        property_meta: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        [Compat] Returns the kwargs for the create function
+
+        This is to support models that don't natively support function calls
+        """
+        function_call = "auto" if function_name and function_name == 'auto' else function_name or self.function_name or self.name
+        if chat.proxy_enabled:
+            property_meta = property_meta or {}
+            headers = self.settings.proxy.configure_proxy_headers_for_function(
+                headers = headers,
+                provider = chat.proxy_provider,
+                function_name = function_name or self.name,
+                disable_cache = disable_cache,
+                **property_meta,
+            )
+
+        if '```json' not in messages[0]['content']:
+            schema = self.compat_schemas[function_call]
+            # Insert the prompt for the json schema
+            schema_msg = f'\nUse the following OpenAPI JSON Schema as your Guide and only respond with the valid JSON that conforms:\n```json\n{json.dumps(schema, indent = 2)}\n```'
+            messages[0]['content'] += schema_msg 
+        return {
+            'messages': messages,
+            'headers': headers,
+            **kwargs,
+        }
+    
+
+
+    def get_create_func_kwargs_for_tool_call(
+        self,
+        messages: List[Dict[str, Any]],
+        chat: 'ChatRoute', 
+        disable_cache: Optional[bool] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        tool_name: Optional[str] = None,
+        property_meta: Optional[Dict[str, Any]] = None,
+        headers: Optional[Dict[str, str]] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Returns the kwargs for the create function
+        """
+        tool_choice = "auto" if tool_name and tool_name == 'auto' else {'name': tool_name or self.function_name or self.name}
+        if chat.proxy_enabled:
+            property_meta = property_meta or {}
+            headers = self.settings.proxy.configure_proxy_headers_for_function(
+                headers = headers,
+                provider = chat.proxy_provider,
+                function_name = tool_choice or self.name,
+                disable_cache = disable_cache,
+                **property_meta,
+            )
+        return {
+            'messages': messages,
+            'tools': tools or self.tools,
+            'tool_choice': tool_choice,
+            'headers': headers,
+            **kwargs,
+        }
+
     def get_create_func_kwargs_for_json_schema(
         self,
         messages: List[Dict[str, Any]],
@@ -532,10 +635,12 @@ class BaseFunction(ABC):
         functions: Optional[List[Dict[str, Any]]] = None,
         function_name: Optional[str] = None,
         json_schema: Optional[Union['JSONSchema', Dict[str, Any]]] = None,
+        tool_name: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         schema_name: Optional[str] = None,
         property_meta: Optional[Dict[str, Any]] = None,
         headers: Optional[Dict[str, str]] = None,
-        mode: Optional[Literal['function_call', 'json_schema']] = None,
+        mode: Optional[Literal['function_call', 'json_schema', 'tool_call']] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -550,6 +655,28 @@ class BaseFunction(ABC):
                 disable_cache = disable_cache,
                 json_schema = json_schema,
                 schema_name = schema_name,
+                property_meta = property_meta,
+                headers = headers,
+                **kwargs,
+            )
+        elif mode == 'tool_call':
+            return self.get_create_func_kwargs_for_tool_call(
+                messages = messages,
+                chat = chat,
+                disable_cache = disable_cache,
+                tools = tools,
+                tool_name = tool_name,
+                property_meta = property_meta,
+                headers = headers,
+                **kwargs,
+            )
+        elif mode == 'compat':
+            return self.get_create_func_kwargs_for_compat_function_call(
+                messages = messages,
+                chat = chat,
+                disable_cache = disable_cache,
+                functions = functions,
+                function_name = function_name,
                 property_meta = property_meta,
                 headers = headers,
                 **kwargs,
@@ -575,11 +702,13 @@ class BaseFunction(ABC):
         function_name: Optional[str] = None,
         json_schema: Optional[Union['JSONSchema', Dict[str, Any]]] = None,
         schema_name: Optional[str] = None,
+        tool_name: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         property_meta: Optional[Dict[str, Any]] = None,
         model: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         excluded_clients: Optional[List[str]] = None,
-        mode: Optional[Literal['function_call', 'json_schema']] = None,
+        mode: Optional[Literal['function_call', 'json_schema', 'tool_call']] = None,
         **kwargs,
     ) -> ChatResponse:  # sourcery skip: low-code-quality
         """
@@ -613,6 +742,8 @@ class BaseFunction(ABC):
             functions = functions,
             function_name = function_name,
             json_schema = json_schema,
+            tool_name = tool_name,
+            tools = tools,
             schema_name = schema_name,
             property_meta = property_meta,
             headers = headers,
@@ -640,6 +771,8 @@ class BaseFunction(ABC):
                 function_name = function_name,
                 json_schema = json_schema,
                 schema_name = schema_name,
+                tool_name = tool_name,
+                tools = tools,
                 property_meta = property_meta,
                 model = model,
                 headers = headers,
@@ -657,6 +790,8 @@ class BaseFunction(ABC):
                 functions = functions,
                 function_name = function_name,
                 json_schema = json_schema,
+                tool_name = tool_name,
+                tools = tools,
                 schema_name = schema_name,
                 property_meta = property_meta,
                 model = model,
@@ -677,12 +812,14 @@ class BaseFunction(ABC):
         functions: Optional[List[Dict[str, Any]]] = None,
         function_name: Optional[str] = None,
         json_schema: Optional[Union['JSONSchema', Dict[str, Any]]] = None,
+        tool_name: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         schema_name: Optional[str] = None,
         property_meta: Optional[Dict[str, Any]] = None,
         model: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         excluded_clients: Optional[List[str]] = None,
-        mode: Optional[Literal['function_call', 'json_schema']] = None,
+        mode: Optional[Literal['function_call', 'json_schema', 'tool_call']] = None,
         **kwargs,
     ) -> ChatResponse:  # sourcery skip: low-code-quality
         """
@@ -699,6 +836,8 @@ class BaseFunction(ABC):
                 functions = functions,
                 function_name = function_name,
                 json_schema = json_schema,
+                tool_name = tool_name,
+                tools = tools,
                 schema_name = schema_name,
                 last_chat_name = last_chat_name,
                 **kwargs,
@@ -717,6 +856,8 @@ class BaseFunction(ABC):
             functions = functions,
             function_name = function_name,
             json_schema = json_schema,
+            tool_name = tool_name,
+            tools = tools,
             schema_name = schema_name,
             property_meta = property_meta,
             headers = headers,
@@ -744,6 +885,8 @@ class BaseFunction(ABC):
                 function_name = function_name,
                 json_schema = json_schema,
                 schema_name = schema_name,
+                tool_name = tool_name,
+                tools = tools,
                 property_meta = property_meta,
                 model = model,
                 headers = headers,
@@ -764,6 +907,8 @@ class BaseFunction(ABC):
                 functions = functions,
                 function_name = function_name,
                 json_schema = json_schema,
+                tool_name = tool_name,
+                tools = tools,
                 schema_name = schema_name,
                 property_meta = property_meta,
                 model = model,
@@ -781,6 +926,8 @@ class BaseFunction(ABC):
         functions: Optional[List[Dict[str, Any]]] = None,
         function_name: Optional[str] = None,
         json_schema: Optional[Union['JSONSchema', Dict[str, Any]]] = None,
+        tool_name: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         schema_name: Optional[str] = None,
     ) -> Type[FunctionSchemaT]:
         """
@@ -792,6 +939,15 @@ class BaseFunction(ABC):
                 return response.input_object.json_schema.source_object
             schema_name = schema_name or self.default_schema
             return self.json_schemas[schema_name]['schema']
+        
+        elif response.has_tools:
+            tool_choice = tool_name or self.name
+            if tools:
+                for tool in tools:
+                    if tool.get('function', {}).get('name') == tool_choice:
+                        return tool.get('function', {}).get('parameters')
+            
+            return self.schema or self.schemas[tool_choice]
 
         # else:
         function_name = function_name or self.name
@@ -807,10 +963,12 @@ class BaseFunction(ABC):
         functions: Optional[List[Dict[str, Any]]] = None,
         function_name: Optional[str] = None,
         json_schema: Optional[Union['JSONSchema', Dict[str, Any]]] = None,
+        tool_name: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         schema_name: Optional[str] = None,
         include_name: Optional[bool] = True,
         client_name: Optional[str] = None,
-    ) -> Optional[FunctionSchemaT]:  # sourcery skip: extract-duplicate-method
+    ) -> Optional[FunctionSchemaT]:  # sourcery skip: extract-duplicate-method, merge-else-if-into-elif
         """
         Parses the response
         """
@@ -819,6 +977,8 @@ class BaseFunction(ABC):
             functions = functions,
             function_name = function_name,
             json_schema = json_schema,
+            tool_name = tool_name,
+            tools = tools,
             schema_name = schema_name,
         )
         # schema = schema or self.schema
@@ -828,12 +988,28 @@ class BaseFunction(ABC):
                     response.messages[0].content, 
                     context = {'source': 'function'}
                 )
-            else:
+            elif response.has_tools:
+                result = schema.model_validate(
+                    response.messages[0].tool_calls[0].function.arguments, 
+                    context = {'source': 'function'}
+                )
+            elif response.has_functions or response.function_results:
                 result = schema.model_validate(
                     response.function_results[0].arguments, 
                     from_attributes = True, 
                     context = {'source': 'function'}
                 )
+            else:
+                # This is a compat model
+                if '```json' in response.messages[0].content:
+                    json_body = response.messages[0].content.split('```json', 1)[1].split('```', 1)[0]
+                    result = schema.model_validate_json(json_body, context = {'source': 'function'})
+                else:
+                    result = schema.model_validate(
+                        response.messages[0].content, 
+                        context = {'source': 'function'}
+                    )
+            
             result._set_values_from_response(response, name = self.name if include_name else None, client_name = client_name)
             return result
         except IndexError as e:
@@ -921,7 +1097,8 @@ class BaseFunction(ABC):
         """
         model = model or self.default_model_func
         prompt = self.template.render(**kwargs)
-        prompt = self.api.truncate_to_max_length(prompt, model = model, buffer_length = self.result_buffer)
+        if self.supports_tokenization:
+            prompt = self.api.truncate_to_max_length(prompt, model = model, buffer_length = self.result_buffer)
         messages = []
         if self.system_template:
             if isinstance(self.system_template, jinja2.Template):
@@ -929,6 +1106,8 @@ class BaseFunction(ABC):
             else:
                 system_template = self.system_template
             system_role = "system" if "o1" not in model else "user"
+            if self.mode == 'compat' and '```json' not in system_template:
+                system_template += f'\nUse the following OpenAPI JSON Schema as your Guide and only respond with the valid JSON that conforms:\n```json\n{json.dumps(self.compat_schemas[self.function_name], indent = 2)}\n```'
             messages.append({
                 # "role": "system",
                 "role": system_role,
@@ -955,7 +1134,8 @@ class BaseFunction(ABC):
         except Exception as e:
             self.autologger.error(f'Error Rendering Prompt: {e}: {kwargs}')
             raise e
-        prompt = await self.api.atruncate_to_max_length(prompt, model = model, buffer_length = self.result_buffer)
+        if self.supports_tokenization:
+            prompt = await self.api.atruncate_to_max_length(prompt, model = model, buffer_length = self.result_buffer)
         messages = []
         if self.system_template:
             if isinstance(self.system_template, jinja2.Template):
@@ -963,6 +1143,8 @@ class BaseFunction(ABC):
             else:
                 system_template = self.system_template
             system_role = "system" if "o1" not in model else "user"
+            if self.mode == 'compat' and '```json' not in system_template:
+                system_template += f'\nUse the following OpenAPI JSON Schema as your Guide and only respond with the valid JSON that conforms:\n```json\n{json.dumps(self.compat_schemas[self.function_name], indent = 2)}\n```'
             messages.append({
                 # "role": "system",
                 "role": system_role,
@@ -1073,8 +1255,10 @@ class BaseFunction(ABC):
         functions: Optional[List[Dict[str, Any]]] = None,
         function_name: Optional[str] = None,
         json_schema: Optional[Union['JSONSchema', Dict[str, Any]]] = None,
+        tool_name: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         schema_name: Optional[str] = None,
-        mode: Optional[Literal['function_call', 'json_schema']] = None,
+        mode: Optional[Literal['function_call', 'json_schema', 'tool_call']] = None,
         raise_errors: Optional[bool] = True,
         **kwargs,
     ) -> Optional[FunctionSchemaT]:
@@ -1088,6 +1272,8 @@ class BaseFunction(ABC):
             functions = functions,
             function_name = function_name,
             json_schema = json_schema,
+            tool_name = tool_name,
+            tools = tools,
             schema_name = schema_name,
             model = model,
             mode = mode,
@@ -1099,6 +1285,8 @@ class BaseFunction(ABC):
             functions = functions,
             function_name = function_name,
             json_schema = json_schema,
+            tool_name = tool_name,
+            tools = tools,
             schema_name = schema_name,
             include_name = True, 
             client_name = chat.name
@@ -1116,6 +1304,8 @@ class BaseFunction(ABC):
                 functions = functions,
                 function_name = function_name,
                 json_schema = json_schema,
+                tool_name = tool_name,
+                tools = tools,
                 schema_name = schema_name,
                 model = model,
                 mode = mode,
@@ -1127,6 +1317,8 @@ class BaseFunction(ABC):
                 functions = functions,
                 function_name = function_name,
                 json_schema = json_schema,
+                tool_name = tool_name,
+                tools = tools,
                 schema_name = schema_name,
                 include_name = True, 
                 client_name = chat.name
@@ -1142,6 +1334,8 @@ class BaseFunction(ABC):
                 functions = functions,
                 function_name = function_name,
                 json_schema = json_schema,
+                tool_name = tool_name,
+                tools = tools,
                 schema_name = schema_name,
                 last_chat_name = chat.name,
                 **kwargs,
@@ -1155,8 +1349,10 @@ class BaseFunction(ABC):
         functions: Optional[List[Dict[str, Any]]] = None,
         function_name: Optional[str] = None,
         json_schema: Optional[Union['JSONSchema', Dict[str, Any]]] = None,
+        tool_name: Optional[str] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
         schema_name: Optional[str] = None,
-        mode: Optional[Literal['function_call', 'json_schema']] = None,
+        mode: Optional[Literal['function_call', 'json_schema', 'tool_call']] = None,
         raise_errors: Optional[bool] = True,
         **kwargs,
     ) -> Optional[FunctionSchemaT]:
@@ -1164,12 +1360,15 @@ class BaseFunction(ABC):
         Runs the function loop
         """
         chat = self.get_chat_client(model = model, **kwargs)
+        # self.logger.info(f'Running Chat Function: {function_name} with {chat.name}:{model}')
         response = await self.arun_chat_function(
             messages = messages,
             chat = chat,
             functions = functions,
             function_name = function_name,
             json_schema = json_schema,
+            tool_name = tool_name,
+            tools = tools,
             schema_name = schema_name,
             model = model,
             mode = mode,
@@ -1181,6 +1380,8 @@ class BaseFunction(ABC):
             function_name = function_name,
             json_schema = json_schema,
             schema_name = schema_name,
+            tool_name = tool_name,
+            tools = tools,
             include_name = True, 
             client_name = chat.name
         )
@@ -1197,6 +1398,8 @@ class BaseFunction(ABC):
                 functions = functions,
                 function_name = function_name,
                 json_schema = json_schema,
+                tool_name = tool_name,
+                tools = tools,
                 schema_name = schema_name,
                 model = model,
                 mode = mode,
@@ -1208,6 +1411,8 @@ class BaseFunction(ABC):
                 functions = functions,
                 function_name = function_name,
                 json_schema = json_schema,
+                tool_name = tool_name,
+                tools = tools,
                 schema_name = schema_name,
                 include_name = True, 
                 client_name = chat.name
@@ -1223,17 +1428,12 @@ class BaseFunction(ABC):
                 functions = functions,
                 function_name = function_name,
                 json_schema = json_schema,
+                tool_name = tool_name,
+                tools = tools,
                 schema_name = schema_name,
                 last_chat_name = chat.name,
                 **kwargs,
             )
-        # if raise_errors: raise errors.MaxRetriesExhausted(
-        #     name = self.name, 
-        #     func_name = self.name,
-        #     model = model,
-        #     attempts = attempts,
-        #     max_attempts = self.max_attempts,
-        # )
         return None
 
     

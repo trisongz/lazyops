@@ -19,15 +19,6 @@ from lzl.api.openai.configs.external import ExternalProviderSettings
 from lzl.api.openai.utils import logger, weighted_choice
 # from lzl.api.openai.types.functions import FunctionManager, OpenAIFunctions
 
-# from async_openai.schemas import *
-# from async_openai.types.options import ApiType
-# from async_openai.types.context import ModelContextHandler
-# from async_openai.utils.config import get_settings, OpenAISettings
-# from async_openai.utils.external_config import ExternalProviderSettings
-# from async_openai.utils.helpers import weighted_choice
-# from async_openai.types.functions import FunctionManager, OpenAIFunctions
-# from async_openai.utils.logs import logger
-
 from .loadbalancer import ClientLoadBalancer
 
 if TYPE_CHECKING:
@@ -35,13 +26,8 @@ if TYPE_CHECKING:
     from .external import ExternalOpenAIClient
     from .functions import FunctionManager
     from lzl.api.openai.types.handlers import ModelCostHandler
-    # from ..types.handlers import ModelCostHandler
     from lzl.pool import ThreadPool
     from lzl.api.openai.schemas.chat import Function
-    # from async_openai.client import OpenAIClient
-    # from async_openai.external_client import ExternalOpenAIClient
-    # from lazyops.libs.pooler import ThreadPool
-    # from async_openai.schemas.chat import Function
 
 
 
@@ -109,6 +95,10 @@ class OpenAIManager(abc.ABC):
         self.external_client_weights: Optional[Dict[str, float]] = {}
         self.external_model_to_client: Dict[str, str] = {}
         self.external_client_default: Optional[str] = None
+        # cn = f'{self.__class__.__module__}.{self.__class__.__qualname__}'
+        # logger.info(f'initizing OpenAIClient - {cn}')
+        # if 'lzl.api' in cn:
+        #     raise RuntimeError('Cannot initialize OpenAIClient from `lzl.api`. Please use `lzl.api.openai.client.OpenAIClient` instead.')
         # self._external_clients: 
 
     @property
@@ -707,6 +697,15 @@ class OpenAIManager(abc.ABC):
         Doc: `https://beta.openai.com/docs/api-reference/embeddings`
         """
         return self.api.embeddings
+
+    @property
+    def rerankings(self) -> RerankingRoute:
+        """
+        Returns the `RerankingRoute` class for interacting with `Rerankings`.
+        
+        Doc: `https://beta.openai.com/docs/api-reference/rerankings`
+        """
+        return self.api.rerankings
     
     # @property
     # def images(self) -> ImageRoute:
@@ -920,6 +919,7 @@ class OpenAIManager(abc.ABC):
         client_name: Optional[str] = None, 
         azure_required: Optional[bool] = None, 
         openai_required: Optional[bool] = None,
+        # provider_required: Optional[str] = None,
         model: Optional[str] = None,
         noproxy_required: Optional[bool] = None,
         excluded_clients: Optional[List[str]] = None,
@@ -937,11 +937,13 @@ class OpenAIManager(abc.ABC):
             excluded_clients (List[str], optional): A list of client names to exclude from selection.
         """
         self._ensure_api()
+        # print(self.external_model_to_client, model, self.external_client_names)
         if (
             model and ('/' in model or model in self.external_model_to_client)
         ) or (
             client_name and client_name in self.external_clients
         ):
+            # print('getting exeternal client')
             return self.get_external_client(client_name = client_name, model = model, noproxy_required = noproxy_required, excluded_clients = excluded_clients, **kwargs)
         client_names = self.select_client_names(
             client_name = client_name, 
@@ -1027,9 +1029,35 @@ class OpenAIManager(abc.ABC):
         **kwargs
     ) -> EmbeddingRoute:
         """
-        Gets the chat client
+        Gets the embedding client
         """
         return self.get_client(client_name = client_name, azure_required = azure_required, openai_required = openai_required, model = model, noproxy_required = noproxy_required, excluded_clients = excluded_clients, **kwargs).embeddings
+
+
+    def get_reranking_client(
+        self, 
+        client_name: Optional[str] = None, 
+        # azure_required: Optional[bool] = None, 
+        # openai_required: Optional[bool] = None,
+        # provider_required: Optional[str] = None,
+        model: Optional[str] = None,
+        noproxy_required: Optional[bool] = None,
+        excluded_clients: Optional[List[str]] = None,
+        **kwargs
+    ) -> RerankingRoute:
+        """
+        Gets the reranking client
+        """
+        return self.get_client(
+            client_name = client_name, 
+            # azure_required = azure_required, 
+            # openai_required = openai_required, 
+            # provider_required = provider_required,
+            model = model, 
+            noproxy_required = noproxy_required, 
+            excluded_clients = excluded_clients, 
+            **kwargs
+        ).rerankings
 
 
     """
@@ -1449,7 +1477,9 @@ class OpenAIManager(abc.ABC):
 
         Returns: `ChatResponse`
         """
-
+        if 'model' in kwargs:
+            client = self.get_chat_client(**kwargs)
+            return await client.async_create(input_object = input_object, parse_stream = parse_stream, auto_retry = auto_retry, auto_retry_limit = auto_retry_limit, **kwargs)
         try:
             return await self.api.chat.async_create(input_object = input_object, parse_stream = parse_stream, auto_retry = auto_retry, auto_retry_limit = auto_retry_limit, **kwargs)
 
@@ -1481,14 +1511,17 @@ class OpenAIManager(abc.ABC):
         """
         from lzo.utils.helpers.batching import split_into_batches
         model = model or 'text-embedding-ada-002'
-        inputs = [inputs] if isinstance(inputs, str) else inputs
-        inputs = self.truncate_batch_to_max_length(
-            inputs, 
-            model = model, 
-            **kwargs
-        )
-        if strip_newlines: inputs = [i.replace('\n', ' ').strip() for i in inputs]
         client = self.get_client(model = model, noproxy_required = noproxy_required, **kwargs)
+
+        inputs = [inputs] if isinstance(inputs, str) else inputs
+        if client.supports_tokenization:
+            inputs = self.truncate_batch_to_max_length(
+                inputs, 
+                model = model, 
+                **kwargs
+            )
+        
+        if strip_newlines: inputs = [i.replace('\n', ' ').strip() for i in inputs]
         if not client.is_azure:
             response = client.embeddings.create(input = inputs, model = model, auto_retry = auto_retry, headers = headers, **kwargs)
             return response.embeddings
@@ -1571,14 +1604,17 @@ class OpenAIManager(abc.ABC):
         """
         from lzo.utils.helpers.batching import split_into_batches
         model = model or 'text-embedding-ada-002'
-        inputs = [inputs] if isinstance(inputs, str) else inputs
-        inputs = await self.atruncate_batch_to_max_length(
-            inputs, 
-            model = model, 
-            **kwargs
-        )
-        if strip_newlines: inputs = [i.replace('\n', ' ').strip() for i in inputs]
         client = self.get_client(model = model, noproxy_required = noproxy_required, **kwargs)
+        inputs = [inputs] if isinstance(inputs, str) else inputs
+        if client.supports_tokenization:
+            inputs = await self.atruncate_batch_to_max_length(
+                inputs, 
+                model = model, 
+                **kwargs
+            )
+        
+        if strip_newlines: inputs = [i.replace('\n', ' ').strip() for i in inputs]
+        
         if not client.is_azure:
             response = await client.embeddings.async_create(input = inputs, model = model, auto_retry = auto_retry, headers = headers, **kwargs)
             return (response.embeddings, response.usage) if include_metadata else response.embeddings
@@ -1598,6 +1634,133 @@ class OpenAIManager(abc.ABC):
         return (embeddings, usage) if include_metadata else embeddings
 
     acreate_embeddings = async_create_embeddings
+
+    def create_rerankings(
+        self,
+        query: Optional[str] = None,
+        documents: Optional[List[str]] = None,
+        top_k: Optional[int] = None,
+        model: Optional[str] = None,
+        client_name: Optional[str] = None,
+        return_documents: Optional[bool] = False,
+        truncation: Optional[bool] = True,
+        strip_newlines: Optional[bool] = True,
+        headers: Optional[Dict[str, str]] = None,
+        noproxy_required: Optional[bool] = False,
+        auto_retry: Optional[bool] = False,
+        auto_retry_limit: Optional[int] = None,
+        **kwargs,
+    ) -> RerankingResponse:
+        """
+        Creates a reranking response for the provided query and documents
+
+        Usage:
+
+        ```python
+        >>> result = OpenAI.create_rerankings(
+        >>>    query = 'say this is a test',
+        >>>    documents = ['say this is a test', 'say this is another test'],
+        >>> )
+        ```
+
+        **Parameters:**
+
+        :query (string, required): The query to rerank
+        
+        :documents (list[string], required): The documents to rerank
+        
+        :top_k (int, optional): The number of documents to return
+        
+        :return_documents (bool, optional): If false, the API will return a list of {"index", "relevance_score"} where "index" refers to the index of a document within the input list., If true, the API will return a list of {"index", "document", "relevance_score"} where "document" is the corresponding document from the input list.
+        
+        :truncation (bool, optional): Whether to truncate the input text to the maximum context length
+        
+        :model (string, optional): ID of the model to use. You can use the List models API to see all of your available models, or see our Model overview for descriptions of them.
+
+        Returns: `RerankingResponse`
+        """
+        if not model and not client_name: 
+            default = self.ctx.default_for_routes.get('rerankings')
+            client_name, model = default.split('/', 1)
+        if strip_newlines: documents = [i.replace('\n', ' ').strip() for i in documents]
+        client = self.get_client(model = model, client_name = client_name, noproxy_required = noproxy_required, **kwargs)
+        return client.rerankings.create(
+            query = query,
+            documents = documents,
+            top_k = top_k,
+            return_documents = return_documents,
+            truncation = truncation,
+            model = model,
+            auto_retry = auto_retry,
+            auto_retry_limit = auto_retry_limit,
+            headers = headers,
+            **kwargs,
+        )
+    
+    async def async_create_rerankings(
+        self,
+        query: Optional[str] = None,
+        documents: Optional[List[str]] = None,
+        top_k: Optional[int] = None,
+        model: Optional[str] = None,
+        client_name: Optional[str] = None,
+        return_documents: Optional[bool] = False,
+        truncation: Optional[bool] = True,
+        strip_newlines: Optional[bool] = True,
+        headers: Optional[Dict[str, str]] = None,
+        noproxy_required: Optional[bool] = False,
+        auto_retry: Optional[bool] = False,
+        auto_retry_limit: Optional[int] = None,
+        **kwargs,
+    ) -> RerankingResponse:
+        """
+        Creates a reranking response for the provided query and documents
+
+        Usage:
+
+        ```python
+        >>> result = OpenAI.acreate_rerankings(
+        >>>    query = 'say this is a test',
+        >>>    documents = ['say this is a test', 'say this is another test'],
+        >>> )
+        ```
+
+        **Parameters:**
+
+        :query (string, required): The query to rerank
+        
+        :documents (list[string], required): The documents to rerank
+        
+        :top_k (int, optional): The number of documents to return
+        
+        :return_documents (bool, optional): If false, the API will return a list of {"index", "relevance_score"} where "index" refers to the index of a document within the input list., If true, the API will return a list of {"index", "document", "relevance_score"} where "document" is the corresponding document from the input list.
+        
+        :truncation (bool, optional): Whether to truncate the input text to the maximum context length
+        
+        :model (string, optional): ID of the model to use. You can use the List models API to see all of your available models, or see our Model overview for descriptions of them.
+
+        Returns: `RerankingResponse`
+        """
+        if not model and not client_name: 
+            default = self.ctx.default_for_routes.get('rerankings')
+            client_name, model = default.split('/', 1)
+            
+        if strip_newlines: documents = [i.replace('\n', ' ').strip() for i in documents]
+        client = self.get_client(model = model, client_name = client_name, noproxy_required = noproxy_required, **kwargs)
+        return await client.rerankings.acreate(
+            query = query,
+            documents = documents,
+            top_k = top_k,
+            return_documents = return_documents,
+            truncation = truncation,
+            model = model,
+            auto_retry = auto_retry,
+            auto_retry_limit = auto_retry_limit,
+            headers = headers,
+            **kwargs,
+        )
+    
+    acreate_rerankings = async_create_rerankings
 
     
     @overload

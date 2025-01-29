@@ -273,6 +273,9 @@ class BaseRoute(BaseModel):
         """
         Handles the Retryable Create
         """
+        # if not self.create_enabled: 
+        #     raise NotImplementedError(f'Create is not enabled for {self.api_resource}')
+        
         if self.is_azure and self.azure_model_mapping and kwargs.get('model') and kwargs['model'] in self.azure_model_mapping:
             kwargs['model'] = self.azure_model_mapping[kwargs['model']]
 
@@ -415,6 +418,9 @@ class BaseRoute(BaseModel):
         """
         Handles the Retryable Create
         """
+        # if not self.create_enabled:
+        #     raise NotImplementedError(f'Create is not enabled for {self.api_resource}')
+        
         if self.is_azure and self.azure_model_mapping and kwargs.get('model') and kwargs['model'] in self.azure_model_mapping:
             kwargs['model'] = self.azure_model_mapping[kwargs['model']]
 

@@ -18,6 +18,7 @@ RouteClasses = {
     'chat': ChatRoute,
     # 'edits': EditRoute,
     'embeddings': EmbeddingRoute,
+    'rerankings': RerankingRoute,
     # 'files': FileRoute,
     # 'images': ImageRoute,
     'models': ModelRoute,
@@ -34,6 +35,7 @@ class ApiRoutes:
     chat: ChatRoute = None
     # edits: EditRoute = None
     embeddings: EmbeddingRoute = None
+    rerankings: RerankingRoute = None
     # files: FileRoute = None
     # images: ImageRoute = None
     models: ModelRoute = None
