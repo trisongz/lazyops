@@ -43,8 +43,28 @@ def browserforge_download(
         if is_downloaded(headers = headers, fingerprints = fingerprints):
             return True
     except ImportError:
-        from browserforge.download import IsDownloaded 
-        if IsDownloaded(): return True
+        from browserforge.download import IsDownloaded
+        try:
+            if IsDownloaded(): return True
+        except Exception as e:
+            logger.error(f'Error checking if downloaded: {e}')
+            try:
+                from browserforge.download import get_all_paths
+            except ImportError:
+                from browserforge.download import _get_all_paths as get_all_paths
+            def _IsDownloaded() -> bool:
+                """
+                Check if the required data files are already downloaded.
+                Returns True if all the requested data files are present, False otherwise.
+                """
+                for path in get_all_paths():
+                    if not path.exists():
+                        return False
+                return True
+            
+            if _IsDownloaded(): return True
+
+
     from browserforge.download import (
         ROOT_DIR,
         DATA_DIRS,
