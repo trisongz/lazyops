@@ -1093,12 +1093,14 @@ class BaseFunction(ABC):
     def prepare_function_inputs(
         self,
         model: Optional[str] = None,
+        mode: Optional[Literal['function_call', 'json_schema', 'tool_call']] = None,
         **kwargs
     ) -> Tuple[List[Dict[str, Any]], str]:
         """
         Prepare the Function Inputs for the function
         """
         model = model or self.default_model_func
+        mode = mode or self.mode
         prompt = self.template.render(**kwargs)
         if self.supports_tokenization:
             prompt = self.api.truncate_to_max_length(prompt, model = model, buffer_length = self.result_buffer)
@@ -1109,7 +1111,7 @@ class BaseFunction(ABC):
             else:
                 system_template = self.system_template
             system_role = "system" if "o1" not in model else "user"
-            if self.mode == 'compat' and '```json' not in system_template:
+            if mode == 'compat' and '```json' not in system_template:
                 system_template += f'\nUse the following OpenAPI JSON Schema as your Guide and only respond with the valid JSON that conforms:\n```json\n{json.dumps(self.compat_schemas[self.function_name])}\n```'
             messages.append({
                 # "role": "system",
@@ -1125,12 +1127,14 @@ class BaseFunction(ABC):
     async def aprepare_function_inputs(
         self,
         model: Optional[str] = None,
+        mode: Optional[Literal['function_call', 'json_schema', 'tool_call']] = None,
         **kwargs
     ) -> Tuple[List[Dict[str, Any]], str]:
         """
         Prepare the Function Inputs for the function
         """
         model = model or self.default_model_func
+        mode = mode or self.mode
         # self.autologger.info(kwargs)
         try:
             prompt = self.template.render(**kwargs)
@@ -1146,7 +1150,7 @@ class BaseFunction(ABC):
             else:
                 system_template = self.system_template
             system_role = "system" if "o1" not in model else "user"
-            if self.mode == 'compat' and '```json' not in system_template:
+            if mode == 'compat' and '```json' not in system_template:
                 system_template += f'\nUse the following OpenAPI JSON Schema as your Guide and only respond with the valid JSON that conforms:\n```json\n{json.dumps(self.compat_schemas[self.function_name])}\n```'
             messages.append({
                 # "role": "system",
