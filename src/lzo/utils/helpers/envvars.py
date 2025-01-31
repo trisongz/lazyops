@@ -222,3 +222,38 @@ def load_env_vars(
             if set_as_env and (overwrite or key not in os.environ):
                 os.environ[key] = value
     return envvars
+
+
+_default_envkeys = [
+    'IN_CI_ENV',
+    'DOCKER_CI',
+    'BUILDER_CI',
+    'APP_ENV=CI',
+    'BUILD_ENV=CI',
+]
+
+_is_in_ci: Optional[bool] = None
+
+def is_in_ci_env(
+    envkeys: Optional[List[str]] = _default_envkeys,
+    enable_global_check: bool = True,
+) -> bool:
+    """
+    Checks if the code is running in a CI environment
+    """
+    global _is_in_ci
+    if _is_in_ci is not None and enable_global_check: 
+        return _is_in_ci
+    
+    def _run_check():
+        for key in envkeys:
+            if '=' in key:
+                key, value = key.split('=', 1)
+                if os.getenv(key, '') == value:
+                    return True
+            elif os.getenv(key, '').lower() in {'true', '1', 't', 'y', 'yes'}:
+                return True
+        return False
+    
+    _is_in_ci = _run_check()
+    return _is_in_ci
