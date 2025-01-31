@@ -13,8 +13,8 @@ import asyncio
 import contextlib
 import collections.abc
 import typing as t
-
-from lazyops.utils.lazy import lazy_import, get_keydb_enabled
+from lzl.load import lazy_import
+from lazyops.utils.lazy import get_keydb_enabled
 from lzl.logging import logger, null_logger
 from lzl.pool import ThreadPool
 
