@@ -123,6 +123,8 @@ class BaseFunctionModel(BaseModel):
             
         self.function_usage = usage
         if response.response_ms: self.function_duration = response.response_ms / 1000
+        elif kwargs.get('duration'):
+            self.function_duration = kwargs.pop('duration')
         self.function_model = response.model
         if client_name: self.function_client_name = client_name
 
@@ -214,6 +216,7 @@ class BaseFunction(ABC):
         from ..utils.logs import logger, null_logger
         from lzl.api.openai.types.handlers import ModelContextHandler
         self.ctx = ModelContextHandler
+        self._extra: Dict[str, Any] = {}
         self._setup_api_(api = api)
         self.pool = self.api.pooler
         self.kwargs = kwargs
@@ -1107,7 +1110,7 @@ class BaseFunction(ABC):
                 system_template = self.system_template
             system_role = "system" if "o1" not in model else "user"
             if self.mode == 'compat' and '```json' not in system_template:
-                system_template += f'\nUse the following OpenAPI JSON Schema as your Guide and only respond with the valid JSON that conforms:\n```json\n{json.dumps(self.compat_schemas[self.function_name], indent = 2)}\n```'
+                system_template += f'\nUse the following OpenAPI JSON Schema as your Guide and only respond with the valid JSON that conforms:\n```json\n{json.dumps(self.compat_schemas[self.function_name])}\n```'
             messages.append({
                 # "role": "system",
                 "role": system_role,
@@ -1144,7 +1147,7 @@ class BaseFunction(ABC):
                 system_template = self.system_template
             system_role = "system" if "o1" not in model else "user"
             if self.mode == 'compat' and '```json' not in system_template:
-                system_template += f'\nUse the following OpenAPI JSON Schema as your Guide and only respond with the valid JSON that conforms:\n```json\n{json.dumps(self.compat_schemas[self.function_name], indent = 2)}\n```'
+                system_template += f'\nUse the following OpenAPI JSON Schema as your Guide and only respond with the valid JSON that conforms:\n```json\n{json.dumps(self.compat_schemas[self.function_name])}\n```'
             messages.append({
                 # "role": "system",
                 "role": system_role,

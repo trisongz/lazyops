@@ -454,7 +454,7 @@ class BaseRoute(BaseModel):
         except APIError as e:
             if current_attempt >= auto_retry_limit:
                 raise MaxRetriesExceeded(name = self.name, attempts=current_attempt, base_exception = e) from e
-            logger.warning(f'[{self.name} - {current_model}: {current_attempt}/{auto_retry_limit}] API Error: {e}. Sleeping for 10 seconds')
+            logger.warning(f'[{e.status} - {self.name} - {current_model}: {current_attempt}/{auto_retry_limit}] API Error: {e}. Sleeping for 10 seconds')
             await asyncio.sleep(5.0 * max(2, current_attempt))
             current_attempt += 1
             if self.proxy_enabled:

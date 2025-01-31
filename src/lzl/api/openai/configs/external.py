@@ -54,7 +54,7 @@ class ExternalProviderConfig(BaseModel):
     hf_compatible: Optional[bool] = Field(None, description="Whether the provider is HuggingFace Compatible for Tokenization")
     supports_tokenization: Optional[bool] = Field(True, description="Whether the provider supports tokenization")
 
-    # @validator("custom_headers", "proxy_headers", pre=True)
+    # @validator("custom_headers", "proxy_headers", pre=True) 
     @field_validator("custom_headers", "proxy_headers", mode = 'before')
     def validate_headers(cls, value: Optional[Dict[str, Any]]) -> Optional[Dict[str, str]]:
         """
