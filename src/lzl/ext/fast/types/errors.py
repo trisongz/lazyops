@@ -4,6 +4,7 @@ from __future__ import annotations
 A FastAPI Exception Helper to register errors
 """
 
+import contextlib
 import traceback
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import HTTPException, RequestValidationError
@@ -80,10 +81,12 @@ class FastAPIException(HTTPException):
         if error and self.verbose is not None:
             if self.verbose >= 1: message += f"\nError: {error}"
             elif self.verbose <= 5: message += f"\nError: {error}\nTraceback: {traceback.format_exc()}"
-        if '{' in message: message = message.format(**kwargs)
+        with contextlib.suppress(Exception):
+            if '{' in message: message = message.format(**kwargs)
         self.detail = message
-        if '{' in self.problem: self.problem = self.problem.format(**kwargs)
-        if '{' in self.solution: self.solution = self.solution.format(**kwargs)
+        with contextlib.suppress(Exception):
+            if '{' in self.problem: self.problem = self.problem.format(**kwargs)
+            if '{' in self.solution: self.solution = self.solution.format(**kwargs)
         
 
     def conf(self, **kwargs):
