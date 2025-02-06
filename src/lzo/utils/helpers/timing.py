@@ -6,6 +6,7 @@ Timing Utils
 
 import abc
 import time
+import asyncio
 from lzl.logging import logger, null_logger
 from typing import Optional, List, Dict, Any, Union, Callable, overload
 
@@ -667,6 +668,21 @@ class Timer(abc.ABC, dict):
             **kwargs,
         )
     
+    @classmethod
+    def asleep(cls, delay: float) -> None:
+        """
+        Sleeps for the specified number of seconds
+        """
+        return asyncio.sleep(delay)
+    
+    @classmethod
+    def sleep(cls, delay: float) -> None:
+        """
+        Sleeps for the specified number of seconds
+        """
+        return time.sleep(delay)
+    
+
 
 def timer(
     start: Optional[float] = None,

@@ -4,107 +4,29 @@ from __future__ import annotations
 Remote Object Storage Backend Dict-Like Persistence
 """
 
-import re
-import time
-import datetime
-import binascii
-import contextlib
 import concurrent.futures
-from lzl import load
 from lzl.pool import ThreadPool
-from lzo.types import BaseModel, Field, model_validator
+from lzo.types import Literal, eproperty
 from lzl.io.file import File
 from typing import TypeVar, Generic, Any, Dict, Optional, Union, Tuple, Iterable, List, Type, Callable, Generator, AsyncGenerator, TYPE_CHECKING
-from .base import BaseStatefulBackend, SchemaType, create_unique_id, logger
+from ..base import BaseStatefulBackend, SchemaType, create_unique_id, logger
+from .expirations import FileExpirationBackend, RedisExpirationBackend
+
 if TYPE_CHECKING:
     from lzl.io.file import FileLike
 
-# if load.TYPE_CHECKING:
-#     import fileio
-# else:
-#     fileio = load.LazyLoad("fileio", install_missing=True, install_options = {'package': 'file-io'})
-
-# if TYPE_CHECKING:
-#     from fileio import File
-
-
-class ExpObject(BaseModel):
-    """
-    The Expiration Object
-    """
-    key: str
-    ex: int
-    expires_at: datetime.datetime
-    
-    @property
-    def is_expired(self) -> bool:
-        """
-        Returns True if the Object is Expired
-
-        - We only cache it if it is expired
-        """
-        if 'is_expired' not in self._extra and \
-            self.expires_at < datetime.datetime.now(tz=datetime.timezone.utc):
-                self._extra['is_expired'] = True
-        return self._extra.get('is_expired', False)
-    
-    def set_new_exp(self, ex: int):
-        """
-        Sets a New Expiration
-        """
-        self.expires_at = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(seconds = ex)
-
-
-class ExpirationFile(BaseModel):
-    """
-    The Expiration File
-    """
-    index: Dict[str, ExpObject] = Field(default_factory = dict)
-
-    def add_exp(self, key: str, ex: int):
-        """
-        Adds an Expiration
-        """
-        self.index[key] = ExpObject(key = key, ex = ex, expires_at = datetime.datetime.now(tz=datetime.timezone.utc) + datetime.timedelta(seconds = ex))
-
-
-    def set_exp(self, key: str, ex: int):
-        """
-        Sets an Expiration
-        """
-        if key not in self.index:
-            self.add_exp(key, ex)
-        else:
-            self.index[key].set_new_exp(ex)
-
-    def set_exps(self, *keys: str, ex: int):
-        """
-        Sets an Expiration
-        """
-        for key in keys:
-            self.set_exp(key, ex)
-
-    def remove_exps(self, *keys: str):
-        """
-        Removes an Expiration
-        """
-        for key in keys:
-            _ = self.index.pop(key, None)
-
-    def get_expired_keys(self) -> List[str]:
-        """
-        Returns the Expired Keys
-        """
-        return [
-            key
-            for key, exp_obj in self.index.items()
-            if exp_obj.is_expired
-        ]
-
-
-
-
 # TODO: add caching support for lookups
+_logged_backend: bool = False
+
+def _display_backend(backend: str):
+    """
+    Displays the backend
+    """
+    global _logged_backend
+    if _logged_backend: return
+    logger.info(f'Using Object Storage Expiration Backend: `|g|{backend}|e|`', colored = True)
+    _logged_backend = True
+
 
 class ObjStorageStatefulBackend(BaseStatefulBackend):
     """
@@ -114,6 +36,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
     - Local File System
     - S3
     - R2
+
+    Implements either filebased expiration or redis expiration
     """
     name: Optional[str] = "objstore"
     expiration: Optional[int] = None
@@ -132,6 +56,7 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         auto_delete_invalid: Optional[bool] = None,
         serializer: Optional[str] = 'json',
         serializer_kwargs: Optional[Dict[str, Any]] = None,
+        expiration_backend: Optional[Literal['auto', 'file', 'redis']] = 'auto', # ``
         **kwargs,
     ):
         """
@@ -155,12 +80,17 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         if expiration is not None: 
             self.expiration = expiration
         self.async_enabled = async_enabled
+        self.expiration_backend = expiration_backend
+
         if file_ext is not None: 
             file_ext = file_ext.lstrip('.')
             self.file_ext = file_ext
         if file_pre is not None: self.file_pre = file_pre
-        self.exp_file: 'File' = self.base_key.joinpath(f'.{self.name}.metadata.expires')
         if auto_delete_invalid is not None: self.auto_delete_invalid = auto_delete_invalid
+        self._setup_exp_backend()
+
+        # self.exp_file: 'File' = self.base_key.joinpath(f'.{self.name}.metadata.expires')
+        
         from lzl.io.ser import get_serializer
         self.serializer = get_serializer(serializer = serializer, **(serializer_kwargs or {}))
         self._exp_ser = get_serializer(serializer = 'json')
@@ -173,6 +103,26 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         self._kwargs['file_ext'] = file_ext
         self._kwargs['file_pre'] = file_pre
         self._kwargs['auto_delete_invalid'] = auto_delete_invalid
+        self._kwargs['expiration_backend'] = self.expiration_backend
+    
+    def _setup_exp_backend(self):
+        """
+        Sets up the expiration backend
+        """
+        # Try to determine the expiration backend
+        # Also handle automigration
+        if self.expiration_backend == 'auto': 
+            if RedisExpirationBackend.is_available(): self.expiration_backend = 'redis'
+            else: self.expiration_backend = 'file'
+            _display_backend(self.expiration_backend)
+        if self.expiration_backend == 'file':
+            self.exp_backend = FileExpirationBackend(backend = self)
+        elif self.expiration_backend == 'redis':
+            self.exp_backend = RedisExpirationBackend(backend = self)
+        else:
+            raise ValueError(f'Invalid Expiration Backend: {self.expiration_backend}')
+        # logger.info(f'Using Expiration Backend: {self.exp_backend.name}')
+        
 
     def get_writer(self, f: 'File', is_async: Optional[bool] = None) -> Callable[[Union[str, bytes]], Any]:
         """
@@ -204,139 +154,6 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         pass
 
-    def _load_exps(self) -> 'ExpirationFile':
-        """
-        Loads the Expirations
-        """
-        if not self.exp_file.exists(): return ExpirationFile()
-        try:
-            return self._exp_ser.loads(self.exp_file.read_text())
-        except Exception as e:
-            logger.error(f'Error Loading Expirations: {e}')
-            return ExpirationFile()
-
-    def _save_exps(self, exps: 'ExpirationFile'):
-        """
-        Saves the Expirations
-        """
-        self.exp_file.write_text(self._exp_ser.dumps(exps))
-    
-    async def _aload_exps(self) -> 'ExpirationFile':
-        """
-        Loads the Expirations
-        """
-        if not await self.exp_file.aexists(): return ExpirationFile()
-        try:
-            return await self._exp_ser.aloads(await self.exp_file.aread_text())
-        except Exception as e:
-            logger.error(f'Error Loading Expirations: {e}')
-            return ExpirationFile()
-
-    async def _asave_exps(self, exps: 'ExpirationFile'):
-        """
-        Saves the Expirations
-        """
-        await self.exp_file.awrite_text(await self._exp_ser.adumps(exps))
-
-    @contextlib.contextmanager
-    def exp_handler(self) -> Generator['ExpirationFile', None, None]:
-        """
-        Handles the expiration file
-        """
-        exps = self._load_exps()
-        try:
-            yield exps
-        except Exception as e:
-            logger.error(f'Error Handling Expirations: {e}')
-        finally:
-            self._save_exps(exps)
-            # logger.info(f'Saved Expirations: {exps}')
-            
-    
-    @contextlib.asynccontextmanager
-    async def aexp_handler(self) -> AsyncGenerator['ExpirationFile', None]:
-        """
-        Handles the expiration file
-        """
-        exps = await self._aload_exps()
-        try:
-            yield exps
-        except Exception as e:
-            logger.error(f'Error Handling Expirations: {e}')
-        finally:
-            await self._asave_exps(exps)
-            # logger.info(f'Saved Expirations: {exps}')
-
-    def _run_expiration_check(self, *keys: str):
-        """
-        Runs the expiration check
-        """
-        # if self.exp_file is None: return
-        if not self.exp_file.exists(): return
-        with self.exp_handler() as exps:
-            expired_keys = exps.get_expired_keys()
-            if expired_keys: 
-                self._clear(*expired_keys)
-                exps.remove_exps(*keys)
-
-    async def _arun_expiration_check(self, *keys: str):
-        """
-        Runs the expiration check
-        """
-        # if self.exp_file is None: return
-        if not await self.exp_file.aexists(): return
-        async with self.aexp_handler() as exps:
-            expired_keys = exps.get_expired_keys()
-            if expired_keys: 
-                # logger.info(f'Expired Keys: {expired_keys}')
-                await self._aclear(*expired_keys)
-                exps.remove_exps(*keys)
-
-    def _set_expiration(self, *keys: str, ex: Optional[int] = None, validate: Optional[bool] = False):
-        """
-        Sets the expiration
-        """
-        # logger.info(f'Setting Expirations: {keys} -> {ex}')
-        ex = ex or self.expiration
-        if ex is None: return
-        with self.exp_handler() as exps:
-            exps.set_exps(*keys, ex = ex)
-            if validate: 
-                expired_keys = exps.get_expired_keys()
-                if expired_keys: 
-                    self._clear(*expired_keys)
-                    exps.remove_exps(*expired_keys)
-
-    async def _aset_expiration(self, *keys: str, ex: Optional[int] = None, validate: Optional[bool] = False):
-        """
-        Sets the expiration
-        """
-        # logger.info(f'Setting Expirations: {keys} -> {ex}')
-        ex = ex or self.expiration
-        if ex is None: return
-        async with self.aexp_handler() as exps:
-            exps.set_exps(*keys, ex = ex)
-            if validate: 
-                expired_keys = exps.get_expired_keys()
-                if expired_keys: 
-                    await self._aclear(*expired_keys)
-                    exps.remove_exps(*expired_keys)
-
-    def _remove_expiration(self, *keys: str):
-        """
-        Removes the expiration
-        """
-        if not self.exp_file.exists(): return
-        with self.exp_handler() as exps:
-            exps.remove_exps(*keys)
-
-    async def _aremove_expiration(self, *keys: str):
-        """
-        Removes the expiration
-        """
-        if not await self.exp_file.aexists(): return
-        async with self.aexp_handler() as exps:
-            exps.remove_exps(*keys)
 
     """
     Implemented Methods
@@ -407,14 +224,16 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Gets a Value from the Object Store
         """
-        self._run_expiration_check(key)
+        self.exp_backend._check(key)
+        # self._run_expiration_check(key)
         return self._fetch_one(key, default, _raw = _raw, **kwargs)
 
     def get_values(self, keys: Iterable[str]) -> List[Any]:
         """
         Gets a Value from the Object Store
         """
-        self._run_expiration_check(*keys)
+        # self._run_expiration_check(*keys)
+        self.exp_backend._check(*keys)
         results = []
         result_map = {key: None for key in keys}
         with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -435,7 +254,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         f_key = self._set_one(key, value, _raw = _raw, **kwargs)
         if f_key is None: return
-        self._set_expiration(key, ex = ex)
+        self.exp_backend._set(key, ex = ex)
+        # self._set_expiration(key, ex = ex)
         return f_key
 
     def _set_batch(self, data: Dict[str, Any], ex: Optional[int] = None, _raw: Optional[bool] = None, **kwargs) -> Dict[str, Optional['File']]:
@@ -455,7 +275,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         for key, value in results:
             result_map[key] = value
             if value is not None: exp_keys.append(key)
-        if exp_keys: self._set_expiration(*exp_keys, ex = ex)
+        if exp_keys: self.exp_backend._set(*exp_keys, ex = ex)
+        # if exp_keys: self._set_expiration(*exp_keys, ex = ex)
         return result_map
 
     def _set_batch_fallback(self, data: Dict[str, Any], ex: Optional[int] = None, _raw: Optional[bool] = None, **kwargs) -> Dict[str, Optional['File']]:
@@ -467,7 +288,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         for key, value in data.items():
             result_map[key] = self._set_one(key, value, _raw = _raw, **kwargs)
             if result_map[key] is not None: exp_keys.append(key)
-        if exp_keys: self._set_expiration(*exp_keys, ex = ex)
+        if exp_keys: self.exp_backend._set(*exp_keys, ex = ex)
+        # if exp_keys: self._set_expiration(*exp_keys, ex = ex)
         return result_map
 
     def set_batch(self, data: Dict[str, Any], ex: Optional[int] = None, _raw: Optional[bool] = None, **kwargs) -> Dict[str, Optional['File']]:
@@ -496,7 +318,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Deletes a Value from the Object Store
         """
-        self._remove_expiration(key)
+        # self._remove_expiration(key)
+        self.exp_backend._remove(key)
         self._delete_one(key, **kwargs)
         
 
@@ -517,7 +340,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Clears the Keys from the Object Store
         """
-        self._remove_expiration(*keys)
+        # self._remove_expiration(*keys)
+        self.exp_backend._remove(*keys)
         self._clear(*keys, **kwargs)
 
     async def _afetch_one(
@@ -602,14 +426,16 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Gets a Value from the Object Store
         """
-        await self._arun_expiration_check(key)
+        # await self._arun_expiration_check(key)
+        await self.exp_backend._acheck(key)
         return await self._afetch_one(key, default, _raw = _raw, **kwargs)
 
     async def aget_values(self, keys: Iterable[str], **kwargs) -> List[Any]:
         """
         Gets a Value from the DB
         """
-        await self._arun_expiration_check(*keys)
+        # await self._arun_expiration_check(*keys)
+        await self.exp_backend._acheck(*keys)
         results = []
         async for result in ThreadPool.aiterate(
             self._afetch_one,
@@ -627,7 +453,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         f_key = await self._aset_one(key, value, _raw = _raw, **kwargs)
         if f_key is None: return
-        await self._aset_expiration(key, ex = ex)
+        await self.exp_backend._aset(key, ex = ex)
+        # await self._aset_expiration(key, ex = ex)
         return f_key
         
 
@@ -647,14 +474,16 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         ):
             results.append(value)
             if value is not None: exp_keys.append(key)
-        if exp_keys: await self._aset_expiration(*exp_keys, ex = ex)
+        if exp_keys: await self.exp_backend._aset(*exp_keys, ex = ex)
+        # if exp_keys: await self._aset_expiration(*exp_keys, ex = ex)
         return results
 
     async def adelete(self, key: str, **kwargs) -> None:
         """
         Deletes a Value from the DB
         """
-        await self._aremove_expiration(key)
+        await self.exp_backend._aremove(key)
+        # await self._aremove_expiration(key)
         await self._adelete_one(key, **kwargs)
 
     async def _aclear(self, *keys: str, **kwargs):
@@ -672,7 +501,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Clears the Cache
         """
-        await self._aremove_expiration(*keys)
+        await self.exp_backend._aremove(*keys)
+        # await self._aremove_expiration(*keys)
         await self._aclear(*keys, **kwargs)
 
     def _fetch_objstr_f_keys(
@@ -683,11 +513,16 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Returns the Keys within the current object storage
         """
-        self._run_expiration_check()
-        f_keys = [f_key for f_key in self.base_key.glob(pattern = pattern) if f_key.is_file()]
-        if self.exp_file is not None:
-            f_keys = [f_key for f_key in f_keys if f_key.name != self.exp_file.name]
-        return f_keys
+        self.exp_backend._check(validate = True)
+        # self._run_expiration_check()
+        # f_keys = [f_key for f_key in self.base_key.glob(pattern = pattern) if f_key.is_file() and 'metadata.expires' not in f_key.name]
+        return [f_key for f_key in self.base_key.glob(pattern = pattern) if f_key.is_file() and 'metadata.expires' not in f_key.name]
+
+
+        # if self.expiration_backend == 'file':
+            # if self.exp_file is not None:
+        #     f_keys = [f_key for f_key in f_keys if f_key.name != self.exp_backend.exp_file.name]
+        # return f_keys
     
     async def _afetch_objstr_f_keys(
         self,
@@ -697,12 +532,16 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Returns the Keys within the current object storage
         """
-        await self._arun_expiration_check()
+        # await self._arun_expiration_check()
+        await self.exp_backend._acheck(validate = True)
         f_keys: List['File'] = list(await self.base_key.aglob(pattern=pattern))
-        f_keys = [f_key for f_key in f_keys if f_key.is_file()]
-        if self.exp_file is not None:
-            f_keys = [f_key for f_key in f_keys if f_key.name != self.exp_file.name]
-        return f_keys
+        # f_keys = [f_key for f_key in f_keys if f_key.is_file()]
+        return [f_key for f_key in f_keys if f_key.is_file() and 'metadata.expires' not in f_key.name]
+        # if self.expiration_backend == 'file':
+
+        # # if self.exp_file is not None:
+        #     f_keys = [f_key for f_key in f_keys if f_key.name != self.exp_backend.exp_file.name]
+        # return f_keys
 
     def _parse_f_keys_to_str(
         self,
@@ -729,7 +568,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Returns the Keys within the current object storage
         """
-        self._run_expiration_check()
+        # self._run_expiration_check()
+        self.exp_backend._check(validate = True)
         f_keys = self._fetch_objstr_f_keys(pattern = pattern)
         if as_file: return f_keys
         return self._parse_f_keys_to_str(f_keys, exclude_base_key = exclude_base_key, **kwargs)
@@ -743,7 +583,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Returns all the Keys
         """
-        self._run_expiration_check()
+        # self._run_expiration_check()
+        self.exp_backend._check(validate = True)
         f_keys = self._fetch_objstr_f_keys()
         if as_file: return f_keys
         return self._parse_f_keys_to_str(f_keys, exclude_base_key = exclude_base_key, **kwargs)
@@ -753,7 +594,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Returns the Length of the Cache
         """
-        self._run_expiration_check()
+        # self._run_expiration_check()
+        self.exp_backend._check(validate = True)
         f_keys = self._fetch_objstr_f_keys()
         return len(f_keys)
     
@@ -761,7 +603,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Returns the Length of the Cache
         """
-        await self._arun_expiration_check()
+        # await self._arun_expiration_check()
+        await self.exp_backend._acheck(validate = True)
         f_keys = await self._afetch_objstr_f_keys()
         return len(f_keys)
 
@@ -775,7 +618,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Returns True if the Cache contains the Key
         """
-        self._run_expiration_check(key)
+        # self._run_expiration_check(key)
+        self.exp_backend._check(key)
         f_key = self.get_key(key)
         return f_key.exists()
     
@@ -783,7 +627,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Returns True if the Cache contains the Key
         """
-        await self._arun_expiration_check(key)
+        # await self._arun_expiration_check(key)
+        await self.exp_backend._acheck(key)
         f_key = self.get_key(key)
         return await f_key.aexists()
     
@@ -791,13 +636,15 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Expires a Key
         """
-        self._set_expiration(key, ex = ex, validate = True)
+        self.exp_backend._set(key, ex = ex, validate = True)
+        # self._set_expiration(key, ex = ex, validate = True)
     
     async def aexpire(self, key: str, ex: int, **kwargs) -> None:
         """
         Expires a Key
         """
-        await self._aset_expiration(key, ex = ex, validate = True)
+        await self.exp_backend._aset(key, ex = ex, validate = True)
+        # await self._aset_expiration(key, ex = ex, validate = True)
 
     def purge(self, **kwargs) -> None:
         """

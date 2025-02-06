@@ -166,6 +166,7 @@ class AppContext(abc.ABC):
         if env_var is not None and (env_val := os.getenv(env_var)):
             env_path = Path(env_val)
             if env_path.exists(): 
+                # print(f'Using Env File: {env_path}')
                 return env_path
         app_env = self.get_app_env()
         is_local_env = app_env in [
@@ -228,7 +229,6 @@ class AppContext(abc.ABC):
         allow_default: Optional[bool] = True,
         configs_path: Optional[Path] = None,
         env_var: Optional[str] = None,
-
         override: Optional[bool] = True,
     ) -> Optional[Path]:
         """
@@ -240,6 +240,7 @@ class AppContext(abc.ABC):
         if env_path is None: return None
         import dotenv
         dotenv.load_dotenv(dotenv_path = env_path.as_posix(), override = override)
+        # print(f'Loaded Env File: {env_path}')
         return env_path
     
     def register_client(
