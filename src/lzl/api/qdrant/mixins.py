@@ -94,6 +94,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
     has_dataset: t.Optional[bool] = None
 
     ds_batch_size: t.Optional[int] = 25
+    ds_log_every: t.Optional[int] = None
 
 
     def __init__(
@@ -655,6 +656,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         self,
         batch_size: t.Optional[int] = None,
         max_items: t.Optional[int] = None,
+        log_every: t.Optional[int] = None,
         parallel: t.Optional[int] = None,
         **kwargs,
     ):
@@ -665,7 +667,8 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         if self._ingested: return
         self.autologger.info(f'Initializing Dataset: `|g|{self.collection_name}|e|`', colored = True)
         batch_size = batch_size or self.ds_batch_size
-        result = self._build_dataset(batch_size = batch_size, max_items = max_items, parallel = parallel, **kwargs)
+        log_every = log_every if log_every is not None else self.ds_log_every
+        result = self._build_dataset(batch_size = batch_size, max_items = max_items, log_every = log_every, parallel = parallel, **kwargs)
         self._ingested = True
         return result
     
@@ -673,6 +676,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         self,
         batch_size: t.Optional[int] = None,
         max_items: t.Optional[int] = None,
+        log_every: t.Optional[int] = None,
         parallel: t.Optional[int] = None,
         **kwargs,
     ):
@@ -683,7 +687,8 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         if self._ingested: return
         self.autologger.info(f'Initializing Dataset: `|g|{self.collection_name}|e|`', colored = True)
         batch_size = batch_size or self.ds_batch_size
-        result = await self._abuild_dataset(batch_size = batch_size, max_items = max_items, parallel = parallel, **kwargs)
+        log_every = log_every if log_every is not None else self.ds_log_every
+        result = await self._abuild_dataset(batch_size = batch_size, max_items = max_items, log_every = log_every, parallel = parallel, **kwargs)
         self._ingested = True
         return result
     
@@ -691,6 +696,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         self,
         batch_size: t.Optional[int] = None,
         max_items: t.Optional[int] = None,
+        log_every: t.Optional[int] = None,
         parallel: t.Optional[int] = None,
         is_async: t.Optional[bool] = True,
         **kwargs,
@@ -699,7 +705,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         Ingests the dataset
         """
         func = self._ainit_dataset if is_async else self._init_dataset
-        return func(batch_size = batch_size, max_items = max_items, parallel = parallel, **kwargs)
+        return func(batch_size = batch_size, max_items = max_items, log_every = log_every, parallel = parallel, **kwargs)
 
 
     """
@@ -820,6 +826,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         # Ingestion Kwargs
         dataset_batch_size: t.Optional[int] = None,
         dataset_max_items: t.Optional[int] = None,
+        dataset_log_every: t.Optional[int] = None,
 
         # Downstream Kwargs
         init_collection_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
@@ -873,6 +880,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
             new.init_dataset(
                 batch_size = dataset_batch_size,
                 max_items = dataset_max_items,
+                log_every = dataset_log_every,
                 is_async = False,
                 **(init_dataset_kwargs or {}),
             )
@@ -902,6 +910,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         # Ingestion Kwargs
         dataset_batch_size: t.Optional[int] = None,
         dataset_max_items: t.Optional[int] = None,
+        dataset_log_every: t.Optional[int] = None,
 
         # Downstream Kwargs
         init_collection_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
@@ -955,6 +964,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
             await new.init_dataset(
                 batch_size = dataset_batch_size,
                 max_items = dataset_max_items,
+                log_every = dataset_log_every,
                 is_async = True,
                 **(init_dataset_kwargs or {}),
             )
@@ -983,6 +993,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         # Ingestion Kwargs
         dataset_batch_size: t.Optional[int] = None,
         dataset_max_items: t.Optional[int] = None,
+        dataset_log_every: t.Optional[int] = None,
 
         # Downstream Kwargs
         init_collection_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
@@ -1020,6 +1031,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
             # Ingestion Kwargs
             dataset_batch_size = dataset_batch_size,
             dataset_max_items = dataset_max_items,
+            dataset_log_every = dataset_log_every,
 
             # Downstream Kwargs
             init_collection_kwargs = init_collection_kwargs,
