@@ -419,7 +419,13 @@ class RedisExpirationBackend(ExpirationBackend):
             from lzo.utils.helpers.envvars import is_in_ci_env
             if not os.getenv('REDIS_URL') or is_in_ci_env(): return False
             # Check that the host is available
-            socket.gethostbyname(os.getenv('REDIS_URL').split('://', 1)[-1].split(':', 1)[0])
+            redis_url = os.getenv('REDIS_URL').split('://', 1)[-1]
+            if '@' in redis_url:
+                redis_url = redis_url.split('@', 1)[-1]
+            if ':' in redis_url:
+                redis_url = redis_url.split(':', 1)[0]
+            socket.gethostbyname(redis_url)
+            # socket.gethostbyname(os.getenv('REDIS_URL').split('://', 1)[-1].split(':', 1)[0])
             cls._is_avail = True
             return True
         
