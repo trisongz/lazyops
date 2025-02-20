@@ -810,6 +810,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         on_disk_by_type: t.Optional[t.Dict[str, bool]] = None,
         on_disk_by_field: t.Optional[t.Dict[str, bool]] = None,
         has_dataset: t.Optional[bool] = None,
+        
 
         # Initializers
         skip_init_collection: t.Optional[bool] = None,
@@ -823,6 +824,12 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         # Downstream Kwargs
         init_collection_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
         init_dataset_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+
+        # Model Config
+        set_cuda: t.Optional[bool | str] = None,
+        set_model_config: t.Optional[t.Dict[str, t.Any]] = None,
+        set_sparse_model_config: t.Optional[t.Dict[str, t.Any]] = None,
+
         **kwargs,        
     ) -> 'QdrantSearcher':
         """
@@ -842,6 +849,19 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
             has_dataset = has_dataset,
             **kwargs,
         )
+        if set_cuda and isinstance(set_cuda, str) and set_cuda.lower() == 'auto':
+            from lzo.utils.system import get_torch_device_name
+            set_cuda = get_torch_device_name() == 'cuda'
+        
+        if set_cuda and set_cuda is True:
+            if not set_model_config: set_model_config = {}
+            set_model_config['cuda'] = set_cuda
+            if not set_sparse_model_config: set_sparse_model_config = {}
+            set_sparse_model_config['cuda'] = set_cuda
+
+        if set_model_config: new.client.shared_config.set_model_config.update(set_model_config)
+        if set_sparse_model_config: new.client.shared_config.set_sparse_model_config.update(set_sparse_model_config)
+
         if not skip_init_collection: 
             new.init_collection(
                 skip_init_index = skip_init_index,
@@ -886,6 +906,12 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         # Downstream Kwargs
         init_collection_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
         init_dataset_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
+
+        # Model Config
+        set_cuda: t.Optional[bool | str] = None,
+        set_model_config: t.Optional[t.Dict[str, t.Any]] = None,
+        set_sparse_model_config: t.Optional[t.Dict[str, t.Any]] = None,
+
         **kwargs,        
     ) -> 'QdrantSearcher':
         """
@@ -905,6 +931,19 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
             has_dataset = has_dataset,
             **kwargs,
         )
+        if set_cuda and isinstance(set_cuda, str) and set_cuda.lower() == 'auto':
+            from lzo.utils.system import get_torch_device_name
+            set_cuda = get_torch_device_name() == 'cuda'
+        
+        if set_cuda and set_cuda is True:
+            if not set_model_config: set_model_config = {}
+            set_model_config['cuda'] = set_cuda
+            if not set_sparse_model_config: set_sparse_model_config = {}
+            set_sparse_model_config['cuda'] = set_cuda
+
+        if set_model_config: new.client.shared_config.set_model_config.update(set_model_config)
+        if set_sparse_model_config: new.client.shared_config.set_sparse_model_config.update(set_sparse_model_config)
+
         if not skip_init_collection: 
             await new.init_collection(
                 skip_init_index = skip_init_index,
@@ -949,6 +988,11 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         init_collection_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
         init_dataset_kwargs: t.Optional[t.Dict[str, t.Any]] = None,
 
+        # Model Config
+        set_cuda: t.Optional[bool | str] = None,
+        set_model_config: t.Optional[t.Dict[str, t.Any]] = None,
+        set_sparse_model_config: t.Optional[t.Dict[str, t.Any]] = None,
+
         is_async: t.Optional[bool] = True,
         **kwargs,        
     ) -> 'QdrantSearcher' | t.Awaitable['QdrantSearcher']:
@@ -980,6 +1024,11 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
             # Downstream Kwargs
             init_collection_kwargs = init_collection_kwargs,
             init_dataset_kwargs = init_dataset_kwargs,
+
+            # Model Config
+            set_cuda = set_cuda,
+            set_model_config = set_model_config,
+            set_sparse_model_config = set_sparse_model_config,
             **kwargs,
         )
 
