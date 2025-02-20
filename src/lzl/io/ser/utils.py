@@ -129,7 +129,7 @@ def serialize_object(
 
     if isinstance(obj, BaseModel) or hasattr(obj, 'model_dump'):
         obj_class_name = register_object_class(obj)
-        obj_value = obj.model_dump(mode = 'json', round_trip = True, **extract_model_dumps_kwargs(kwargs))
+        obj_value = obj.model_dump(mode = 'json', round_trip = True, context = {'source': 'io', 'method': 'serializer'}, **extract_model_dumps_kwargs(kwargs))
         if mode == 'raw': return obj_value
         if disable_nested_values:
             return {
@@ -346,6 +346,8 @@ def deserialize_object(
                 # for k,v in obj_value.items():
                 #     if not is_primitive(v):
                 #         obj_value[k] = deserialize_object(v)
+                if hasattr(obj_class, 'model_validate'):
+                    return obj_class.model_validate(obj_value, context = {'source': 'io', 'method': 'deserializer'})
                 return obj_class(**obj_value)
             except ImportError as e:
                 if allow_failed_import:

@@ -18,9 +18,11 @@ else:
 PyModelType = TypeVar("PyModelType", bound=BaseModel)
 ObjT = Union['PyModelType', Dict, Any]
 
+
 def create_object_hash(
     obj: ObjT,
     _sep: Optional[str] = ':',
+    _hash_length: Optional[int] = None,
 ) -> str:
     """
     Creates a hash for the object
@@ -30,14 +32,21 @@ def create_object_hash(
     _sep (str, optional):
         the separator to use for the hash
         Defaults to ':'.
+    _hash_length (int, optional):
+        the length of the hash
+        Defaults to None.
     """
+    if _hash_length is None or _hash_length == 32: _hasher = xxhash.xxh3_128_hexdigest
+    elif _hash_length == 16: _hasher = xxhash.xxh3_64_hexdigest
+    elif _hash_length == 8: _hasher = xxhash.xxh32_hexdigest
+
     if isinstance(obj, dict):
-        return xxhash.xxh3_128_hexdigest(str(obj))
+        return _hasher(str(obj))
     if isinstance(obj, (list, tuple, set)):
         return f'{_sep}'.join(create_object_hash(item, _sep = _sep) for item in obj)
     if isinstance(obj, BaseModel) or hasattr(obj, "model_dump"):
-        return xxhash.xxh3_128_hexdigest(obj.model_dump_json(exclude_none=True))
-    return xxhash.xxh3_128_hexdigest(str(obj))
+        return _hasher(obj.model_dump_json(exclude_none=True))
+    return _hasher(str(obj))
 
 def create_hash_from_args_and_kwargs(
     *args,
@@ -46,6 +55,7 @@ def create_hash_from_args_and_kwargs(
     _exclude: Optional[List[str]] = None,
     _exclude_none: Optional[bool] = True,
     _sep: Optional[str] = ':',
+    _hash_length: Optional[int] = None,
     **kwargs,
 ) -> str:
     """
@@ -69,6 +79,9 @@ def create_hash_from_args_and_kwargs(
     _sep (str, optional):
         the separator to use for the hash
         Defaults to ':'.
+    _hash_length (int, optional):
+        the length of the hash
+        Defaults to None.
     """
     hash_key = _key_base or ()
     if args: 
@@ -81,6 +94,6 @@ def create_hash_from_args_and_kwargs(
             hash_key += item
     
     key = f'{_sep}'.join(str(k) for k in hash_key)
-    return create_object_hash(key, _sep = _sep)
+    return create_object_hash(key, _sep = _sep, _hash_length = _hash_length)
 
 

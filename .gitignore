@@ -56,3 +56,7 @@ tests/lzl/test_abcs.py
 tests/lzl/settings.py
 tests/lzl/db_sql_model.py
 src/lzl/api/slack/slack_context.json
+tests/out/kvdb/components/session.pyi
+tests/out/lzl/api/qdrant/client.pyi
+tests/out/lzl/api/qdrant/client_v2.pyi
+tests/out/lzl/api/qdrant/client_v3.pyi

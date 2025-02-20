@@ -523,7 +523,7 @@ class RedisExpirationBackend(ExpirationBackend):
         for key in keys:
             if await self.session.ahexists(self.exp_base_key, key):
                 try:
-                    exp = float(await self.session.aget(self.exp_base_key, key))
+                    exp = float(await self.session.ahget(self.exp_base_key, key))
                     if exp <= now:
                         expired_keys.append(key)
                         continue
