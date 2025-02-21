@@ -487,7 +487,10 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         """
         if self._initialized: return
         if self.collection_name is None: raise ValueError('Collection Name is None')
-        if self.client.collection_exists(self.collection_name): return
+        if self.client.collection_exists(self.collection_name): 
+            collection_info = self.client.get_collection(collection_name = self.collection_name)
+            self.client.api._validate_collection_info(collection_info)
+            return
         self.autologger.info(f'Initializing Collection: `|g|{self.collection_name}|e|`', colored = True)
         self.client.create_collection(
             collection_name = self.collection_name,
@@ -510,7 +513,10 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         """
         if self._initialized: return
         if self.collection_name is None: raise ValueError('Collection Name is None')
-        if await self.client.acollection_exists(self.collection_name): return
+        if await self.client.acollection_exists(self.collection_name): 
+            collection_info = await self.client.aget_collection(collection_name = self.collection_name)
+            self.client.api._validate_collection_info(collection_info)
+            return
         self.autologger.info(f'Initializing Collection: `|g|{self.collection_name}|e|`', colored = True)
         await self.client.acreate_collection(
             collection_name = self.collection_name,
@@ -798,6 +804,155 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         """
         func = self._aquery if is_async else self._query
         return func(query = query, limit = limit, **filters)
+    
+    def add(
+        self,
+        documents: t.Iterable[str],
+        metadata: t.Optional[t.Iterable[dict[str, t.Any]]] = None,
+        ids: t.Optional[t.Iterable['qm.ExtendedPointId']] = None,
+        batch_size: int = 32,
+        parallel: t.Optional[int] = None,
+        **kwargs: t.Any,
+    ) -> list[t.Union[str, int]]:
+        """
+        Adds text documents into qdrant collection.
+        If collection does not exist, it will be created with default parameters.
+        Metadata in combination with documents will be added as payload.
+        Documents will be embedded using the specified embedding model.
+
+        If you want to use your own vectors, use `upsert` method instead.
+
+        Args:
+            collection_name (str):
+                Name of the collection to add documents to.
+            documents (Iterable[str]):
+                List of documents to embed and add to the collection.
+            metadata (Iterable[dict[str, Any]], optional):
+                List of metadata dicts. Defaults to None.
+            ids (Iterable[models.ExtendedPointId], optional):
+                List of ids to assign to documents.
+                If not specified, UUIDs will be generated. Defaults to None.
+            batch_size (int, optional):
+                How many documents to embed and upload in single request. Defaults to 32.
+            parallel (Optional[int], optional):
+                How many parallel workers to use for embedding. Defaults to None.
+                If number is specified, data-parallel process will be used.
+
+        Raises:
+            ImportError: If fastembed is not installed.
+
+        Returns:
+            List of IDs of added documents. If no ids provided, UUIDs will be randomly generated on client side.
+
+        """
+        # Wrapper method for the add method
+        if not self._initialized: self.init_collection(is_async = False)
+        encoded_docs = self.client.sapi._embed_documents(
+            documents=documents,
+            embedding_model_name=self.client.sapi.embedding_model_name,
+            batch_size=batch_size,
+            embed_type="passage",
+            parallel=parallel,
+        )
+        encoded_sparse_docs = None
+        if self.client.sapi.sparse_embedding_model_name is not None:
+            encoded_sparse_docs = self.client.sapi._sparse_embed_documents(
+                documents = documents,
+                embedding_model_name = self.client.sapi.sparse_embedding_model_name,
+                batch_size = batch_size,
+                parallel = parallel,
+            )
+        inserted_ids: list = []
+        points = self.client.sapi._points_iterator(
+            ids = ids,
+            metadata = metadata,
+            encoded_docs = encoded_docs,
+            ids_accumulator = inserted_ids,
+            sparse_vectors = encoded_sparse_docs,
+        )
+        self.client.sapi.upload_points(
+            collection_name = self.collection_name,
+            points = points,
+            wait = True,
+            parallel = parallel or 1,
+            batch_size = batch_size,
+            **kwargs,
+        )
+        return inserted_ids
+
+    async def aadd(
+        self,
+        documents: t.Iterable[str],
+        metadata: t.Optional[t.Iterable[dict[str, t.Any]]] = None,
+        ids: t.Optional[t.Iterable['qm.ExtendedPointId']] = None,
+        batch_size: int = 32,
+        parallel: t.Optional[int] = None,
+        **kwargs: t.Any,
+    ) -> list[t.Union[str, int]]:
+        """
+        Adds text documents into qdrant collection.
+        If collection does not exist, it will be created with default parameters.
+        Metadata in combination with documents will be added as payload.
+        Documents will be embedded using the specified embedding model.
+
+        If you want to use your own vectors, use `upsert` method instead.
+
+        Args:
+            collection_name (str):
+                Name of the collection to add documents to.
+            documents (Iterable[str]):
+                List of documents to embed and add to the collection.
+            metadata (Iterable[dict[str, Any]], optional):
+                List of metadata dicts. Defaults to None.
+            ids (Iterable[models.ExtendedPointId], optional):
+                List of ids to assign to documents.
+                If not specified, UUIDs will be generated. Defaults to None.
+            batch_size (int, optional):
+                How many documents to embed and upload in single request. Defaults to 32.
+            parallel (Optional[int], optional):
+                How many parallel workers to use for embedding. Defaults to None.
+                If number is specified, data-parallel process will be used.
+
+        Raises:
+            ImportError: If fastembed is not installed.
+
+        Returns:
+            List of IDs of added documents. If no ids provided, UUIDs will be randomly generated on client side.
+
+        """
+        if not self._initialized: await self.init_collection(is_async = True)
+        encoded_docs = self.client.api._embed_documents(
+            documents=documents,
+            embedding_model_name=self.client.api.embedding_model_name,
+            batch_size=batch_size,
+            embed_type="passage",
+            parallel=parallel,
+        )
+        encoded_sparse_docs = None
+        if self.client.api.sparse_embedding_model_name is not None:
+            encoded_sparse_docs = self.client.api._sparse_embed_documents(
+                documents = documents,
+                embedding_model_name = self.client.api.sparse_embedding_model_name,
+                batch_size = batch_size,
+                parallel = parallel,
+            )
+        inserted_ids: list = []
+        points = self.client.api._points_iterator(
+            ids = ids,
+            metadata = metadata,
+            encoded_docs = encoded_docs,
+            ids_accumulator = inserted_ids,
+            sparse_vectors = encoded_sparse_docs,
+        )
+        self.client.api.upload_points(
+            collection_name = self.collection_name,
+            points = points,
+            wait = True,
+            parallel = parallel or 1,
+            batch_size = batch_size,
+            **kwargs,
+        )
+        return inserted_ids
 
     """
     Setup Methods
