@@ -13,7 +13,7 @@ import typing as t
 warnings.filterwarnings("ignore", message = "Api key is used with an insecure connection.", category = UserWarning)
 
 # warnings.filterwarnings("ignore", message = "Api key is used with an insecure connection.", module = "qdrant_client")
-
+import pathlib
 from lzl import load
 from lzl.proxied import ProxyObject
 from lzo.types import BaseModel, BaseSettings, AppEnv, eproperty
@@ -21,6 +21,7 @@ from pydantic import model_validator, Field, PrivateAttr
 from lzl.logging import logger, null_logger, Logger
 
 if t.TYPE_CHECKING:
+    from lzl.io import TemporaryData
     import fastembed
     import fastembed.text.clip_embedding
     import fastembed.text.multitask_embedding
@@ -48,6 +49,9 @@ pooled_normalized_models:
     hf: Alibaba-NLP/gte-modernbert-base
   model_file: onnx/model.onnx
 """
+
+
+lib_path = pathlib.Path(__file__).parent
 
 
 class QdrantSharedConfig(BaseModel):
@@ -161,7 +165,14 @@ class QdrantClientSettings(BaseSettings):
 
     class Config(BaseSettings.Config):
         env_prefix = "QDRANT_"
-    
+
+    @eproperty
+    def temp_data(self) -> 'TemporaryData':
+        """
+        Returns the temporary data
+        """
+        from lzl.io.persistence import TemporaryData
+        return TemporaryData(lib_path.joinpath('data'))
 
     @eproperty
     def added_fastembed_models(self) -> t.Set[str]:
@@ -257,8 +268,9 @@ class QdrantClientSettings(BaseSettings):
         from lzl.io import File
         config_file = File(config)
         if not config_file.exists(): raise ValueError(f'Config File cannot be loaded from: `{config}`')
+        if not self.temp_data.has_logged(f'config_file:load:{config_file.as_posix()}'):
+            logger.info(f'Loading from Config File: `{config_file}`')
         
-        logger.info(f'Loading from Config File: `{config_file}`')
         config_data: t.Dict[str, t.List[t.Dict[str, t.Union[str, int, t.Dict[str, str]]]]] = yaml.safe_load(config_file.read_text())
         self.add_fastembed_models(**config_data)
 

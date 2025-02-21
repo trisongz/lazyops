@@ -9,6 +9,7 @@ import collections.abc
 from pathlib import Path
 from lzl.types import Literal
 from lzl.proxied import ProxyObject
+from lzo.utils.state import TempData
 from typing import Dict, TypeVar, Optional, Type, Union, Any, Generic, Callable, MutableMapping, TYPE_CHECKING
 
 RT = TypeVar('RT')
@@ -61,7 +62,8 @@ class MRegistry(Generic[RT]):
             self.uninit_registry.pop(key)
         if os.getenv('MUTE_LZ_REGISTRY', 'false').lower() in {'true', '1'}: return
         if not isinstance(value, str) and getattr(value, '_rverbose', self.verbose):
-            self.logger.info(f'Registered: {key}', colored = True, prefix = self.name)
+            if not TempData.has_logged(f'lzo.registry.register:{key}'):
+                self.logger.info(f'Registered: {key}', colored = True, prefix = self.name)
 
     def __setitem__(self, key: str, value: RT) -> None:
         """
