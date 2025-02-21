@@ -490,6 +490,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         if self.client.collection_exists(self.collection_name): 
             collection_info = self.client.get_collection(collection_name = self.collection_name)
             self.client.api._validate_collection_info(collection_info)
+            self._initialized = True
             return
         self.autologger.info(f'Initializing Collection: `|g|{self.collection_name}|e|`', colored = True)
         self.client.create_collection(
@@ -516,6 +517,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         if await self.client.acollection_exists(self.collection_name): 
             collection_info = await self.client.aget_collection(collection_name = self.collection_name)
             self.client.api._validate_collection_info(collection_info)
+            self._initialized = True
             return
         self.autologger.info(f'Initializing Collection: `|g|{self.collection_name}|e|`', colored = True)
         await self.client.acreate_collection(
@@ -878,6 +880,9 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
             batch_size = batch_size,
             **kwargs,
         )
+        if ids and len(inserted_ids) != len(ids):
+            missing_ids = set(ids) - set(inserted_ids)
+            self.logger.warning(f'Some IDs were not inserted: {missing_ids} ({len(missing_ids)} missing)')
         return inserted_ids
 
     async def aadd(
@@ -952,6 +957,10 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
             batch_size = batch_size,
             **kwargs,
         )
+        if ids and len(inserted_ids) != len(ids):
+            missing_ids = set(ids) - set(inserted_ids)
+            self.logger.warning(f'Some IDs were not inserted: {missing_ids} ({len(missing_ids)} missing)')
+        # self.logger.info(f'{inserted_ids}', prefix = f'{len(inserted_ids)}', colored = True)
         return inserted_ids
 
     """
