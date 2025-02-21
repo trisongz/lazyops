@@ -807,6 +807,29 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         func = self._aquery if is_async else self._query
         return func(query = query, limit = limit, **filters)
     
+    def _points_iterator(
+        self,
+        ids: t.Optional[t.Iterable['qm.ExtendedPointId']],
+        metadata: t.Optional[t.Iterable[dict[str, t.Any]]],
+        encoded_docs: t.Iterable[tuple[str, list[float]]],
+        ids_accumulator: list,
+        sparse_vectors: t.Optional[t.Iterable['ct.SparseVector']] = None,
+        callback: t.Optional[t.Callable[[t.Any], None]] = None,
+    ) -> t.Iterable['qm.PointStruct']:
+        """
+        The Points Iterator is a generator that yields PointStruct objects.
+        """
+        for point in self.client.sapi._points_iterator(
+            ids = ids,
+            metadata = metadata,
+            encoded_docs = encoded_docs,
+            ids_accumulator = ids_accumulator,
+            sparse_vectors = sparse_vectors,
+        ):
+            yield point
+            if callback: callback(point)
+        
+    
     def add(
         self,
         documents: t.Iterable[str],
@@ -814,6 +837,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         ids: t.Optional[t.Iterable['qm.ExtendedPointId']] = None,
         batch_size: int = 32,
         parallel: t.Optional[int] = None,
+        callback: t.Optional[t.Callable[[t.Any], None]] = None,
         **kwargs: t.Any,
     ) -> list[t.Union[str, int]]:
         """
@@ -865,13 +889,21 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
                 parallel = parallel,
             )
         inserted_ids: list = []
-        points = self.client.sapi._points_iterator(
+        points = self._points_iterator(
             ids = ids,
             metadata = metadata,
             encoded_docs = encoded_docs,
             ids_accumulator = inserted_ids,
             sparse_vectors = encoded_sparse_docs,
+            callback = callback,
         )
+        # points = self.client.sapi._points_iterator(
+        #     ids = ids,
+        #     metadata = metadata,
+        #     encoded_docs = encoded_docs,
+        #     ids_accumulator = inserted_ids,
+        #     sparse_vectors = encoded_sparse_docs,
+        # )
         self.client.sapi.upload_points(
             collection_name = self.collection_name,
             points = points,
@@ -885,6 +917,28 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
             self.logger.warning(f'Some IDs were not inserted: {missing_ids} ({len(missing_ids)} missing)')
         return inserted_ids
 
+    def _apoints_iterator(
+        self,
+        ids: t.Optional[t.Iterable['qm.ExtendedPointId']],
+        metadata: t.Optional[t.Iterable[dict[str, t.Any]]],
+        encoded_docs: t.Iterable[tuple[str, list[float]]],
+        ids_accumulator: list,
+        sparse_vectors: t.Optional[t.Iterable['ct.SparseVector']] = None,
+        callback: t.Optional[t.Callable[[t.Any], None]] = None,
+    ) -> t.Iterable['qm.PointStruct']:
+        """
+        [Async Client] The Points Iterator is a generator that yields PointStruct objects.
+        """
+        for point in self.client.api._points_iterator(
+            ids = ids,
+            metadata = metadata,
+            encoded_docs = encoded_docs,
+            ids_accumulator = ids_accumulator,
+            sparse_vectors = sparse_vectors,
+        ):
+            yield point
+            if callback: callback(point)
+
     async def aadd(
         self,
         documents: t.Iterable[str],
@@ -892,6 +946,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         ids: t.Optional[t.Iterable['qm.ExtendedPointId']] = None,
         batch_size: int = 32,
         parallel: t.Optional[int] = None,
+        callback: t.Optional[t.Callable[[t.Any], None]] = None,
         **kwargs: t.Any,
     ) -> list[t.Union[str, int]]:
         """
@@ -942,13 +997,21 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
                 parallel = parallel,
             )
         inserted_ids: list = []
-        points = self.client.api._points_iterator(
+        points = self._apoints_iterator(
             ids = ids,
             metadata = metadata,
             encoded_docs = encoded_docs,
             ids_accumulator = inserted_ids,
             sparse_vectors = encoded_sparse_docs,
+            callback = callback,
         )
+        # points = self.client.api._points_iterator(
+        #     ids = ids,
+        #     metadata = metadata,
+        #     encoded_docs = encoded_docs,
+        #     ids_accumulator = inserted_ids,
+        #     sparse_vectors = encoded_sparse_docs,
+        # )
         self.client.api.upload_points(
             collection_name = self.collection_name,
             points = points,
