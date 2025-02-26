@@ -480,7 +480,7 @@ class FilePath(Path, FilePurePath):
         chunker = ByteChunker(chunk_size = chunk_size)
         chunk_size = chunk_size if chunk_size is not None else -1
         async with self.aopen(mode = 'rb', buffering = chunk_size) as stream:
-            for raw_stream_bytes in stream:
+            async for raw_stream_bytes in stream:
                 for chunk in chunker.decode(raw_stream_bytes):
                     yield chunk
         for chunk in chunker.flush():

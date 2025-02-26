@@ -25,12 +25,26 @@ if t.TYPE_CHECKING:
         Base Qdrant Model
         """
 
+        @property
+        def data_id(self) -> t.Optional[str | int]:
+            """
+            Returns the data id
+            """
+            ...
+
+
         @classmethod
         def get_qdrant_index_config(cls) -> t.Dict[str, t.Dict[str, t.Any]]:
             """
             Returns the Qdrant index config
             """
             return {}
+
+        def to_qdrant_payload(self, mode: str = 'json', exclude_none: bool = True, **kwargs) -> t.Tuple[str, str, t.Dict[str, t.Any]]:
+            """
+            Returns a Qdrant payload
+            """
+            ...
         
     
 QdrantModelT = t.TypeVar('QdrantModelT', bound = 'QdrantBaseModel')
