@@ -31,6 +31,7 @@ if t.TYPE_CHECKING:
     import fastembed.rerank.cross_encoder
     import fastembed.sparse.splade_pp
     # import fastembed.rerank.cross_encoder.onnx_text_cross_encoder
+    from .full_client import QdrantClient
     
 else:
     fastembed = load.LazyLoad('fastembed', install_missing = True)
@@ -76,18 +77,20 @@ class QdrantSharedConfig(BaseModel):
     ] = None
     cloud_inference: t.Optional[bool] = None
     check_compatibility: t.Optional[bool] = None
-    kwargs: t.Optional[t.Dict[str, t.Any]] = None
+    kwargs: t.Optional[t.Dict[str, t.Any]] = Field(None, exclude = True)
 
     set_model: t.Optional[str] = Field(None, exclude = True)
     set_model_config: t.Optional[t.Dict[str, t.Any]] = Field(default_factory=dict, exclude = True)
     set_sparse_model: t.Optional[str] = Field(None, exclude = True)
     set_sparse_model_config: t.Optional[t.Dict[str, t.Any]] = Field(default_factory=dict, exclude = True)
+    retries: t.Optional[int] = Field(None, exclude = True)
 
 
     @classmethod
     def build(
         cls, 
-        s: 'QdrantClientSettings',
+        # s: 'QdrantClientSettings',
+        c: 'QdrantClient',
 
         # These are shard with the config
         url: t.Optional[str] = None,
@@ -112,22 +115,23 @@ class QdrantSharedConfig(BaseModel):
         check_compatibility: t.Optional[bool] = None,
         set_model: t.Optional[str] = None,
         set_sparse_model: t.Optional[str] = None,
+        retries: t.Optional[int] = None,
         **kwargs: t.Any,
     ) -> 'QdrantSharedConfig':
         """
         Constructs a shared client config
         """
         new = {
-            'url': url if url is not None else s.url,
-            'port': port or s.port,
-            'grpc_port': grpc_port or s.grpc_port,
-            'prefer_grpc': prefer_grpc if prefer_grpc is not None else s.prefer_grpc,
-            'https': https if https is not None else s.https,
-            'api_key': api_key if api_key is not None else s.api_key,
-            'prefix': prefix if prefix is not None else s.prefix,
-            'timeout': timeout if timeout is not None else s.timeout,
-            'host': host if host is not None else s.host,
-            'path': path if path is not None else s.path,
+            'url': url if url is not None else c.settings.url,
+            'port': port or c.settings.port,
+            'grpc_port': grpc_port or c.settings.grpc_port,
+            'prefer_grpc': prefer_grpc if prefer_grpc is not None else c.settings.prefer_grpc,
+            'https': https if https is not None else c.settings.https,
+            'api_key': api_key if api_key is not None else c.settings.api_key,
+            'prefix': prefix if prefix is not None else c.settings.prefix,
+            'timeout': timeout if timeout is not None else c.settings.timeout,
+            'host': host if host is not None else c.settings.host,
+            'path': path if path is not None else c.settings.path,
             'location': location,
             'force_disable_check_same_thread': force_disable_check_same_thread,
             'grpc_options': grpc_options,
@@ -136,6 +140,7 @@ class QdrantSharedConfig(BaseModel):
             'check_compatibility': check_compatibility,
             'set_model': set_model,
             'set_sparse_model': set_sparse_model,
+            'retries': retries if retries is not None else c.settings.retries,
             'kwargs': kwargs,
         }
         new = {k:v for k,v in new.items() if v is not None}
@@ -161,6 +166,7 @@ class QdrantClientSettings(BaseSettings):
     fastembed_config: t.Optional[str] = None
     set_model: t.Optional[str] = None
     set_sparse_model: t.Optional[str] = None
+    retries: t.Optional[int] = None
 
 
     class Config(BaseSettings.Config):

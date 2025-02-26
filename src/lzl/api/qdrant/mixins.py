@@ -9,7 +9,7 @@ import datetime
 import typing as t
 from lzl import load
 from lzl.types import eproperty
-from lzo.utils import Timer
+from lzo.utils import Timer, parse_datetime
 from lzl.logging import Logger, logger as _logger, null_logger
 
 if t.TYPE_CHECKING:
@@ -72,7 +72,12 @@ def get_model_config_fields(
 
 _SupportedIndexTypes: t.Set[str] = {'keyword', 'integer', 'float', 'bool', 'geo', 'datetime', 'text', 'uuid'}
 CollectionState = t.Literal['create', 'recreate', 'delete']
-
+comp_op = {
+    '>': 'gt',
+    '<': 'lt',
+    '>=': 'gte',
+    '<=': 'lte',
+}
 
 class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
     """
@@ -90,6 +95,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
     sparse_model: t.Optional[str] = None
     rerank_model: t.Optional[str] = None
     debug_enabled: t.Optional[bool] = None
+    retries: t.Optional[int] = None
 
     has_dataset: t.Optional[bool] = None
 
@@ -153,6 +159,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         return QdrantClient(
             set_model = self.dense_model,
             set_sparse_model = self.sparse_model,
+            retries = self.retries,
             **self._kwargs,
         )
     
@@ -720,6 +727,99 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
     Search Methods
     """
 
+    def _filter_datetime_parse(
+        self,
+        key: str,
+        value: t.Union[str, int, datetime.datetime, t.Tuple[datetime.datetime, datetime.datetime]],
+    ) -> 'qm.FieldCondition':
+        """
+        Parses the datetime Filter
+        
+        Possible Values:
+        - str
+            - '> 2023-08-16'
+            - '< 2023-08-16'
+            - '>= 2023-08-16'
+
+        - datetime.datetime: we assume that it is always greater than for now.
+            - 2023-08-16T00:00:00
+            - 2023-08-16
+        
+        # - int: we assume that it is always greater than for now.
+        #     - 
+        """
+        range_obj = self.qm.DatetimeRange()
+        if isinstance(value, tuple):
+            start, end = value
+            start = parse_datetime(start)
+            end = parse_datetime(end)
+            setattr(range_obj, 'gte', start)
+            setattr(range_obj, 'lte', end)
+
+        elif isinstance(value, str): 
+            if value.startswith('>') or value.startswith('<'):
+                operator, value = value.split(' ', 1)
+                value = parse_datetime(value.strip())
+                setattr(range_obj, comp_op[operator], value)
+            else:
+                value = parse_datetime(value)
+                setattr(range_obj, 'gt', value)
+        elif isinstance(value, datetime.datetime):
+            value = parse_datetime(value)
+            setattr(range_obj, 'gt', value)
+        
+        elif isinstance(value, int):
+            now = datetime.datetime.now(tz = datetime.timezone.utc) - datetime.timedelta(days = value)
+            setattr(range_obj, 'gt', now)
+        return self.qm.FieldCondition(key = key, range = range_obj)
+            
+    def _filter_numeric_parse(
+        self,
+        key: str,
+        value: t.Union[str, int, float, t.Tuple[float, float]],
+    ) -> 'qm.FieldCondition':
+        """
+        Parses the numeric Filter
+        
+        Possible Values:
+        - str
+            - '50 - 100'
+            - '< 100'
+            - '>= 100'
+        
+        - int: we assume that it is always greater than for now.
+            - 50
+
+        - float: we assume that it is always greater than for now.
+            - 50.0
+        """
+        range_obj = self.qm.Range()
+        if isinstance(value, tuple):
+            start, end = value
+            setattr(range_obj, 'gte', start)
+            setattr(range_obj, 'lte', end)
+
+        elif isinstance(value, str): 
+            if value.startswith('>') or value.startswith('<'):
+                operator, value = value.split(' ', 1)
+                value = float(value.strip())
+                setattr(range_obj, comp_op[operator], value)
+            elif '-' in value:
+                start, end = value.split('-', 1)
+                start = float(start.strip())
+                end = float(end.strip())
+                setattr(range_obj, 'gte', start)
+                setattr(range_obj, 'lte', end)
+            else:
+                value = float(value)
+                setattr(range_obj, 'gt', value)
+        else:
+            value = float(value)
+            setattr(range_obj, 'gt', value)
+        return self.qm.FieldCondition(key = key, range = range_obj)
+
+            
+
     def build_filters_for_search(
         self,
         query: t.Optional[str] = None,
@@ -750,6 +850,62 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         return [results[rank[0]] for rank in ranking]
 
 
+    def _fast_query(
+        self,
+        limit: t.Optional[int] = None,
+        **filters: t.Any,
+    ) -> t.List[QdrantModelT]:
+        """
+        Does a Fast Search Query using Scroll
+        """
+        _, filters = self.build_filters_for_search(**filters)
+        limit = limit or 10
+        cursor = self.client.scroll(
+            collection_name = self.collection_name,
+            scroll_filter = filters,
+            limit = limit,
+            with_payload = True,
+            timeout = 60 * 60,
+        )
+        results, _ = cursor
+        if results:
+            return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+        return []
+    
+    async def _afast_query(
+        self,
+        limit: t.Optional[int] = None,
+        **filters: t.Any,
+    ) -> t.List[QdrantModelT]:
+        """
+        Does a Fast Search Query using Scroll
+        """
+        _, filters = self.build_filters_for_search(**filters)
+        limit = limit or 10
+        cursor = await self.client.ascroll(
+            collection_name = self.collection_name,
+            scroll_filter = filters,
+            limit = limit,
+            with_payload = True,
+            timeout = 60 * 60,
+        )
+        results, _ = cursor
+        if results:
+            return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+        return []
+
+    def fast_query(
+        self,
+        limit: t.Optional[int] = None,
+        is_async: t.Optional[bool] = True,
+        **filters: t.Any,
+    ) -> t.List[QdrantModelT] | t.Awaitable[t.List[QdrantModelT]]:
+        """
+        Does a Fast Search Query using Scroll
+        """
+        func = self._afast_query if is_async else self._fast_query
+        return func(limit = limit, **filters)
+
     def _query(
         self,
         query: t.Optional[str] = None,
@@ -760,6 +916,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         Queries the collection
         """
         query, filters = self.build_filters_for_search(query = query, **filters)
+        limit = limit or 10
         results = self.client.query(
             collection_name = self.collection_name,
             query_text = query,
@@ -782,6 +939,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         Queries the collection
         """
         query, filters = self.build_filters_for_search(query = query, **filters)
+        limit = limit or 10
         results = await self.client.aquery(
             collection_name = self.collection_name,
             query_text = query,
@@ -806,6 +964,90 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         """
         func = self._aquery if is_async else self._query
         return func(query = query, limit = limit, **filters)
+
+    def _search(
+        self,
+        query: t.Optional[str] = None,
+        limit: t.Optional[int] = None,
+        is_async: t.Optional[bool] = True,
+        **filters: t.Any,
+    ) -> t.List[QdrantModelT]:
+        """
+        Queries/Searches the collection
+        """
+        query, filters = self.build_filters_for_search(query = query, **filters)
+        limit = limit or 10
+        if query:
+            results = self.client.query(
+                collection_name = self.collection_name,
+                query_text = query,
+                query_filter = filters,
+                limit = limit,
+            )
+            if results:
+                if self.has_reranker:
+                    results = self.rerank_results(query = query, results = results)
+        else:
+            cursor = self.client.scroll(
+                collection_name = self.collection_name,
+                scroll_filter = filters,
+                limit = limit,
+                with_payload = True,
+                timeout = 60 * 60,
+            )
+            results, _ = cursor
+        if results: 
+            return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+        return []
+
+    async def _asearch(
+        self,
+        query: t.Optional[str] = None,
+        limit: t.Optional[int] = None,
+        is_async: t.Optional[bool] = True,
+        **filters: t.Any,
+    ) -> t.List[QdrantModelT]:
+        """
+        Queries/Searches the collection
+        """
+        query, filters = self.build_filters_for_search(query = query, **filters)
+        limit = limit or 10
+        if query:
+            results = await self.client.aquery(
+                collection_name = self.collection_name,
+                query_text = query,
+                query_filter = filters,
+                limit = limit,
+            )
+            if results:
+                if self.has_reranker:
+                    results = self.rerank_results(query = query, results = results)
+        else:
+            cursor = await self.client.ascroll(
+                collection_name = self.collection_name,
+                scroll_filter = filters,
+                limit = limit,
+                with_payload = True,
+                timeout = 60 * 60,
+            )
+            results, _ = cursor
+        if results: 
+            return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+        return []
+
+    def search(
+        self,
+        query: t.Optional[str] = None,
+        limit: t.Optional[int] = None,
+        is_async: t.Optional[bool] = True,
+        **filters: t.Any,
+    ) -> t.List[QdrantModelT] | t.Awaitable[t.List[QdrantModelT]]:
+        """
+        Queries/Searches the collection
+        """
+        func = self._asearch if is_async else self._search
+        return func(query = query, limit = limit, **filters)
+
     
     def _points_iterator(
         self,

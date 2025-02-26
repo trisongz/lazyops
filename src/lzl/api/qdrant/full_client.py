@@ -9,107 +9,73 @@ import typing as t
 from lzl import load
 from lzo.types import BaseModel, eproperty, Field
 from lzl.logging import logger, null_logger, Logger
-from .config import QdrantClientSettings, fastembed, settings as _settings
+from .config import QdrantSharedConfig, QdrantClientSettings, fastembed, settings as _settings
 
 if t.TYPE_CHECKING:
+    import httpx
+    import stamina
     import qdrant_client
+    import qdrant_client.http.exceptions
     from qdrant_client import grpc as grpc
     from qdrant_client.conversions import common_types as ct
     from qdrant_client.http import ApiClient, SyncApis, models
     from qdrant_client.http import AsyncApiClient, AsyncApis
+    from qdrant_client.http.api_client import SendAsync, Send
     from qdrant_client import QdrantClient as SyncQdrantClient, AsyncQdrantClient
     from qdrant_client.fastembed_common import QueryResponse
     from fastembed.common import OnnxProvider
 else:
+    httpx = load.LazyLoad('httpx', install_missing = True)
+    stamina = load.LazyLoad('stamina', install_missing = True)
     qdrant_client = load.LazyLoad('qdrant_client', 'qdrant_client[fastembed]', install_missing = True)
 
-class QdrantSharedConfig(BaseModel):
+
+def retry_context_maker(
+    retries: int,
+    is_async: bool,
+    **kwargs,
+):
     """
-    The sharded config for Qdrant
+    Creates a context manager for retrying an asynchronous function.
     """
-    location: t.Optional[str] = None
-    url: t.Optional[str] = None
-    port: t.Optional[int] = None
-    grpc_port: t.Optional[int] = None
-    prefer_grpc: t.Optional[bool] = None
-    https: t.Optional[bool] = None
-    api_key: t.Optional[str] = None
-    prefix: t.Optional[str] = None
-    timeout: t.Optional[int] = None
-    host: t.Optional[str] = None
-    path: t.Optional[str] = None
-    
-    force_disable_check_same_thread: t.Optional[bool] = None
-    auth_token_provider: t.Optional[
-        t.Union[t.Callable[[], str], t.Callable[[], t.Awaitable[str]]]
-    ] = None
-    cloud_inference: t.Optional[bool] = None
-    check_compatibility: t.Optional[bool] = None
-    kwargs: t.Optional[t.Dict[str, t.Any]] = Field(None, exclude = True)
-
-    set_model: t.Optional[str] = Field(None, exclude = True)
-    set_model_config: t.Optional[t.Dict[str, t.Any]] = Field(default_factory=dict, exclude = True)
-    set_sparse_model: t.Optional[str] = Field(None, exclude = True)
-    set_sparse_model_config: t.Optional[t.Dict[str, t.Any]] = Field(default_factory=dict, exclude = True)
-
-
-    @classmethod
-    def build(
-        cls, 
-        c: 'QdrantClient',
-
-        # These are shard with the config
-        url: t.Optional[str] = None,
-        port: t.Optional[int] = None,
-        grpc_port: t.Optional[int] = None,
-        prefer_grpc: t.Optional[bool] = None,
-        https: t.Optional[bool] = None,
-        api_key: t.Optional[str] = None,
-        prefix: t.Optional[str] = None,
-        timeout: t.Optional[int] = None,
-        host: t.Optional[str] = None,
-        path: t.Optional[str] = None,
-
-        # These are from the client
-        location: t.Optional[str] = None,
-        force_disable_check_same_thread: t.Optional[bool] = None,
-        grpc_options: t.Optional[t.Dict[str, t.Any]] = None,
-        auth_token_provider: t.Optional[
-            t.Union[t.Callable[[], str], t.Callable[[], t.Awaitable[str]]]
-        ] = None,
-        cloud_inference: t.Optional[bool] = None,
-        check_compatibility: t.Optional[bool] = None,
-        set_model: t.Optional[str] = None,
-        set_sparse_model: t.Optional[str] = None,
-        **kwargs: t.Any,
-    ) -> 'QdrantSharedConfig':
+    def is_retryable_error(exc: Exception | 'httpx.HTTPError' | 'qdrant_client.http.exceptions.ResponseHandlingException'):
         """
-        Constructs a shared client config
+        Checks if the error is retryable.
         """
-        new = {
-            'url': url if url is not None else c.settings.url,
-            'port': port or c.settings.port,
-            'grpc_port': grpc_port or c.settings.grpc_port,
-            'prefer_grpc': prefer_grpc if prefer_grpc is not None else c.settings.prefer_grpc,
-            'https': https if https is not None else c.settings.https,
-            'api_key': api_key if api_key is not None else c.settings.api_key,
-            'prefix': prefix if prefix is not None else c.settings.prefix,
-            'timeout': timeout if timeout is not None else c.settings.timeout,
-            'host': host if host is not None else c.settings.host,
-            'path': path if path is not None else c.settings.path,
+        if isinstance(exc, httpx.ReadTimeout): return True
+        if 'nodename nor servname provided, or not known' in str(exc): return True
+        return isinstance(exc, qdrant_client.http.exceptions.ResponseHandlingException)
+        
 
-            'location': location,
-            'force_disable_check_same_thread': force_disable_check_same_thread,
-            'grpc_options': grpc_options,
-            'auth_token_provider': auth_token_provider,
-            'cloud_inference': cloud_inference,
-            'check_compatibility': check_compatibility,
-            'set_model': set_model if set_model is not None else c.settings.set_model,
-            'set_sparse_model': set_sparse_model if set_sparse_model is not None else c.settings.set_sparse_model,
-            'kwargs': kwargs,
-        }
-        new = {k:v for k,v in new.items() if v is not None}
-        return cls.model_validate(new, context = {'source': 'build', 'client': c})
+    if is_async:
+        async def retry_middleware(request: 'httpx.Request', call_next: 'SendAsync') -> 'httpx.Response':
+            """
+            Middleware that retries requests if they are being rate limited.
+            """
+            async for attempt in stamina.retry_context(
+                attempts = retries,
+                on = is_retryable_error,
+            ):
+                with attempt:
+                    response = await call_next(request)
+                    response.raise_for_status()
+                    return response
+    else:
+        def retry_middleware(request: 'httpx.Request', call_next: 'Send') -> 'httpx.Response':
+            """
+            Middleware that retries requests if they are being rate limited.
+            """
+            for attempt in stamina.retry_context(
+                attempts = retries,
+                on = is_retryable_error,
+            ):
+                with attempt:
+                    response = call_next(request)
+                    response.raise_for_status()
+                    return response
+
+    return retry_middleware
+
 
 
 
@@ -161,6 +127,7 @@ class QdrantClient(abc.ABC):
         check_compatibility: If `true` - check compatibility with the server version. Default: `true`
         set_model: Name of the model to use for encoding documents and queries. Default: `None`
         set_sparse_model: Name of the model to use for hybrid search over documents in combination with dense embeddings. Default: `None`
+        retries: Number of times to retry a failed request. Default: `None`
         **kwargs: Additional arguments passed directly into REST client initialization
     """
 
@@ -188,6 +155,7 @@ class QdrantClient(abc.ABC):
         set_sparse_model: t.Optional[str] = None,
         settings: t.Optional[QdrantClientSettings] = None,
         mute_httpx: t.Optional[bool] = True,
+        retries: t.Optional[int] = None,
         **kwargs: t.Any,
     ):
         self._extra: t.Dict[str, t.Any] = {}
@@ -215,6 +183,7 @@ class QdrantClient(abc.ABC):
             check_compatibility = check_compatibility,
             set_model = set_model,
             set_sparse_model = set_sparse_model,
+            retries = retries,
             **kwargs,
         )
 
@@ -235,6 +204,13 @@ class QdrantClient(abc.ABC):
             _api.set_model(self.shared_config.set_model, **self.shared_config.set_model_config)
         if self.shared_config.set_sparse_model is not None:
             _api.set_sparse_model(self.shared_config.set_sparse_model, **self.shared_config.set_sparse_model_config)
+        if self.shared_config.retries:
+            _api.http.client.add_middleware(
+                retry_context_maker(
+                    retries = self.shared_config.retries,
+                    is_async = True,
+                )
+            )
         return _api
     
     @property
@@ -257,6 +233,13 @@ class QdrantClient(abc.ABC):
             _api.set_model(self.shared_config.set_model, **self.shared_config.set_model_config)
         if self.shared_config.set_sparse_model is not None:
             _api.set_sparse_model(self.shared_config.set_sparse_model, **self.shared_config.set_sparse_model_config)
+        if self.shared_config.retries:
+            _api.http.client.add_middleware(
+                retry_context_maker(
+                    retries = self.shared_config.retries,
+                    is_async = False,
+                )
+            )
         return _api
 
     @property
