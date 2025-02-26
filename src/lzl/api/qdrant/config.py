@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fastembed.embedding
 import fastembed.rerank.cross_encoder.onnx_text_cross_encoder
 
 """
@@ -188,7 +189,8 @@ class QdrantClientSettings(BaseSettings):
         return set()
         # return self._extra.get('added_fastembed_models', set())
 
-    def add_fastembed_models(
+    
+    def add_fastembed_models_v1(
         self,
         
         # embedding
@@ -208,7 +210,9 @@ class QdrantClientSettings(BaseSettings):
         **kwargs: t.Any,
     ) -> None:
         """
-        Adds the specified models to the list of added models
+        [v1] Adds the specified models to the list of added models
+
+        This method is for adding models before v0.6.0
         """
         # Embedding
         if clip_models:
@@ -264,6 +268,143 @@ class QdrantClientSettings(BaseSettings):
                     if verbose: logger.info(f'Adding Model |g|{conf["model"]}|e| to `sparse_splade_pp_models`', colored = True)
                     fastembed.sparse.splade_pp.supported_splade_models.append(conf)
                     self.added_fastembed_models.add(conf['model'])
+
+    def add_fastembed_models(
+        self,
+        
+        # embedding
+        clip_models: t.Optional[t.List[t.Dict[str, t.Union[str, int, t.Dict[str, str]]]]] = None,
+        multitask_models: t.Optional[t.List[t.Dict[str, t.Union[str, int, t.Dict[str, str]]]]] = None,
+        pooled_models: t.Optional[t.List[t.Dict[str, t.Union[str, int, t.Dict[str, str]]]]] = None,
+        pooled_normalized_models: t.Optional[t.List[t.Dict[str, t.Union[str, int, t.Dict[str, str]]]]] = None,
+        onnx_models: t.Optional[t.List[t.Dict[str, t.Union[str, int, t.Dict[str, str]]]]] = None,
+
+        # added for reranking
+        cross_encoder_models: t.Optional[t.List[t.Dict[str, t.Union[str, int, t.Dict[str, str]]]]] = None,
+        
+        # added for sparse models
+        sparse_splade_pp_models: t.Optional[t.List[t.Dict[str, t.Union[str, int, t.Dict[str, str]]]]] = None,
+
+        verbose: t.Optional[bool] = False,
+        **kwargs: t.Any,
+    ) -> None:
+        """
+        Adds the specified models to the list of added models
+        """
+        try:
+            from fastembed.common.model_description import PoolingType, BaseModelDescription, ModelSource, DenseModelDescription, SparseModelDescription
+        except ImportError:
+            return self.add_fastembed_models_v1(
+                clip_models=clip_models,
+                multitask_models=multitask_models,
+                pooled_models=pooled_models,
+                pooled_normalized_models=pooled_normalized_models,
+                onnx_models=onnx_models,
+                cross_encoder_models=cross_encoder_models,
+                sparse_splade_pp_models=sparse_splade_pp_models,
+                verbose=verbose,
+                **kwargs,
+            )
+        
+        # > 0.6.0
+        # CLIP Models 
+        if clip_models:
+            for conf in clip_models:
+                if conf['model'] not in self.added_fastembed_models:
+                    if verbose: logger.info(f'Adding Model |g|{conf["model"]}|e| to `clip_models`', colored = True)
+                    sources = ModelSource(**conf.pop('sources'))
+                    fastembed.text.clip_embedding.supported_clip_models.append(
+                        DenseModelDescription(
+                            sources = sources,
+                            **conf
+                        )
+                    )
+                    self.added_fastembed_models.add(conf['model'])
+    
+        if multitask_models:
+            try:
+                for conf in multitask_models:
+                    if conf['model'] not in self.added_fastembed_models:
+                        if verbose: logger.info(f'Adding Model |g|{conf["model"]}|e| to `multitask_models`', colored = True)
+                        sources = ModelSource(**conf.pop('sources'))
+                        fastembed.text.multitask_embedding.supported_multitask_models.append(
+                            DenseModelDescription(
+                                sources = sources,
+                                **conf
+                            )
+                        )
+                        self.added_fastembed_models.add(conf['model'])
+            except Exception as e:
+                logger.trace('Unable to add multi-task models', e)
+
+        if pooled_models:
+            for conf in pooled_models:
+                if conf['model'] not in self.added_fastembed_models:
+                    if verbose: logger.info(f'Adding Model |g|{conf["model"]}|e| to `pooled_models`', colored = True)
+                    sources = ModelSource(**conf.pop('sources'))
+                    fastembed.text.pooled_embedding.supported_pooled_models.append(
+                        DenseModelDescription(
+                            sources = sources,
+                            **conf
+                        )
+                    )
+                    # fastembed.text.pooled_embedding.supported_pooled_models.append(conf)
+                    self.added_fastembed_models.add(conf['model'])
+
+        if pooled_normalized_models:
+            for conf in pooled_normalized_models:
+                if conf['model'] not in self.added_fastembed_models:
+                    if verbose: logger.info(f'Adding Model |g|{conf["model"]}|e| to `pooled_normalized_models`', colored = True)
+                    sources = ModelSource(**conf.pop('sources'))
+                    fastembed.text.pooled_normalized_embedding.supported_pooled_normalized_models.append(
+                        DenseModelDescription(
+                            sources = sources,
+                            **conf
+                        )
+                    )
+                    self.added_fastembed_models.add(conf['model'])
+
+        if onnx_models:
+            for conf in onnx_models:
+                if conf['model'] not in self.added_fastembed_models:
+                    if verbose: logger.info(f'Adding Model |g|{conf["model"]}|e| to `onnx_models`', colored = True)
+                    sources = ModelSource(**conf.pop('sources'))
+                    fastembed.text.onnx_embedding.supported_onnx_models.append(
+                        DenseModelDescription(
+                            sources = sources,
+                            **conf
+                        )
+                    )
+                    self.added_fastembed_models.add(conf['model'])
+
+        # Rerankers
+        if cross_encoder_models:
+            for conf in cross_encoder_models:
+                if conf['model'] not in self.added_fastembed_models:
+                    if verbose: logger.info(f'Adding Model |g|{conf["model"]}|e| to `cross_encoder_models`', colored = True)
+                    sources = ModelSource(**conf.pop('sources'))
+                    fastembed.rerank.cross_encoder.onnx_text_cross_encoder.supported_onnx_models.append(
+                        BaseModelDescription(
+                            sources = sources,
+                            **conf
+                        )
+                    )
+                    self.added_fastembed_models.add(conf['model'])
+        
+        # Sparse Models
+        if sparse_splade_pp_models:
+            for conf in sparse_splade_pp_models:
+                if conf['model'] not in self.added_fastembed_models:
+                    if verbose: logger.info(f'Adding Model |g|{conf["model"]}|e| to `sparse_splade_pp_models`', colored = True)
+                    sources = ModelSource(**conf.pop('sources'))
+                    fastembed.sparse.splade_pp.supported_splade_models.append(
+                        SparseModelDescription(
+                            sources = sources,
+                            **conf
+                        )
+                    )
+                    self.added_fastembed_models.add(conf['model'])
+
         
     
     def _load_fastembed_configs(self, config: t.Optional[str]):
