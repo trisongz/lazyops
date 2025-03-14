@@ -18,6 +18,7 @@ import subprocess
 import contextvars
 import contextlib
 import anyio.from_thread
+import typing as t
 from concurrent import futures
 from anyio._core._eventloop import threadlocals
 from lzl.proxied import proxied
@@ -140,6 +141,45 @@ async def async_map(
         mapped_iterable = (partial(x) async for x in iterable)
     async for task in amap_iterable(mapped_iterable, limit = limit, return_when = return_when):
         yield await task
+
+
+async def _read_stream(stream: asyncio.streams.StreamReader, cb: t.Optional[t.Union[t.Callable, t.Awaitable]]):  
+    """
+    Read from the stream
+    """
+    if cb is None: return
+    _is_coro = is_coro_func(cb)
+    while True:
+        line = await stream.readline()
+        if line:
+            await cb(line) if _is_coro else cb(line)
+        else:
+            break
+
+
+async def _stream_subprocess(
+    cmd: Union[str, List[str]], 
+    stdout_cb: t.Union[t.Callable, t.Awaitable], 
+    stderr_cb: t.Optional[t.Union[t.Callable, t.Awaitable]] = None,
+    **kwargs 
+):  
+    """
+    Streams the Subprocess Output into the Callbacks
+    """
+    # https://stackoverflow.com/questions/65649412/getting-live-output-from-asyncio-subprocess
+    if isinstance(cmd, str): cmd = shlex.split(cmd)
+    process = await asyncio.create_subprocess_exec(*cmd,
+        stdout=asyncio.subprocess.PIPE, 
+        stderr=asyncio.subprocess.PIPE,
+        **kwargs
+    )
+    await asyncio.gather(
+        _read_stream(process.stdout, stdout_cb),
+        _read_stream(process.stderr, stderr_cb)
+    )
+    return await process.wait()
+
+
 
 @proxied
 class ThreadPool(abc.ABC):
@@ -551,6 +591,18 @@ class ThreadPool(abc.ABC):
         if not output_only: return p
         stdout, _ = await p.communicate()
         return stdout.decode(encoding = output_encoding, errors = output_errors).strip()
+    
+    @staticmethod
+    async def acmd_stream(
+        command: Union[str, List[str]], 
+        stdout_cb: t.Union[t.Callable, t.Awaitable], 
+        stderr_cb: t.Optional[t.Union[t.Callable, t.Awaitable]] = None,
+        **kwargs 
+    ) -> asyncio.subprocess.Process:
+        """
+        Streams the Subprocess Output into the Callbacks
+        """
+        return await _stream_subprocess(command, stdout_cb, stderr_cb, **kwargs)
     
 
 

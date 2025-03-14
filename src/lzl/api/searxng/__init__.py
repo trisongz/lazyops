@@ -1,0 +1,3 @@
+"""
+SearxNG API Client
+"""

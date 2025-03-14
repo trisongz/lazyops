@@ -1,0 +1,5 @@
+{
+  "logged": [
+    "config_file:load:/Volumes/Hub/github/goverlyai/_secrets/envs/../models/qdrant_models.yaml"
+  ]
+}

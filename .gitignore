@@ -60,3 +60,4 @@ tests/out/kvdb/components/session.pyi
 tests/out/lzl/api/qdrant/client.pyi
 tests/out/lzl/api/qdrant/client_v2.pyi
 tests/out/lzl/api/qdrant/client_v3.pyi
+src/lzo/utils/.tmpdata

@@ -862,13 +862,60 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
 
         # return the rerank the results
         return [results[rank[0]] for rank in ranking]
+    
+    def _schema_validate(
+        self,
+        hit: t.Dict[str, t.Any] | 'ct.Record' | 'ct.QueryResponse',
+        context: t.Optional[t.Dict[str, t.Any]] = None,
+    ) -> QdrantModelT | t.Tuple[QdrantModelT, float]:
+        """
+        Validates the schema
+        """
+        result = self.schema.model_validate(hit, context = context)
+        if context:
+            if context.get('include_scores') and hasattr(hit, 'score'):
+                return result, hit.score
+            if context.get('include_hits'):
+                return result, hit
+        return result
+    
+    def _batch_schema_validate(
+        self,
+        hits: t.List[t.Dict[str, t.Any] | 'ct.Record' | 'ct.QueryResponse'],
+        context: t.Optional[t.Dict[str, t.Any]] = None,
+    ) -> t.List[QdrantModelT] | t.List[t.Tuple[QdrantModelT, float]]:
+        """
+        Validates the schema
+        """
+        return [self._schema_validate(hit, context = context) for hit in hits]
 
+    async def _aschema_validate(
+        self,
+        hit: t.Dict[str, t.Any] | 'ct.Record' | 'ct.QueryResponse',
+        context: t.Optional[t.Dict[str, t.Any]] = None,
+    ) -> QdrantModelT | t.Tuple[QdrantModelT, float]:
+        """
+        Validates the schema
+        """
+        return self._schema_validate(hit, context = context)
+    
+    async def _abatch_schema_validate(
+        self,
+        hits: t.List[t.Dict[str, t.Any] | 'ct.Record' | 'ct.QueryResponse'],
+        context: t.Optional[t.Dict[str, t.Any]] = None,
+    ) -> t.List[QdrantModelT] | t.List[t.Tuple[QdrantModelT, float]]:
+        """
+        Validates the schema
+        """
+        return [await self._aschema_validate(hit, context = context) for hit in hits]
 
     def _fast_query(
         self,
         limit: t.Optional[int] = None,
+        include_scores: t.Optional[bool] = None,
+        include_hits: t.Optional[bool] = None, 
         **filters: t.Any,
-    ) -> t.List[QdrantModelT]:
+    ) -> t.List[QdrantModelT] | t.List[t.Tuple[QdrantModelT, float]]:
         """
         Does a Fast Search Query using Scroll
         """
@@ -883,14 +930,18 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         )
         results, _ = cursor
         if results:
-            return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            return self._batch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits})
+            # return [self._schema_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            # return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
         return []
     
     async def _afast_query(
         self,
         limit: t.Optional[int] = None,
+        include_scores: t.Optional[bool] = None,
+        include_hits: t.Optional[bool] = None, 
         **filters: t.Any,
-    ) -> t.List[QdrantModelT]:
+    ) -> t.List[QdrantModelT] | t.List[t.Tuple[QdrantModelT, float]]:
         """
         Does a Fast Search Query using Scroll
         """
@@ -905,12 +956,73 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         )
         results, _ = cursor
         if results:
-            return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            return await self._abatch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits})
+            # return [await self._aschema_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            # return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
         return []
+
+    @t.overload
+    def fast_query(
+        self,
+        limit: t.Optional[int] = ...,
+        include_scores: t.Literal[False] = ...,
+        include_hits: t.Optional[bool] = ..., 
+        is_async: t.Literal[True] = ...,
+        **filters: t.Any,
+    ) -> t.Awaitable[t.List[QdrantModelT]]:
+        """
+        Does a Fast Search Query using Scroll
+        """
+        ...
+    
+    @t.overload
+    def fast_query(
+        self,
+        limit: t.Optional[int] = ...,
+        include_scores: t.Literal[True] = ...,
+        include_hits: t.Optional[bool] = ...,
+        is_async: t.Literal[True] = ...,
+        **filters: t.Any,
+    ) -> t.Awaitable[t.List[t.Tuple[QdrantModelT, float]]]:
+        """
+        Does a Fast Search Query using Scroll and includes scores
+        """
+        ...
+
+
+    @t.overload
+    def fast_query(
+        self,
+        limit: t.Optional[int] = ...,
+        include_scores: t.Literal[False] = ...,
+        include_hits: t.Optional[bool] = ...,
+        is_async: t.Literal[False] = ...,
+        **filters: t.Any,
+    ) -> t.List[QdrantModelT]:
+        """
+        Does a Fast Search Query using Scroll
+        """
+        ...
+    
+    @t.overload
+    def fast_query(
+        self,
+        limit: t.Optional[int] = ...,
+        include_scores: t.Literal[True] = ...,
+        include_hits: t.Optional[bool] = ...,
+        is_async: t.Literal[False] = ...,
+        **filters: t.Any,
+    ) -> t.List[t.Tuple[QdrantModelT, float]]:
+        """
+        Does a Fast Search Query using Scroll and includes scores
+        """
+        ...
 
     def fast_query(
         self,
         limit: t.Optional[int] = None,
+        include_scores: t.Optional[bool] = None,
+        include_hits: t.Optional[bool] = None,
         is_async: t.Optional[bool] = True,
         **filters: t.Any,
     ) -> t.List[QdrantModelT] | t.Awaitable[t.List[QdrantModelT]]:
@@ -918,12 +1030,14 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         Does a Fast Search Query using Scroll
         """
         func = self._afast_query if is_async else self._fast_query
-        return func(limit = limit, **filters)
+        return func(limit = limit, include_scores = include_scores, include_hits = include_hits, **filters)
 
     def _query(
         self,
         query: t.Optional[str] = None,
         limit: t.Optional[int] = None,
+        include_scores: t.Optional[bool] = None,
+        include_hits: t.Optional[bool] = None,
         **filters: t.Any,
     ) -> t.List[QdrantModelT]:
         """
@@ -940,13 +1054,17 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         if results:
             if self.has_reranker:
                 results = self.rerank_results(query = query, results = results)
-            return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            # return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            # return [self._schema_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            return self._batch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits})
         return []
 
     async def _aquery(
         self,
         query: t.Optional[str] = None,
         limit: t.Optional[int] = None,
+        include_scores: t.Optional[bool] = None,
+        include_hits: t.Optional[bool] = None,
         **filters: t.Any,
     ) -> t.List[QdrantModelT]:
         """
@@ -963,13 +1081,79 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         if results:
             if self.has_reranker:
                 results = self.rerank_results(query = query, results = results)
-            return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            # return [await self._aschema_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            # return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            return await self._abatch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits})
+
         return []
+    
+
+    @t.overload
+    def query(
+        self,
+        query: t.Optional[str] = ...,
+        limit: t.Optional[int] = ...,
+        include_scores: t.Literal[False] = ...,
+        include_hits: t.Optional[bool] = ...,
+        is_async: t.Literal[True] = ...,
+        **filters: t.Any,
+    ) -> t.Awaitable[t.List[QdrantModelT]]:
+        """
+        Queries the collection
+        """
+        ...
+    
+    @t.overload
+    def query(
+        self,
+        query: t.Optional[str] = ...,
+        limit: t.Optional[int] = ...,
+        include_scores: t.Literal[True] = ...,
+        include_hits: t.Optional[bool] = ...,
+        is_async: t.Literal[True] = ...,
+        **filters: t.Any,
+    ) -> t.Awaitable[t.List[t.Tuple[QdrantModelT, float]]]:
+        """
+        Queries the collection with scores
+        """
+        ...
+
+    @t.overload
+    def query(
+        self,
+        query: t.Optional[str] = ...,
+        limit: t.Optional[int] = ...,
+        include_scores: t.Literal[False] = ...,
+        include_hits: t.Optional[bool] = ...,
+        is_async: t.Literal[False] = ...,
+        **filters: t.Any,
+    ) -> t.List[QdrantModelT]:
+        """
+        Queries the collection
+        """
+        ...
+    
+    @t.overload
+    def query(
+        self,
+        query: t.Optional[str] = ...,
+        limit: t.Optional[int] = ...,
+        include_scores: t.Literal[True] = ...,
+        include_hits: t.Optional[bool] = ...,
+        is_async: t.Literal[False] = ...,
+        **filters: t.Any,
+    ) -> t.List[t.Tuple[QdrantModelT, float]]:
+        """
+        Queries the collection with scores
+        """
+        ...
     
     def query(
         self,
         query: t.Optional[str] = None,
         limit: t.Optional[int] = None,
+        include_scores: t.Optional[bool] = None,
+        include_hits: t.Optional[bool] = None,
         is_async: t.Optional[bool] = True,
         **filters: t.Any,
     ) -> t.List[QdrantModelT] | t.Awaitable[t.List[QdrantModelT]]:
@@ -977,13 +1161,14 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         Queries the collection
         """
         func = self._aquery if is_async else self._query
-        return func(query = query, limit = limit, **filters)
+        return func(query = query, limit = limit, include_scores = include_scores, include_hits = include_hits, **filters)
 
     def _search(
         self,
         query: t.Optional[str] = None,
         limit: t.Optional[int] = None,
-        is_async: t.Optional[bool] = True,
+        include_scores: t.Optional[bool] = None,
+        include_hits: t.Optional[bool] = None,
         **filters: t.Any,
     ) -> t.List[QdrantModelT]:
         """
@@ -1011,14 +1196,17 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
             )
             results, _ = cursor
         if results: 
-            return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            # return [self._schema_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            # return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            return self._batch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits})
         return []
 
     async def _asearch(
         self,
         query: t.Optional[str] = None,
         limit: t.Optional[int] = None,
-        is_async: t.Optional[bool] = True,
+        include_scores: t.Optional[bool] = None,
+        include_hits: t.Optional[bool] = None,
         **filters: t.Any,
     ) -> t.List[QdrantModelT]:
         """
@@ -1046,13 +1234,78 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
             )
             results, _ = cursor
         if results: 
-            return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            # return [await self._aschema_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            # return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
+            return await self._abatch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits})
         return []
+
+    
+    @t.overload
+    def search(
+        self,
+        query: t.Optional[str] = ...,
+        limit: t.Optional[int] = ...,
+        include_scores: t.Literal[False] = ...,
+        include_hits: t.Optional[bool] = ...,
+        is_async: t.Literal[True] = ...,
+        **filters: t.Any,
+    ) -> t.Awaitable[t.List[QdrantModelT]]:
+        """
+        Queries/Searches the collection
+        """
+        ...
+    
+    @t.overload
+    def search(
+        self,
+        query: t.Optional[str] = ...,
+        limit: t.Optional[int] = ...,
+        include_scores: t.Literal[True] = ...,
+        include_hits: t.Optional[bool] = ...,
+        is_async: t.Literal[True] = ...,
+        **filters: t.Any,
+    ) -> t.Awaitable[t.List[t.Tuple[QdrantModelT, float]]]:
+        """
+        Queries/Searches the collection with scores
+        """
+        ...
+
+    @t.overload
+    def search(
+        self,
+        query: t.Optional[str] = ...,
+        limit: t.Optional[int] = ...,
+        include_scores: t.Literal[False] = ...,
+        include_hits: t.Optional[bool] = ...,
+        is_async: t.Literal[False] = ...,
+        **filters: t.Any,
+    ) -> t.List[QdrantModelT]:
+        """
+        Queries/Searches the collection
+        """
+        ...
+    
+    @t.overload
+    def search(
+        self,
+        query: t.Optional[str] = ...,
+        limit: t.Optional[int] = ...,
+        include_scores: t.Literal[True] = ...,
+        include_hits: t.Optional[bool] = ...,
+        is_async: t.Literal[False] = ...,
+        **filters: t.Any,
+    ) -> t.List[t.Tuple[QdrantModelT, float]]:
+        """
+        Queries/Searches the collection with scores
+        """
+        ...
 
     def search(
         self,
         query: t.Optional[str] = None,
         limit: t.Optional[int] = None,
+        include_scores: t.Optional[bool] = None,
+        include_hits: t.Optional[bool] = None,
         is_async: t.Optional[bool] = True,
         **filters: t.Any,
     ) -> t.List[QdrantModelT] | t.Awaitable[t.List[QdrantModelT]]:
@@ -1060,7 +1313,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         Queries/Searches the collection
         """
         func = self._asearch if is_async else self._search
-        return func(query = query, limit = limit, **filters)
+        return func(query = query, limit = limit, include_scores = include_scores, include_hits = include_hits, **filters)
 
     
     def _points_iterator(
