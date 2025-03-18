@@ -29,7 +29,7 @@ class ClientParams(BaseModel):
     ]] = httpx._client.DEFAULT_TIMEOUT_CONFIG
     follow_redirects: t.Optional[bool] = None
     retries: t.Optional[int] = None
-    limits: httpx._client.Limits = httpx._client.DEFAULT_LIMITS
+    limits: t.Optional[httpx._client.Limits] = httpx._client.DEFAULT_LIMITS
     max_redirects: int = httpx._client.DEFAULT_MAX_REDIRECTS
     event_hooks: t.Optional[t.Mapping[str, t.List[t.Callable]]] = None
     async_event_hooks: t.Optional[t.Mapping[str, t.List[t.Callable]]] = None
