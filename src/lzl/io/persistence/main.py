@@ -14,7 +14,7 @@ import contextlib
 import collections.abc
 import typing as t
 from lzl.load import lazy_import
-from lazyops.utils.lazy import get_keydb_enabled
+
 from lzl.logging import logger, null_logger
 from lzl.pool import ThreadPool
 
@@ -250,9 +250,10 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
                 if kvdb.is_available(url = kwargs.get('url')):
                     from kvdb.components.persistence import KVDBStatefulBackend
                     return KVDBStatefulBackend
-            
-            if get_keydb_enabled():
-                return RedisStatefulBackend
+            with contextlib.suppress(Exception):
+                from lazyops.utils.lazy import get_keydb_enabled
+                if get_keydb_enabled():
+                    return RedisStatefulBackend
             logger.warning('Defaulting to Local Stateful Backend')
             return LocalStatefulBackend
         raise NotImplementedError(f'Backend Type {self.backend_type} is not implemented')
