@@ -11,6 +11,7 @@ import pathlib
 import typing
 import functools
 import importlib
+import importlib.metadata
 import subprocess
 from lzl.logging import default_logger as logger
 from typing import List, Type, Any, Union, Dict
@@ -107,6 +108,14 @@ class LazyLibType(type):
     @classmethod
     def is_available(cls, library: str) -> bool:
         """ Checks whether a Python Library is available."""
+        try:
+            _ = importlib.metadata.version(library)
+            return True
+        except importlib.metadata.PackageNotFoundError: return False
+
+    @classmethod
+    def __is_available(cls, library: str) -> bool:
+        """ [v1] Checks whether a Python Library is available."""
         try:
             import pkg_resources
         except ImportError:
