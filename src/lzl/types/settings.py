@@ -5,7 +5,8 @@ Pydantic Settings with additional helpers
 """
 import os
 import inspect
-import pkg_resources
+# import pkg_resources
+from importlib import metadata
 from pathlib import Path
 from .base import (
     Field,
@@ -39,10 +40,10 @@ class BaseSettings(_BaseSettings):
         arbitrary_types_allowed: bool = True
 
 
-    @eproperty
-    def module_path(self) -> Path:
+    @property
+    def __module_path(self) -> Path:
         """
-        Gets the module root path
+        [V1 - Broken] Gets the module root path
 
         https://stackoverflow.com/questions/25389095/python-get-path-of-root-project-structure
         """
@@ -53,6 +54,36 @@ class BaseSettings(_BaseSettings):
             p = p.joinpath('src', self.module_name)
         return p
     
+    @eproperty
+    def module_path(self) -> Path:
+        """
+        Gets the project root directory for a given module name using importlib.metadata.
+        Corrected to properly find the package directory within site-packages.
+        Replicates the logic of the original pkg_resources code, attempting to find
+        a "project root" within the installation location, considering 'src' directories.
+
+        Returns:
+            Path: The project root path if found, otherwise None.
+        """
+        # sourcery skip: remove-redundant-path-exists
+        try:
+            dist = metadata.distribution(self.module_name)
+            site_packages_path = Path(dist.locate_file('.'))  # Get site-packages path
+            module_base_name = self.module_name.split('.')[0] # Handle submodules like pandas.plotting
+            package_dir_path = site_packages_path / module_base_name # Construct package directory path
+            if package_dir_path.exists() and package_dir_path.is_dir(): # Verify package dir exists
+                p = package_dir_path
+            else:
+                # Fallback: if package dir not found (unusual but handle it), use site-packages
+                p = site_packages_path
+
+            if p.joinpath('src').exists() and p.joinpath('src', module_base_name).exists():
+                p = p.joinpath('src', module_base_name)
+            return p
+
+        except metadata.PackageNotFoundError:
+            return None
+
     @eproperty
     def module_config_path(self) -> Path:
         """
@@ -72,7 +103,8 @@ class BaseSettings(_BaseSettings):
         """
         Returns the module version
         """
-        return pkg_resources.get_distribution(self.module_name).version
+        return metadata.version(self.module_name)
+        # return pkg_resources.get_distribution(self.module_name).version
     
     @eproperty
     def module_pkg_name(self) -> str:

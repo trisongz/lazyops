@@ -116,7 +116,8 @@ class ProxyObject(Generic[ProxyObjT]):
         """
         Setup and initialize the proxy object arguments
         """
-        from lazyops.utils.helpers import lazy_import
+        from lzl.load import lazy_import
+        # from lazyops.utils.helpers import lazy_import
         if self.__dict__['__obj_args_'] is not None and not isinstance(self.__dict__['__obj_args_'], (list, tuple)):
             if isinstance(self.__dict__['__obj_args_'], str):
                 self.__dict__['__obj_args_'] = lazy_import(self.__dict__['__obj_args_'])
