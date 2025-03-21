@@ -506,6 +506,20 @@ class ThreadPool(abc.ABC):
     ) -> AsyncGenerator[RT, None]:
         """
         Creates an Async Generator that iterates over an iterable and runs a function on each item in the iterable.
+
+
+        Usage:
+        ```
+        async for result in pool.aiterate(
+            func,
+            iterable,
+            *args,
+            return_ordered = True,
+            concurrency_limit = 10,
+            **kwargs
+        ):
+            yield result
+        ```
         """
         return_when = kwargs.pop('return_when', 'ALL_COMPLETED' if return_ordered else 'FIRST_COMPLETED')
         concurrency_limit = kwargs.pop('limit', concurrency_limit)

@@ -40,7 +40,7 @@ if t.TYPE_CHECKING:
             """
             return {}
 
-        def to_qdrant_payload(self, mode: str = 'json', exclude_none: bool = True, **kwargs) -> t.Tuple[str, str, t.Dict[str, t.Any]]:
+        def to_qdrant_payload(self, mode: str = 'json', exclude_none: bool = True, context: t.Optional[t.Dict[str, t.Any]] = None, **kwargs) -> t.Tuple[str, str, t.Dict[str, t.Any]]:
             """
             Returns a Qdrant payload
             """
@@ -744,7 +744,8 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
     def _filter_datetime_parse(
         self,
         key: str,
-        value: t.Union[str, int, datetime.datetime, t.Tuple[datetime.datetime, datetime.datetime]],
+        value: t.Union[str, bool, int, float, datetime.datetime, t.Tuple[datetime.datetime, datetime.datetime]],
+        op: t.Optional[str] = 'gt',
     ) -> 'qm.FieldCondition':
         """
         Parses the datetime Filter
@@ -763,12 +764,16 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         #     - 
         """
         range_obj = self.qm.DatetimeRange()
+        
         if isinstance(value, tuple):
             start, end = value
             start = parse_datetime(start)
             end = parse_datetime(end)
-            setattr(range_obj, 'gte', start)
-            setattr(range_obj, 'lte', end)
+            opposite_op = 'lt' if op == 'gt' else 'gt'
+            setattr(range_obj, f'{op}e', start)
+            setattr(range_obj, f'{opposite_op}e', end)
+            # setattr(range_obj, 'gte', start)
+            # setattr(range_obj, 'lte', end)
 
         elif isinstance(value, str): 
             if value.startswith('>') or value.startswith('<'):
@@ -777,20 +782,35 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
                 setattr(range_obj, comp_op[operator], value)
             else:
                 value = parse_datetime(value)
-                setattr(range_obj, 'gt', value)
+                # setattr(range_obj, 'gt', value)
+                setattr(range_obj, op, value)
         elif isinstance(value, datetime.datetime):
             value = parse_datetime(value)
-            setattr(range_obj, 'gt', value)
+            setattr(range_obj, op, value)
+            # setattr(range_obj, 'gt', value)
+
         
-        elif isinstance(value, int):
+        elif isinstance(value, (int, float)):
             now = datetime.datetime.now(tz = datetime.timezone.utc) - datetime.timedelta(days = value)
-            setattr(range_obj, 'gt', now)
+            # setattr(range_obj, 'gt', now)
+            setattr(range_obj, op, now)
+
+        elif isinstance(value, bool):
+            # Assume it's >/< now
+            now = datetime.datetime.now(tz = datetime.timezone.utc)
+            if value:
+                setattr(range_obj, op, now)
+            else:
+                opposite_op = 'lt' if op == 'gt' else 'gt'
+                setattr(range_obj, opposite_op, now)
+
         return self.qm.FieldCondition(key = key, range = range_obj)
             
     def _filter_numeric_parse(
         self,
         key: str,
         value: t.Union[str, int, float, t.Tuple[float, float]],
+        op: t.Optional[str] = 'gt',
     ) -> 'qm.FieldCondition':
         """
         Parses the numeric Filter
@@ -808,10 +828,13 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
             - 50.0
         """
         range_obj = self.qm.Range()
+        opposite_op = 'lt' if op == 'gt' else 'gt'
         if isinstance(value, tuple):
             start, end = value
-            setattr(range_obj, 'gte', start)
-            setattr(range_obj, 'lte', end)
+            setattr(range_obj, f'{op}e', start)
+            setattr(range_obj, f'{opposite_op}e', end)
+            # setattr(range_obj, 'gte', start)
+            # setattr(range_obj, 'lte', end)
 
         elif isinstance(value, str): 
             if value.startswith('>') or value.startswith('<'):
@@ -822,14 +845,18 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
                 start, end = value.split('-', 1)
                 start = float(start.strip())
                 end = float(end.strip())
-                setattr(range_obj, 'gte', start)
-                setattr(range_obj, 'lte', end)
+                # setattr(range_obj, 'gte', start)
+                # setattr(range_obj, 'lte', end)
+                setattr(range_obj, f'{op}e', start)
+                setattr(range_obj, f'{opposite_op}e', end)
             else:
                 value = float(value)
-                setattr(range_obj, 'gt', value)
+                # setattr(range_obj, 'gt', value)
+                setattr(range_obj, op, value)
         else:
             value = float(value)
-            setattr(range_obj, 'gt', value)
+            # setattr(range_obj, 'gt', value)
+            setattr(range_obj, op, value)
         return self.qm.FieldCondition(key = key, range = range_obj)
 
             
@@ -855,6 +882,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         """
         Reranks the results
         """
+        # self.logger.info(f'Reranking Results for Query: {query}', prefix = self.rerank_model)
         description_hits = [hit.document for hit in results]
         new_scores = list(self.reranker.rerank(query, description_hits))
         ranking = list(enumerate(new_scores)) #saving document indices
@@ -914,6 +942,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = None,
         include_scores: t.Optional[bool] = None,
         include_hits: t.Optional[bool] = None, 
+        context: t.Optional[t.Dict[str, t.Any]] = None,
         **filters: t.Any,
     ) -> t.List[QdrantModelT] | t.List[t.Tuple[QdrantModelT, float]]:
         """
@@ -930,7 +959,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         )
         results, _ = cursor
         if results:
-            return self._batch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits})
+            return self._batch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits, **(context or {})})
             # return [self._schema_validate(hit, context = {'source': 'qdrant'}) for hit in results]
             # return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
         return []
@@ -940,6 +969,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = None,
         include_scores: t.Optional[bool] = None,
         include_hits: t.Optional[bool] = None, 
+        context: t.Optional[t.Dict[str, t.Any]] = None,
         **filters: t.Any,
     ) -> t.List[QdrantModelT] | t.List[t.Tuple[QdrantModelT, float]]:
         """
@@ -956,7 +986,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         )
         results, _ = cursor
         if results:
-            return await self._abatch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits})
+            return await self._abatch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits, **(context or {})})
             # return [await self._aschema_validate(hit, context = {'source': 'qdrant'}) for hit in results]
             # return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
         return []
@@ -967,6 +997,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = ...,
         include_scores: t.Literal[False] = ...,
         include_hits: t.Optional[bool] = ..., 
+        context: t.Optional[t.Dict[str, t.Any]] = ...,
         is_async: t.Literal[True] = ...,
         **filters: t.Any,
     ) -> t.Awaitable[t.List[QdrantModelT]]:
@@ -981,6 +1012,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = ...,
         include_scores: t.Literal[True] = ...,
         include_hits: t.Optional[bool] = ...,
+        context: t.Optional[t.Dict[str, t.Any]] = ...,
         is_async: t.Literal[True] = ...,
         **filters: t.Any,
     ) -> t.Awaitable[t.List[t.Tuple[QdrantModelT, float]]]:
@@ -996,6 +1028,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = ...,
         include_scores: t.Literal[False] = ...,
         include_hits: t.Optional[bool] = ...,
+        context: t.Optional[t.Dict[str, t.Any]] = ...,
         is_async: t.Literal[False] = ...,
         **filters: t.Any,
     ) -> t.List[QdrantModelT]:
@@ -1010,6 +1043,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = ...,
         include_scores: t.Literal[True] = ...,
         include_hits: t.Optional[bool] = ...,
+        context: t.Optional[t.Dict[str, t.Any]] = ...,
         is_async: t.Literal[False] = ...,
         **filters: t.Any,
     ) -> t.List[t.Tuple[QdrantModelT, float]]:
@@ -1023,6 +1057,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = None,
         include_scores: t.Optional[bool] = None,
         include_hits: t.Optional[bool] = None,
+        context: t.Optional[t.Dict[str, t.Any]] = None,
         is_async: t.Optional[bool] = True,
         **filters: t.Any,
     ) -> t.List[QdrantModelT] | t.Awaitable[t.List[QdrantModelT]]:
@@ -1030,7 +1065,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         Does a Fast Search Query using Scroll
         """
         func = self._afast_query if is_async else self._fast_query
-        return func(limit = limit, include_scores = include_scores, include_hits = include_hits, **filters)
+        return func(limit = limit, include_scores = include_scores, include_hits = include_hits, context = context, **filters)
 
     def _query(
         self,
@@ -1038,6 +1073,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = None,
         include_scores: t.Optional[bool] = None,
         include_hits: t.Optional[bool] = None,
+        context: t.Optional[t.Dict[str, t.Any]] = None,
         **filters: t.Any,
     ) -> t.List[QdrantModelT]:
         """
@@ -1056,7 +1092,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
                 results = self.rerank_results(query = query, results = results)
             # return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
             # return [self._schema_validate(hit, context = {'source': 'qdrant'}) for hit in results]
-            return self._batch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits})
+            return self._batch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits, **(context or {})})
         return []
 
     async def _aquery(
@@ -1065,6 +1101,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = None,
         include_scores: t.Optional[bool] = None,
         include_hits: t.Optional[bool] = None,
+        context: t.Optional[t.Dict[str, t.Any]] = None,
         **filters: t.Any,
     ) -> t.List[QdrantModelT]:
         """
@@ -1083,7 +1120,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
                 results = self.rerank_results(query = query, results = results)
             # return [await self._aschema_validate(hit, context = {'source': 'qdrant'}) for hit in results]
             # return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
-            return await self._abatch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits})
+            return await self._abatch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits, **(context or {})})
 
         return []
     
@@ -1095,6 +1132,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = ...,
         include_scores: t.Literal[False] = ...,
         include_hits: t.Optional[bool] = ...,
+        context: t.Optional[t.Dict[str, t.Any]] = ...,
         is_async: t.Literal[True] = ...,
         **filters: t.Any,
     ) -> t.Awaitable[t.List[QdrantModelT]]:
@@ -1110,6 +1148,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = ...,
         include_scores: t.Literal[True] = ...,
         include_hits: t.Optional[bool] = ...,
+        context: t.Optional[t.Dict[str, t.Any]] = ...,
         is_async: t.Literal[True] = ...,
         **filters: t.Any,
     ) -> t.Awaitable[t.List[t.Tuple[QdrantModelT, float]]]:
@@ -1125,6 +1164,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = ...,
         include_scores: t.Literal[False] = ...,
         include_hits: t.Optional[bool] = ...,
+        context: t.Optional[t.Dict[str, t.Any]] = ...,
         is_async: t.Literal[False] = ...,
         **filters: t.Any,
     ) -> t.List[QdrantModelT]:
@@ -1140,6 +1180,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = ...,
         include_scores: t.Literal[True] = ...,
         include_hits: t.Optional[bool] = ...,
+        context: t.Optional[t.Dict[str, t.Any]] = ...,
         is_async: t.Literal[False] = ...,
         **filters: t.Any,
     ) -> t.List[t.Tuple[QdrantModelT, float]]:
@@ -1154,6 +1195,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = None,
         include_scores: t.Optional[bool] = None,
         include_hits: t.Optional[bool] = None,
+        context: t.Optional[t.Dict[str, t.Any]] = None,
         is_async: t.Optional[bool] = True,
         **filters: t.Any,
     ) -> t.List[QdrantModelT] | t.Awaitable[t.List[QdrantModelT]]:
@@ -1161,7 +1203,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         Queries the collection
         """
         func = self._aquery if is_async else self._query
-        return func(query = query, limit = limit, include_scores = include_scores, include_hits = include_hits, **filters)
+        return func(query = query, limit = limit, include_scores = include_scores, include_hits = include_hits, context = context, **filters)
 
     def _search(
         self,
@@ -1169,6 +1211,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = None,
         include_scores: t.Optional[bool] = None,
         include_hits: t.Optional[bool] = None,
+        context: t.Optional[t.Dict[str, t.Any]] = None,
         **filters: t.Any,
     ) -> t.List[QdrantModelT]:
         """
@@ -1198,7 +1241,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         if results: 
             # return [self._schema_validate(hit, context = {'source': 'qdrant'}) for hit in results]
             # return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
-            return self._batch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits})
+            return self._batch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits, **(context or {})})
         return []
 
     async def _asearch(
@@ -1207,6 +1250,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = None,
         include_scores: t.Optional[bool] = None,
         include_hits: t.Optional[bool] = None,
+        context: t.Optional[t.Dict[str, t.Any]] = None,
         **filters: t.Any,
     ) -> t.List[QdrantModelT]:
         """
@@ -1236,7 +1280,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         if results: 
             # return [await self._aschema_validate(hit, context = {'source': 'qdrant'}) for hit in results]
             # return [self.schema.model_validate(hit, context = {'source': 'qdrant'}) for hit in results]
-            return await self._abatch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits})
+            return await self._abatch_schema_validate(results, context = {'source': 'qdrant', 'include_scores': include_scores, 'include_hits': include_hits, **(context or {})})
         return []
 
     
@@ -1247,6 +1291,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = ...,
         include_scores: t.Literal[False] = ...,
         include_hits: t.Optional[bool] = ...,
+        context: t.Optional[t.Dict[str, t.Any]] = ...,
         is_async: t.Literal[True] = ...,
         **filters: t.Any,
     ) -> t.Awaitable[t.List[QdrantModelT]]:
@@ -1262,6 +1307,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = ...,
         include_scores: t.Literal[True] = ...,
         include_hits: t.Optional[bool] = ...,
+        context: t.Optional[t.Dict[str, t.Any]] = ...,
         is_async: t.Literal[True] = ...,
         **filters: t.Any,
     ) -> t.Awaitable[t.List[t.Tuple[QdrantModelT, float]]]:
@@ -1277,6 +1323,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = ...,
         include_scores: t.Literal[False] = ...,
         include_hits: t.Optional[bool] = ...,
+        context: t.Optional[t.Dict[str, t.Any]] = ...,
         is_async: t.Literal[False] = ...,
         **filters: t.Any,
     ) -> t.List[QdrantModelT]:
@@ -1292,6 +1339,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = ...,
         include_scores: t.Literal[True] = ...,
         include_hits: t.Optional[bool] = ...,
+        context: t.Optional[t.Dict[str, t.Any]] = ...,
         is_async: t.Literal[False] = ...,
         **filters: t.Any,
     ) -> t.List[t.Tuple[QdrantModelT, float]]:
@@ -1306,6 +1354,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         limit: t.Optional[int] = None,
         include_scores: t.Optional[bool] = None,
         include_hits: t.Optional[bool] = None,
+        context: t.Optional[t.Dict[str, t.Any]] = None,
         is_async: t.Optional[bool] = True,
         **filters: t.Any,
     ) -> t.List[QdrantModelT] | t.Awaitable[t.List[QdrantModelT]]:
@@ -1313,7 +1362,7 @@ class QdrantSearchMixin(abc.ABC, t.Generic[QdrantModelT]):
         Queries/Searches the collection
         """
         func = self._asearch if is_async else self._search
-        return func(query = query, limit = limit, include_scores = include_scores, include_hits = include_hits, **filters)
+        return func(query = query, limit = limit, include_scores = include_scores, include_hits = include_hits, context = context, **filters)
 
     
     def _points_iterator(

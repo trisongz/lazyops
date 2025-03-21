@@ -517,6 +517,29 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             yield line
 
 
+    def copy_to(self, dest: 'PathLike', overwrite: bool = False, chunk_size: t.Optional[int] = None, **kwargs) -> 'FileLike':
+        """
+        Copies this file to the destination path.
+        """
+        dst = self.get_pathlike_(dest)
+        if not overwrite and dst.exists():
+            raise FileExistsError(f"Destination file {dst} exists and overwrite is False")
+        with dst.open('wb') as f:
+            for chunk in self.iter_raw(chunk_size = chunk_size):
+                f.write(chunk)
+        return dst
+    
+    async def acopy_to(self, dest: 'PathLike', overwrite: bool = False, chunk_size: t.Optional[int] = None, **kwargs) -> 'FileLike':
+        """
+        Copies this file to the destination path.
+        """
+        dst = self.get_pathlike_(dest)
+        if not overwrite and await dst.aexists():
+            raise FileExistsError(f"Destination file {dst} exists and overwrite is False")
+        async with dst.aopen('wb') as f:
+            async for chunk in self.aiter_raw(chunk_size = chunk_size):
+                await f.write(chunk)
+        return dst
 
     def reader(self, mode: FileMode = 'r', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, block_size: int = 5242880, compression: str = None, **kwargs: t.Any) -> t.IO[t.Union[str, bytes]]:
         """

@@ -68,7 +68,20 @@ extras = {
         'pyyaml',
         'numpy',
         'scipy',
-    ]
+    ],
+    'fileio': [
+        "botocore == 1.29.76",
+        "urllib3 < 2",
+        "aiobotocore == 2.5.0",
+        "s3fs == 2023.6.0",
+        "boto3 == 1.26.76",
+        "fsspec == 2023.6.0",
+        "s3transfer == 0.6.1",
+        "python-magic",
+        "aiopath",
+        "aiofiles",
+        "aiofile",
+    ],
 }
 args = {
     'package_dir': {'': 'src'},
