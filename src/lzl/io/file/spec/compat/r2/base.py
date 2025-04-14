@@ -246,7 +246,7 @@ class R2AsyncStreamedFile(R2File, AbstractAsyncStreamedFile):
     the loops for some reason.
     """
 
-    def __init__(self, fs: 'R2FileSystem', path, mode, encoding: Optional[str], errors: Optional[str], newline: Optional[str], buffering: Optional[int], **kwargs):
+    def __init__(self, fs: 'R2FileSystem', path, mode, encoding: Optional[str] = None, errors: Optional[str]  = None, newline: Optional[str]  = None, buffering: Optional[int]  = None, **kwargs):
         super().__init__(fs, path, mode, **kwargs)
         self.r = None
         self.size = None
