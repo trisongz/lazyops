@@ -63,3 +63,4 @@ tests/out/lzl/api/qdrant/client_v3.pyi
 src/lzo/utils/.tmpdata
 .cursor/mcp.json
 docs/todo
+!docs/changelogs

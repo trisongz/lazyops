@@ -1,0 +1,54 @@
+---
+description: This policy outlines common code patterns and conventions in the lazyops codebase.
+globs: **/*.py
+alwaysApply: true
+---
+
+# Common Code Patterns in lazyops (lzl/lzo)
+
+This document outlines recurring design patterns and conventions observed in the codebase. Adhering to these patterns promotes consistency.
+
+1.  **Custom Properties (`src/lzl/types/properties.py`):**
+    *   Use `eproperty`, `rproperty`, `xproperty`, `lazyproperty` for instance-level properties requiring lazy evaluation or caching.
+    *   Use `classproperty` or `cached_classproperty` for class-level properties.
+    *   These often rely on private instance attributes (`_extra`, `_rxtra`, `__dict__`) or class-level caches for storage.
+
+2.  **Pydantic Models (`src/lzl/types/base.py`, `src/lzl/types/settings.py`):**
+    *   Use `BaseModel` for data modeling and validation.
+    *   Use `BaseSettings` for configuration management, leveraging environment variable loading.
+    *   Utilize the Pydantic v1/v2 compatibility helpers provided in `src/lzl/types/base.py` (e.g., `model_validator`, `field_validator`).
+
+3.  **Enhanced Enumerations (`src/lzl/types/common.py`):**
+    *   Use `StrEnum` or `UpperStrEnum` for string-based enums requiring case-insensitive comparison or Pydantic integration.
+
+4.  **Type Protocols (`src/lzl/types/typed.py`):**
+    *   Use `typing.Protocol` to define structural types for complex callables (e.g., specifying sync/async nature, parameters, self types for methods).
+
+5.  **Object Registry (`src/lzo/registry/base.py`):**
+    *   The `MRegistry` class provides a pattern for registering and lazily initializing objects (classes or instances) using string keys.
+    *   Often used for managing configurations, clients, or other pluggable components.
+
+6.  **Introspection (`importlib.metadata`, `inspect`):**
+    *   Use `importlib.metadata` (preferred over `pkg_resources`) to get package information like version and installation path (see `lzl.types.settings.BaseSettings`).
+    *   Use `inspect` module for runtime type checking and function/class analysis (e.g., `inspect.iscoroutinefunction`).
+
+7.  **Decorators:**
+    *   Extensively used for cross-cutting concerns:
+        *   Timing (`@timed` in `lazyops.utils.helpers` - *needs migration/review*)
+        *   Caching (`@timed_cache` in `lazyops.utils.helpers` - *needs migration/review*, `@async_lru.alru_cache`, `functools.lru_cache`)
+        *   Property implementations (see point 1).
+        *   Validation wrappers (Pydantic compatibility).
+        *   Retry logic (`@retryable` in `lazyops.utils.helpers` - *needs migration/review*).
+
+8.  **Sync/Async Separation:**
+    *   Where both sync and async operations are needed, provide distinct functions/methods (e.g., `ping`/`aping`, `close`/`async_close`).
+    *   Use helper functions (`run_as_coro`, `create_background_task` in `lazyops.utils.helpers` - *needs migration/review*) to bridge sync/async code where necessary.
+
+9.  **Centralized Logging (`lzl.logging`):**
+    *   Route logging through the configured logger available via `lzl.logging`.
+
+10. **Async HTTP Client (`lzl.api.aiohttpx`):**
+    *   Use the `aiohttpx` wrapper provided in `lzl` for standardized asynchronous HTTP requests within API clients.
+
+**Interaction:**
+When generating or refactoring code, attempt to utilize these existing patterns where appropriate rather than introducing entirely new mechanisms for similar functionality. 

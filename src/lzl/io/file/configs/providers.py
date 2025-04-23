@@ -644,6 +644,7 @@ class CloudflareR2Config(ConfigMixin):
                 "region_name": self.r2_region,
             },
             "config_kwargs": {},
+            "fixed_upload_size": True,
             **(self.r2_fs_config or {})
         }
         if self.r2_access_key_id:
