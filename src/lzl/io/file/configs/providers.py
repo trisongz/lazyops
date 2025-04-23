@@ -5,7 +5,7 @@ import os
 import json
 import pathlib
 import multiprocessing as mp
-from lzo.types import BaseSettings, eproperty, model_validator, field_validator, Literal
+from lzo.types import BaseSettings, eproperty, model_validator, field_validator, Literal, PrivateAttr
 
 from typing import Optional, Dict, Any, List, Union, TYPE_CHECKING
 
@@ -35,6 +35,11 @@ class ConfigMixin(BaseSettings):
     read_chunking_large_size: Optional[int] = 1024 * 1024 * 50 # 50 MB
     read_chunking_manager_default: Optional[bool] = True
 
+    # NOTE: These properties/methods relying on global state or performing actions
+    # beyond configuration might need to be handled at a higher level (e.g., FileIOConfig or a dedicated manager).
+    _uri_scheme: Optional[str] = PrivateAttr(None)
+    _env_prefix: Optional[str] = PrivateAttr(None)
+
     @field_validator("authz_config_dir", mode = 'before')
     def validate_authz_config_dir(cls, value: Optional[pathlib.Path]) -> pathlib.Path:
         """
@@ -57,6 +62,15 @@ class ConfigMixin(BaseSettings):
         if self.boto_config is None:
             return pathlib.Path('/root/.boto') if self.in_colab else pathlib.Path("~/.boto").expanduser()
         return self.boto_config
+    
+    @eproperty
+    def user_home(self) -> pathlib.Path:
+        """
+        Returns the user home directory
+        """
+        if self.in_colab:
+            return pathlib.Path("/content")
+        return pathlib.Path("~").expanduser()
 
     @eproperty
     def boto_config_exists(self):
@@ -66,29 +80,12 @@ class ConfigMixin(BaseSettings):
         return self.boto_config_path.exists()
 
     @eproperty
-    def user_home(self) -> pathlib.Path:
-        """
-        Returns the user home directory
-        """
-        if self.in_colab:
-            return pathlib.Path("/content")
-        return pathlib.Path("~").expanduser()
-    
-    @eproperty
     def in_colab(self) -> bool:
         """
         Checks if the code is running in Google Colab
         """
         from lzl.require import LazyLib
         return LazyLib.is_available('google.colab')
-    
-    @eproperty
-    def provider_fsm(self) -> 'ProviderFileSystemManager':
-        """
-        Returns the Provider File System Manager
-        """
-        from ..spec.providers.main import ProviderManager
-        return ProviderManager
     
     def set_env(self):
         """
@@ -109,19 +106,12 @@ class ConfigMixin(BaseSettings):
             else:
                 setattr(self, k, v)
 
-    def update_fs(self, **kwargs):
+    def update_auth(self, **config):
         """
-        Updates the fs config
-        """
-        pass
-
-    def update_auth(self, update_fs: bool = True, **config):
-        """
-        Updates the auth
+        Updates the auth config for this instance.
         """
         self.update_config(**config)
         self.set_env()
-        if update_fs: self.update_fs(**config)
     
     
     def build_fs_config(self) -> Dict[str, Any]:
@@ -218,12 +208,6 @@ class AWSConfig(ConfigMixin):
             os.environ['AWS_ACCESS_TOKEN'] = self.aws_access_token
         if self.set_s3_endpoint:
             os.environ['S3_ENDPOINT'] = self.s3_endpoint
-
-    def update_fs(self, **kwargs):
-        """
-        Updates the fs config
-        """
-        self.provider_fsm.get_accessor('aws', _reset = True)
 
     def build_fs_config(self) -> Dict[str, Any]:
         """
@@ -331,13 +315,6 @@ class GCPConfig(ConfigMixin):
             os.environ['GOOGLE_CLOUD_PROJECT'] = self.project
     
 
-    def update_fs(self, **kwargs):
-        """
-        Updates the fs config
-        """
-        self.provider_fsm.get_accessor('gcs', _reset = True)
-
-
     def build_fs_config(self) -> Dict[str, Any]:
         """
         Builds the gcsfs config kwargs
@@ -363,7 +340,7 @@ class MinioConfig(ConfigMixin):
     minio_secure: Optional[bool] = True
     minio_region: Optional[str] = 'us-east-1'
     minio_signature_ver: Optional[str] = 's3v4'
-    minio_addressing_style: Optional[Literal['virtual', 'path', 'auto']] = 'auto'
+    minio_addressing_style: Optional[Literal["virtual", "path", "auto"]] = 'auto'  # noqa: F821
     
     minio_config: Optional[Union[str, Dict[str, Any]]] = None
     minio_fs_config: Optional[Union[str, Dict[str, Any]]] = None
@@ -430,13 +407,6 @@ class MinioConfig(ConfigMixin):
             config["config_kwargs"].update(self.minio_config)
         return config
     
-    def update_fs(self, **kwargs):
-        """
-        Updates the fs config
-        """
-        self.provider_fsm.get_accessor('minio', _reset = True)
-
-
     def get_boto_config(self) -> Dict[str, Any]:
         """
         Returns the boto config
@@ -474,7 +444,7 @@ class S3CompatConfig(ConfigMixin):
     s3c_access_token: Optional[str] = None
     s3c_secure: Optional[bool] = True
     s3c_region: Optional[str] = None
-    s3c_addressing_style: Optional[Literal['virtual', 'path', 'auto']] = 'auto'
+    s3c_addressing_style: Optional[Literal["virtual", "path", "auto"]] = 'auto'  # noqa: F821
     s3c_signature_ver: Optional[str] = 's3v4'
 
     s3c_config: Optional[Union[str, Dict[str, Any]]] = None
@@ -557,13 +527,6 @@ class S3CompatConfig(ConfigMixin):
         return config
     
 
-    def update_fs(self, **kwargs):
-        """
-        Updates the fs config
-        """
-        self.provider_fsm.get_accessor('s3c', _reset = True)
-
-    
     def get_boto_config(self) -> Dict[str, Any]:
         """
         Returns the boto config
@@ -658,13 +621,6 @@ class CloudflareR2Config(ConfigMixin):
         return config
 
 
-    def update_fs(self, **kwargs):
-        """
-        Updates the fs config
-        """
-        self.provider_fsm.get_accessor('r2', _reset = True)
-
-
     def get_boto_config(self) -> Dict[str, Any]:
         """
         Returns the boto config
@@ -684,3 +640,6 @@ class CloudflareR2Config(ConfigMixin):
             'endpoint_url': self.r2_endpoint,
         }
         
+
+# Define the Union type for all provider configs
+ProviderConfig = Union[AWSConfig, GCPConfig, MinioConfig, S3CompatConfig, CloudflareR2Config]

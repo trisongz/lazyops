@@ -1,7 +1,7 @@
 ---
 description: This policy outlines requirements for documenting code changes in the project.
-globs: **/*.py
-alwaysApply: true
+globs: 
+alwaysApply: false
 ---
 
 # Changelog Policy

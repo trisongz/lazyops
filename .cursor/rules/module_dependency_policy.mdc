@@ -1,7 +1,7 @@
 ---
 description: This policy outlines the requirements for dependencies in the project.
-globs: **/*.py
-alwaysApply: true
+globs: 
+alwaysApply: false
 ---
 # Module Dependency Policy (lzl vs. lzo)
 

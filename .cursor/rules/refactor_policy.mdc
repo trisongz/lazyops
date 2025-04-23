@@ -1,0 +1,15 @@
+---
+description: This policy outlines requirements for updating the RefactorPlan.md file.
+globs: **/*.py, **/*.md
+alwaysApply: true
+---
+
+# Refactor Plan Policy
+
+**Rule:** All code changes (bug fixes, features, refactoring, documentation updates) MUST be documented in the [RefactorPlan.md](mdc:../../docs/RefactorPlan.md) file.
+
+* Use this policy to track the status of refactoring tasks, including their purpose, current status, and any relevant notes. This ensures that all members are aware of the ongoing refactoring efforts and can contribute to or review them as needed.
+
+* If no tasks are currently being worked on, select the most relevant task from the RefactorPlan.md file and suggest it for the next task.
+
+* Unless explicitly requested to show the process beforehand, it is expect you should proceed with implementation of the task at hand without being asked to continue.
