@@ -19,7 +19,12 @@ from typing_extensions import ParamSpec, Protocol
 
 
 """
-Borrowed from temporalio
+Advanced Type Hinting Definitions.
+
+Provides sophisticated type aliases, `TypeVar` instances, `ParamSpec`,
+and `Protocol` definitions for precise static analysis, particularly for
+callables and asynchronous generators. Many concepts are inspired by or
+adapted from libraries like `temporalio`.
 """
     
 AnyType = TypeVar("AnyType")
@@ -47,96 +52,96 @@ ProtocolSelfType = TypeVar("ProtocolSelfType", contravariant=True)
 
 
 class CallableAsyncNoParam(Protocol[ProtocolReturnType]):
-    """Generic callable type."""
+    """Protocol for an asynchronous callable that takes no parameters."""
 
     def __call__(self) -> Awaitable[ProtocolReturnType]:
-        """Generic callable type callback."""
+        """Type signature for the callable."""
         ...
 
 
 class CallableSyncNoParam(Protocol[ProtocolReturnType]):
-    """Generic callable type."""
+    """Protocol for a synchronous callable that takes no parameters."""
 
     def __call__(self) -> ProtocolReturnType:
-        """Generic callable type callback."""
+        """Type signature for the callable."""
         ...
 
 
 class CallableAsyncSingleParam(Protocol[ProtocolParamType, ProtocolReturnType]):
-    """Generic callable type."""
+    """Protocol for an asynchronous callable that takes a single parameter."""
 
     def __call__(self, __arg: ProtocolParamType) -> Awaitable[ProtocolReturnType]:
-        """Generic callable type callback."""
+        """Type signature for the callable."""
         ...
 
 
 class CallableSyncSingleParam(Protocol[ProtocolParamType, ProtocolReturnType]):
-    """Generic callable type."""
+    """Protocol for a synchronous callable that takes a single parameter."""
 
     def __call__(self, __arg: ProtocolParamType) -> ProtocolReturnType:
-        """Generic callable type callback."""
+        """Type signature for the callable."""
         ...
 
 
 class MethodAsyncNoParam(Protocol[ProtocolSelfType, ProtocolReturnType]):
-    """Generic callable type."""
+    """Protocol for an asynchronous method that takes no parameters (besides self)."""
 
     def __call__(__self, self: ProtocolSelfType) -> Awaitable[ProtocolReturnType]:
-        """Generic callable type callback."""
+        """Type signature for the method."""
         ...
 
 
 class MethodSyncNoParam(Protocol[ProtocolSelfType, ProtocolReturnType]):
-    """Generic callable type."""
+    """Protocol for a synchronous method that takes no parameters (besides self)."""
 
     def __call__(__self, self: ProtocolSelfType) -> ProtocolReturnType:
-        """Generic callable type callback."""
+        """Type signature for the method."""
         ...
 
 
 class MethodAsyncSingleParam(
     Protocol[ProtocolSelfType, ProtocolParamType, ProtocolReturnType]
 ):
-    """Generic callable type."""
+    """Protocol for an asynchronous method that takes a single parameter (besides self)."""
 
     def __call__(
         self, __self: ProtocolSelfType, __arg: ProtocolParamType, /
     ) -> Awaitable[ProtocolReturnType]:
-        """Generic callable type callback."""
+        """Type signature for the method."""
         ...
 
 
 class MethodSyncSingleParam(
     Protocol[ProtocolSelfType, ProtocolParamType, ProtocolReturnType]
 ):
-    """Generic callable type."""
+    """Protocol for a synchronous method that takes a single parameter (besides self)."""
 
     def __call__(
         self, __self: ProtocolSelfType, __arg: ProtocolParamType, /
     ) -> ProtocolReturnType:
-        """Generic callable type callback."""
+        """Type signature for the method."""
         ...
 
 
 class MethodSyncOrAsyncNoParam(Protocol[ProtocolSelfType, ProtocolReturnType]):
-    """Generic callable type."""
+    """Protocol for a method (sync or async) that takes no parameters (besides self)."""
 
     def __call__(
         self, __self: ProtocolSelfType
     ) -> Union[ProtocolReturnType, Awaitable[ProtocolReturnType]]:
-        """Generic callable type callback."""
+        """Type signature for the method."""
         ...
 
 
 class MethodSyncOrAsyncSingleParam(
     Protocol[ProtocolSelfType, ProtocolParamType, ProtocolReturnType]
 ):
-    """Generic callable type."""
+    """Protocol for a method (sync or async) that takes a single parameter (besides self)."""
 
     def __call__(
         self, __self: ProtocolSelfType, __param: ProtocolParamType, /
     ) -> Union[ProtocolReturnType, Awaitable[ProtocolReturnType]]:
-        """Generic callable type callback."""
+        """Type signature for the method."""
         ...
 
 
@@ -144,131 +149,65 @@ TSend = TypeVar('TSend', contravariant=True)
 TYield = TypeVar('TYield', covariant=True)
 
 class AsyncGenerator(ABC, AsyncIterator[TYield], Generic[TYield, TSend]):
-    """
-    Represents a one-shot "asynchronous generator-iterator" (as it is
-    referred to in the docs). The concept referred to as an "asynchronous
-    generator _function_" is the function defined with `async def` that has a
-    return type of AsyncGenerator.
-    
-    In other words, `fn` here is an asynchronous generator function:
-    
-        async def fn() -> AsyncGenerator[...]:
-            ...
-    
-    And `agen` here is an asynchronous generator-iterator:
-    
-        agen = fn()
-    
-    The lifetime of an AsyncGenerator is as follows:
-    
-    1. The asynchronous generator-iterator is started by awaiting __anext__()
-    or asend(None). This begins executing the asynchronous generator
-    function.
-    
-    2. Once started, you may (but are not required to):
-        
-        2a. Call asend() with a TSend value and await the result, to continue
-        executing the asynchronous generator function.
-        
-        2b. Await athrow() to raise an exception inside the asynchronous
-        generator function, which may respond by yielding a value.
-    
-    3. You may repeat step 2 as long as the awaitable returned does not raise
-    an exception.
-    
-    4. At any point, you may await aclose() to raise GeneratorExit inside the
-    asynchronous generator function, requesting that it exit. This has no
-    effect if an awaitable from step 2 already raised an exception, or if the
-    asynchronous generator function never began executing, so it is always
-    safe to invoke.
-    
-    5. Once the asynchronous generator function has exited (gracefully or
-    through an exception), or the generator has been closed (even if the
-    function was never started), the asynchronous generator-iterator instance
-    may not be restarted. However, a new one can be obtained by calling the
-    function again:
-    
-        agen = fn()
+    """Abstract base class representing an asynchronous generator-iterator.
+
+    This defines the interface for objects returned by functions defined with
+    `async def` that use `yield`. It follows the protocol for asynchronous
+    generators as defined in PEP 525.
+
+    The lifecycle involves starting with `__anext__` or `asend(None)`, optionally
+    sending values with `asend`, throwing exceptions with `athrow`, and closing
+    with `aclose`.
+
+    Generic Parameters:
+        TYield: The type of values yielded by the generator.
+        TSend: The type of values that can be sent into the generator via `asend`.
     """
 
     def __aiter__(self) -> AsyncIterator[TYield]:
+        """Returns the asynchronous iterator itself."""
         return self
-    
-    async def __anext__(self) -> TYield:  # throws: StopAsyncIteration, ...
+
+    async def __anext__(self) -> TYield:
+        """Starts or resumes the generator, returning the next yielded value.
+
+        Equivalent to `asend(None)`.
+
+        Returns:
+            TYield: The next value yielded by the generator.
+
+        Raises:
+            StopAsyncIteration: If the generator finishes or is already closed.
+            Exception: Any exception raised uncaught within the generator.
+                (StopIteration and StopAsyncIteration are converted to RuntimeError
+                as per PEP 479).
         """
-        Returns an awaitable which, when run, starts to execute the
-        asynchronous generator, or resumes it from the last executed yield
-        expression.
-        
-        If the generator has already exited (gracefully or through an
-        exception) or been closed previously, nothing happens, and the
-        awaitable returned by __anext__() will raise a StopAsyncIteration
-        exception.
-        
-        If resuming from a yield expression, the expression will evaluate to
-        None inside the generator, because no value is being provided (use
-        asend() if you want that).
-        
-        The generator will run until the next yield expression or it exits
-        (e.g., through a return statement).
-        
-        If the generator yields a value, the awaitable returned by
-        __anext__() will return that value, and the generator's execution
-        will be re-suspended. (Under the hood, this is implemented as the
-        generator raising StopIteration, but you don't need to care about
-        that.)
-        
-        If the generator raises an exception, the awaitable returned by
-        __anext__() will raise the same exception. (Note that if a generator
-        attempts to _explicitly_ raise StopIteration or StopAsyncIteration in
-        its implementation, it will instead be converted into a RuntimeError,
-        per PEP 479.)
-        
-        If the generator exits gracefully, the awaitable returned by
-        __anext__() will raise a StopAsyncIteration exception.
-        """
+        # Implementation Note: PEP 525 states __anext__ should behave like asend(None).
         return await self.asend(None)
 
     async def asend(
         self,
-        input: Optional[TSend]
-    ) -> TYield:  # throws: StopAsyncIteration, ...
+        value: Optional[TSend] # Changed name from 'input' for clarity
+    ) -> TYield:
+        """Resumes the generator execution, sending a value into it.
+
+        The sent value becomes the result of the `yield` expression where the
+        generator was paused.
+
+        Args:
+            value: The value to send into the generator. Must be None if this
+                is the first call to start the generator.
+
+        Returns:
+            TYield: The next value yielded by the generator after processing
+                the sent value.
+
+        Raises:
+            StopAsyncIteration: If the generator finishes or is already closed.
+            TypeError: If a non-None value is sent to a newly started generator.
+            Exception: Any exception raised uncaught within the generator.
         """
-        Returns an awaitable which, when run, starts to execute the
-        asynchronous generator, or resumes it from the last executed yield
-        expression.
-        
-        If asend() is being called to start the generator, it must be called
-        with None as the argument, because there is no yield expression that
-        could receive the value. (This is the only reason `input` is typed as
-        Optional[TSend].)
-        
-        If the generator has already exited (gracefully or through an
-        exception) or been closed previously, nothing happens, and the
-        awaitable returned by asend() will raise a StopAsyncIteration
-        exception.
-        
-        If resuming from a yield expression, the expression will evaluate to
-        `input` inside the generator.
-        
-        The generator will run until the next yield expression or it exits
-        (e.g., through a return statement).
-        
-        If the generator yields a value, the awaitable returned by asend()
-        will return that value, and the generator's execution will be
-        re-suspended. (Under the hood, this is implemented as the generator
-        raising StopIteration, but you don't need to consider that.)
-        
-        If the generator raises an exception, the awaitable returned by
-        asend() will raise the same exception. (Note that if a generator
-        attempts to _explicitly_ raise StopIteration or StopAsyncIteration in
-        its implementation, it will instead be converted into a RuntimeError,
-        per PEP 479.)
-        
-        If the generator exits gracefully, the awaitable returned by asend()
-        will raise a StopAsyncIteration exception.
-        """
-        ...
+        raise NotImplementedError
 
     async def athrow(
         self,
