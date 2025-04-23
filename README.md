@@ -1,41 +1,90 @@
-# Lazy Op(eration)s or lazyops
-  
-  **Latest Version**: [![PyPI version](https://badge.fury.io/py/lazyops.svg)](https://badge.fury.io/py/lazyops)
+# lazyops: Lazy Operations Toolkit (lzl / lzo)
 
-  A collection of submodules/patterns that are commonly used within personal projects. 
+[![PyPI version](https://badge.fury.io/py/lazyops.svg)](https://badge.fury.io/py/lazyops)
+<!-- Add other badges here later: e.g., Build Status, Code Coverage -->
 
-**Deprecation Notice**
+A Python library providing a collection of utility modules (`lzl`) and object registry patterns (`lzo`) for building robust applications.
 
-  If you are looking for the previous version of `lazyops`, please see the `v0.2.x` tag. This is the last stable version of the previous implementation of `lazyops` prior to rework of the entire project.
+## ⚠️ Project Status: Under Active Refactoring
 
-  New APIs are implemented in `v0.2.x` and above.
+This library is currently undergoing a major refactoring (targeting version `v0.3.x` and above).
+
+The core functionality is being migrated from the older `lazyops` namespace (versions `v0.2.x` and below) into two distinct, more focused namespaces:
+
+*   **`lzl` (Lazy Libraries/Utilities):** Contains foundational utilities, asynchronous helpers, common API client interfaces, I/O operations, logging, type definitions, and more.
+*   **`lzo` (Lazy Objects/Registry):** Provides object registry patterns, state management, settings configuration, and related functionalities.
+
+Expect potential API changes and improvements during this transition. The previous `v0.2.x` implementation is available under the corresponding git tag if needed.
 
 ---
 
 ### Installation
-Install directory from pypi
 
-`pip install --upgrade lazyops`
+Install the latest version from PyPI:
 
-Install from Github
-
-`pip install --upgrade git+https://github.com/trisongz/lazyops`
-
----
-
-### Usage
-
-Work in Progress
-
-```python
+```bash
+pip install --upgrade lazyops
 ```
 
+Or install directly from GitHub for the latest development version:
+
+```bash
+pip install --upgrade git+https://github.com/trisongz/lazyops.git
+```
 
 ---
 
-### Dependencies
+### Basic Usage (Illustrative)
 
-- Python 3.7+
-- [pydantic](https://github.com/pydantic/pydantic)
+```python
+# Import from the new namespaces
+import lzl
+import lzo
 
-- [loguru](https://github.com/Delgan/loguru)
+# Example using lzl logging (assuming configuration)
+from lzl.logging import logger
+logger.info("Logging configured via lzl!")
+
+# Example using lzo registry (illustrative)
+# Assuming 'my_settings' are registered somewhere
+from lzo.registry import settings
+# app_config = settings['my_settings']
+# print(f"Loaded setting: {app_config.some_value}")
+
+# Example using lzl utils (e.g., async helper)
+# import asyncio
+# from lzl.utils import run_as_coro
+#
+# def my_sync_function(x):
+#    return x * 2
+#
+# async def main():
+#    result = await run_as_coro(my_sync_function, 5)
+#    print(f"Async result: {result}")
+#
+# asyncio.run(main())
+
+```
+*(More detailed usage examples will be added as the refactoring progresses).*
+
+---
+
+### Core Dependencies
+
+*   Python 3.7+
+*   [pydantic](https://github.com/pydantic/pydantic): Used for data validation and settings management.
+*   Other foundational libraries used internally (e.g., `aiohttpx`, `loguru`, `async_lru`).
+
+*(A more detailed dependency list will be maintained in `setup.py` or `pyproject.toml`)*.
+
+---
+
+### Contributing
+
+Contributions are welcome! Please read the **[`CONTRIBUTING.md`](CONTRIBUTING.md)** file for guidelines on code style, formatting, type hinting, docstrings, and the development process.
+
+---
+
+### License
+
+This project is licensed under the MIT License - see the [`LICENSE`](LICENSE) file for details.
