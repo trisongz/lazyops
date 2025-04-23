@@ -24,9 +24,9 @@ from ..path import (
     IterableAIOFile,
 )
 from ..utils import logger, get_fsspec_file
+from ..cloudfs import BaseFileSystemAccessor
 
 if t.TYPE_CHECKING:
-    from ..providers.main import R2Accessor
     from ..main import FileLike, PathLike
 
 
@@ -64,18 +64,35 @@ class FileR2Path(CloudFileSystemPath):
     Our customized class that incorporates both sync and async methods
     """
     _flavour = _pathz_default_flavor
-    _accessor: 'R2Accessor' = None
+    _accessor: 'BaseFileSystemAccessor' = BaseFileSystemAccessor()
     _pathlike = posixpath
-    _prefix = 'r2'
     _provider = 'CloudFlare'
+    is_fsspec = True
+    scheme: str = None
 
     _win_pathz: t.ModuleType['FileR2WindowsPath'] = 'FileR2WindowsPath'
     _posix_pathz: t.ModuleType['FileR2PosixPath'] = 'FileR2PosixPath'
 
     def _init(self, template: t.Optional['FileR2Path'] = None):
-        self._accessor = self._get_provider_accessor(self._prefix)
+        path_str = self.as_posix()
+        if '://' in path_str:
+            self.scheme = path_str.split('://', 1)[0].lower()
+        else:
+            self.scheme = 'r2' 
+
         self._closed = False
         self._fileio = None
+
+    @property
+    def path_as_fsspec(self) -> str:
+        bucket = getattr(self, 'bucket', getattr(self, 'bucket_', None))
+        key = getattr(self, 'key', getattr(self, 'key_', None))
+        
+        if bucket and key:
+            return f"{bucket}/{key}".lstrip('/')
+        elif bucket:
+            return bucket
+        return self.key_ if hasattr(self, 'key_') else str(self)
 
     def __new__(cls, *parts, **kwargs):
         if cls is FileR2Path or issubclass(cls, FileR2Path): 
