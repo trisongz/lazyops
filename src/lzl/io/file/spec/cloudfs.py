@@ -42,7 +42,6 @@ class FilesystemBundle(t.NamedTuple):
 class CloudFileManager:
     """Manages cloud filesystem instances keyed by URI scheme."""
     _instances: t.Dict[str, FilesystemBundle] = {}
-    # _s3t_creators: Dict[str, t.Callable[..., TransferManager]] = {} # Incorporated into bundle
     _settings: t.Optional['FileIOConfig'] = None
     _creating: t.Set[str] = set() # To prevent recursive creation loops
 
@@ -50,8 +49,8 @@ class CloudFileManager:
     def settings(self) -> 'FileIOConfig':
         """Lazily retrieves the global FileIOConfig."""
         if self._settings is None:
-            from ..utils import fileio_settings # Use the central settings getter
-            self._settings = fileio_settings
+            from ..utils import get_settings # Use the central settings getter
+            self._settings = get_settings()
         return self._settings
 
     def get_bundle(self, scheme: str, create: bool = True) -> t.Optional[FilesystemBundle]:
@@ -67,6 +66,7 @@ class CloudFileManager:
                  self._creating.remove(scheme)
 
         bundle = self._instances.get(scheme)
+        # Lazy S3T creation logic added back
         if bundle and bundle._s3t_creator and not bundle.s3t:
             # Lazily create S3 Transfer Manager
             try:
@@ -231,11 +231,20 @@ def _extract_scheme_and_path(path_obj_or_str: t.Union[str, 'FileLikePath']) -> t
             # urlparse can help handle file:// paths better
             parsed = urlparse(path_obj_or_str)
             adjusted_path = f"{parsed.netloc}{parsed.path}".lstrip('/') if parsed.netloc else parsed.path.lstrip('/')
-            if scheme == 'file': adjusted_path = f"/{adjusted_path}" # Ensure leading slash for absolute file paths
+            # Handle edge case for file scheme where path might be relative or absolute
+            if scheme == 'file': 
+                # If original path was file:///abs/path, netloc is empty, path is /abs/path
+                # If original path was file://rel/path, netloc is rel, path is /path (urlparse quirk)
+                # If original path was file:/abs/path, netloc empty, path /abs/path
+                # If original path was /abs/path (no scheme), scheme is 'file', adjusted_path is /abs/path
+                # We want absolute paths to start with /, relative paths not to.
+                # The most reliable way is to use the original path for 'file'
+                adjusted_path = original_path # Use original path for NormalAccessor
             
             return scheme, adjusted_path, original_path
         else:
             # Assume local file path if no scheme provided
+            # Pass original path, NormalAccessor handles it
             return 'file', path_obj_or_str, original_path
     else:
         raise TypeError(f"Unsupported path type for scheme extraction: {type(path_obj_or_str)}")
@@ -253,6 +262,9 @@ def create_dynamic_sync_method(manager: CloudFileManager, method_name: str):
                  # NormalAccessor methods expect the standard path, not adjusted
                  return actual_method(original_path, *args, **kwargs)
             else:
+                 # NormalAccessor might not have all fsspec methods (e.g., checksum)
+                 # Should we attempt to use fsspec 'file' backend here? 
+                 # For now, raise error for missing methods on NormalAccessor.
                  raise NotImplementedError(f"Sync method '{method_name}' not available for local 'file' scheme via NormalAccessor.")
 
         fs = manager.get_fs(scheme)
@@ -268,7 +280,6 @@ def create_dynamic_sync_method(manager: CloudFileManager, method_name: str):
         return actual_method(adjusted_path, *args, **kwargs)
     
     # Try to preserve docstrings if possible
-    # Might need functools.wraps if we knew the target method, but it's dynamic
     sync_wrapper.__doc__ = f"Dynamically calls '{method_name}' on the appropriate sync filesystem based on path scheme."
     sync_wrapper.__name__ = method_name
     return sync_wrapper
@@ -283,7 +294,7 @@ def create_dynamic_async_method(manager: CloudFileManager, fsspec_method_names: 
 
         if scheme == 'file':
              # Async local file operations are complex, delegate or raise
-             # Check if NormalAccessor has an async version? Unlikely.
+             # Consider using aiofiles if needed, but fsspec doesn't guarantee async file ops
              raise NotImplementedError(f"Async method '{requested_name}' not currently supported for local 'file' scheme.")
 
         fsa = manager.get_fsa(scheme)
