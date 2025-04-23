@@ -80,7 +80,7 @@ class FileIOConfig(BaseSettings, RegisteredSettings.configure_registered(module 
                 default_config = provider_cls(
                     _env_prefix = base_prefix,
                     _uri_scheme = default_scheme,
-                    **load_env_vars(base_prefix, strip_prefix=True)
+                    **load_env_vars(base_prefix)
                 )
                 default_config.set_env() # Set env vars for this instance
                 self._provider_configs[default_scheme] = default_config
@@ -110,7 +110,7 @@ class FileIOConfig(BaseSettings, RegisteredSettings.configure_registered(module 
                         config = provider_cls(
                             _env_prefix = env_prefix,
                             _uri_scheme = uri_scheme,
-                            **load_env_vars(env_prefix, strip_prefix=True)
+                            **load_env_vars(env_prefix)
                         )
                         config.set_env() # Set env vars for this instance
                         self._provider_configs[uri_scheme] = config
