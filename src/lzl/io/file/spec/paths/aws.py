@@ -18,9 +18,9 @@ from ..path import (
     register_pydantictype,
     CloudPathT,
 )
+from ..cloudfs import BaseFileSystemAccessor
 
 if t.TYPE_CHECKING:
-    from ..providers.main import AWSAccessor
     from ..main import FileLike, PathLike
 
 
@@ -57,18 +57,40 @@ class FileS3Path(CloudFileSystemPath):
     Our customized class that incorporates both sync and async methods
     """
     _flavour = _pathz_default_flavor
-    _accessor: 'AWSAccessor' = None
+    _accessor: 'BaseFileSystemAccessor' = BaseFileSystemAccessor()
     _pathlike = posixpath
-    _prefix = 's3'
     _provider = 'AmazonS3'
+    is_fsspec = True
+    scheme: str = None
 
     _win_pathz: t.ModuleType['FileS3WindowsPath'] = 'FileS3WindowsPath'
     _posix_pathz: t.ModuleType['FileS3PosixPath'] = 'FileS3PosixPath'
 
     def _init(self, template: t.Optional['FileS3Path'] = None):
-        self._accessor = self._get_provider_accessor(self._prefix)
+        path_str = self.as_posix()
+        if '://' in path_str:
+            self.scheme = path_str.split('://', 1)[0].lower()
+        else:
+            self.scheme = 's3' 
+            
         self._closed = False
         self._fileio = None
+
+    @property
+    def path_as_fsspec(self) -> str:
+        """Returns the path formatted for fsspec (bucket/key)."""
+        # Assuming base class or _parse_uri correctly sets bucket and key attributes
+        # Adjust attribute names (e.g., self.bucket_, self.key_) if necessary based on base class implementation
+        bucket = getattr(self, 'bucket', getattr(self, 'bucket_', None))
+        key = getattr(self, 'key', getattr(self, 'key_', None))
+        
+        if bucket and key:
+            return f"{bucket}/{key}".lstrip('/')
+        elif bucket:
+             # If only bucket is present (e.g., s3://mybucket)
+             return bucket
+        # Fallback if parsing failed or path is just scheme (shouldn't happen often)
+        return self.key_ if hasattr(self, 'key_') else str(self)
 
     def __new__(cls, *parts, **kwargs):
         if cls is FileS3Path or issubclass(cls, FileS3Path): 
