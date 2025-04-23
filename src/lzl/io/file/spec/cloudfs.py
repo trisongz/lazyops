@@ -34,7 +34,7 @@ class FilesystemBundle(t.NamedTuple):
     fs: t.Optional[_FST] = None
     fsa: t.Optional[_ASFST] = None
     boto: t.Optional[Session] = None
-    _s3t_creator: t.Optional[t.Callable[..., TransferManager]] = None
+    s3t_creator: t.Optional[t.Callable[..., TransferManager]] = None
     s3t: t.Optional[TransferManager] = None
     config: t.Optional[ProviderConfig] = None
 
@@ -67,13 +67,13 @@ class CloudFileManager:
 
         bundle = self._instances.get(scheme)
         # Lazy S3T creation logic added back
-        if bundle and bundle._s3t_creator and not bundle.s3t:
+        if bundle and bundle.s3t_creator and not bundle.s3t:
             # Lazily create S3 Transfer Manager
             try:
                 logger.debug(f"Lazily creating S3 Transfer Manager for scheme: {scheme}")
-                s3t = bundle._s3t_creator()
+                s3t = bundle.s3t_creator()
                 # Update the bundle in the dictionary
-                self._instances[scheme] = bundle._replace(s3t=s3t, _s3t_creator=None) # Clear creator after creation
+                self._instances[scheme] = bundle._replace(s3t=s3t, s3t_creator=None) # Clear creator after creation
                 atexit.register(self._atexit_s3t, scheme) # Register specific shutdown
                 logger.debug(f"Registered S3 Transfer Manager shutdown for scheme: {scheme}")
                 return self._instances[scheme] # Return updated bundle
@@ -164,7 +164,7 @@ class CloudFileManager:
 
             # Store the created bundle
             self._instances[scheme] = FilesystemBundle(
-                scheme=scheme, fs=fs, fsa=fsa, boto=boto_client, _s3t_creator=s3t_creator, config=provider_config
+                scheme=scheme, fs=fs, fsa=fsa, boto=boto_client, s3t_creator=s3t_creator, config=provider_config
             )
             logger.info(f"Successfully created filesystem bundle for scheme: {scheme}")
 

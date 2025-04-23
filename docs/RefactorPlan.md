@@ -68,6 +68,12 @@ and `lzo` (Lazy Objects/Registry) namespaces, deprecating the older `lazyops` na
 
 ### Phase 3: Code Migration & Cleanup
 
+- [X] **Refactor `lzl.io.file` for Multi-Provider Instance Support:**
+    - [X] Refactored provider configs (`configs/providers.py`) to be instance-specific.
+    - [X] Refactored main config (`configs/main.py`) to load multiple instances via `*_ENV_PREFIXES` and manage them by scheme.
+    - [X] Refactored filesystem management (`spec/cloudfs.py`) using `CloudFileManager` and dynamic `BaseFileSystemAccessor`.
+    - [X] Refactored path resolution (`spec/main.py`) to use scheme-to-class mapping.
+    - [X] Updated cloud path classes (`spec/paths/*.py`) for compatibility (scheme, `path_as_fsspec`, accessor).
 - [ ] Identify core functionality in `src/lazyops` to migrate.
 - [ ] Migrate identified code piece-by-piece into appropriate `src/lzl` or `src/lzo` locations.
     - Apply coding standards (typing, docstrings, formatting) during migration.
@@ -78,15 +84,14 @@ and `lzo` (Lazy Objects/Registry) namespaces, deprecating the older `lazyops` na
 
 ### Phase 4: Documentation & Tooling
 
-- [ ] Set up `black` formatting configuration (e.g., in `pyproject.toml`) and apply it.
-- [ ] Set up Mintlify for documentation generation.
-    - Configure Mintlify to parse Google-style docstrings.
-    - Structure documentation content.
-- [ ] Implement CI/CD workflow (e.g., GitHub Actions) to automatically build and push documentation updates upon version changes/tags.
-- [ ] Review and improve `changelogs.md`.
-- [ ] Enhance overall repository documentation (e.g., architecture overview, detailed usage examples).
-
-### Phase 5: Finalization
-
-- [ ] Finalize `CONTRIBUTING.md` with Testing and Commit/PR guidelines.
-- [ ] Review all changes and ensure consistency. 
+- [ ] Setup Mintlify documentation for the refactored library.
+- [ ] Develop and implement automated testing for the refactored library.
+- [ ] Set up CI/CD pipeline for the refactored library.
+- [ ] Develop and implement a clear set of guidelines and rules based on how the library has been developed thus far.
+- [ ] Setup library documentation via Mintlify.
+- [ ] Be able to automatically push documentation update whenever the library\'s version is updated.
+- [ ] Improve the changelogs.
+- [ ] Improve inline code annotations to be more consistent and descriptive (IDE experience).
+- [ ] Prepare the repo for usage with Cursor (LLM Assistance).
+- [ ] Prepare and rework the project README to be up to date.
+- [ ] Greatly improve repo documentation (beyond README/CONTRIBUTING).
