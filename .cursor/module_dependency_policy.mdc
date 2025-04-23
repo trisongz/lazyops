@@ -1,0 +1,28 @@
+---
+description: This policy outlines the requirements for dependencies in the project.
+globs: **/*.py
+alwaysApply: true
+---
+# Module Dependency Policy (lzl vs. lzo)
+
+This policy defines the intended dependency structure and philosophy for the `lzl` and `lzo` modules.
+
+**`lzl` (Lazy Libraries/Utilities):**
+
+*   **Goal:** Maximize Standalone Potential & Minimize Dependencies.
+*   **Rule:** Code within `lzl` should strive to have minimal dependencies on other parts of `lzl` or **any** part of `lzo`.
+*   **Submodule Independence:** Submodules within `lzl` (especially distinct areas like `lzl.types`, `lzl.logging`, `lzl.io`, and individual API clients under `lzl.api.*`) should be designed to be as self-contained as possible. The aim is that they could potentially be extracted into separate, smaller libraries in the future with minimal effort.
+*   **External Dependencies:** Dependencies on external libraries should be carefully considered and kept relevant to the specific submodule's functionality.
+*   **Allowed Imports:** Primarily standard library, essential third-party libraries (like `pydantic`), and potentially other foundational `lzl` modules (like `lzl.types`). Imports from `lzo` are generally discouraged.
+
+**`lzo` (Lazy Objects/Registry):**
+
+*   **Goal:** Provide Integrated Framework Components.
+*   **Rule:** Code within `lzo` is allowed to have more referential dependencies, including dependencies on modules within `lzl` and potentially other parts of `lzo`.
+*   **Integration:** `lzo` often acts as the integration layer, utilizing utilities from `lzl` and providing higher-level abstractions like registries and state management.
+*   **Allowed Imports:** Standard library, third-party libraries, any module within `lzl`, and other modules within `lzo`.
+
+**Interaction:**
+*   When adding new functionality or refactoring code into `lzl`, prioritize minimizing its dependencies according to the `lzl` goal.
+*   When working within `lzo`, feel free to utilize components from `lzl` where appropriate.
+*   Flag any potential violations of this policy (e.g., an `lzl` module importing heavily from `lzo`) for review. 
