@@ -18,10 +18,10 @@ from ..path import (
     register_pathlike,
     register_pydantictype,
 )
-from ..cloudfs import BaseFileSystemAccessor
 from ..utils import logger
 
 if t.TYPE_CHECKING:
+    from ..providers.main import MinioAccessor
     from s3transfer.manager import TransferManager
 
 
@@ -60,36 +60,19 @@ class FileMinioPath(CloudFileSystemPath):
     Our customized class that incorporates both sync and async methods
     """
     _flavour = _pathz_default_flavor
-    _accessor: 'BaseFileSystemAccessor' = BaseFileSystemAccessor()
+    _accessor: 'MinioAccessor' = None
     _pathlike = posixpath
+    _prefix = 'mc'
+    _posix_prefix = 's3'
     _provider = 'Minio'
-    is_fsspec = True
-    scheme: str = None
 
     _win_pathz: t.ModuleType['FileMinioWindowsPath'] = 'FileMinioWindowsPath'
     _posix_pathz: t.ModuleType['FileMinioPosixPath'] = 'FileMinioPosixPath'
 
     def _init(self, template: t.Optional['FileMinioPath'] = None):
-        path_str = self.as_posix()
-        if '://' in path_str:
-            self.scheme = path_str.split('://', 1)[0].lower()
-        else:
-            self.scheme = 'mc' 
-
+        self._accessor = self._get_provider_accessor(self._prefix)
         self._closed = False
         self._fileio = None
-
-    @property
-    def path_as_fsspec(self) -> str:
-        """Returns the path formatted for fsspec (bucket/key)."""
-        bucket = getattr(self, 'bucket', getattr(self, 'bucket_', None))
-        key = getattr(self, 'key', getattr(self, 'key_', None))
-        
-        if bucket and key:
-            return f"{bucket}/{key}".lstrip('/')
-        elif bucket:
-            return bucket
-        return self.key_ if hasattr(self, 'key_') else str(self)
 
     def __new__(cls, *parts, **kwargs):
         if cls is FileMinioPath or issubclass(cls, FileMinioPath): 

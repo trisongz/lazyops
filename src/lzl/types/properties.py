@@ -1,13 +1,5 @@
 from __future__ import annotations
 
-"""
-Custom Property Descriptors.
-
-This module provides enhanced property decorators offering features like
-lazy evaluation and caching, designed to work seamlessly with Pydantic models
-and other classes.
-"""
-
 import threading
 import typing as t
 import functools
@@ -26,22 +18,28 @@ if TYPE_CHECKING:
 
 
 class eproperty(property):
-    """A property that computes its value only once per instance.
+    """
+    Works similarly to property(), but computes the value only once.
 
-    Designed for use with Pydantic models that utilize a `PrivateAttr` named
-    `_extra` (a dictionary) for storing the cached value. It memorizes the
-    result of the first getter call.
+    Designed specifically for `pydantic` models using `PrivateAttr`.
+    It expects that the `_extra` attribute is a `PrivateAttr` that is
+    used to store the computed value.
 
-    Default setters/deleters overwrite/remove the value from the `_extra` dict.
-    User-defined setters/deleters run before the default actions.
+    This essentially memorizes the value of the property by storing the result
+    of its computation in the ``_extra`` of the object instance.  This is
+    useful for computing the value of some property that should otherwise be
+    invariant.  For example, the two examples below are equivalent::
 
-    Example:
-        >>> from pydantic import BaseModel, PrivateAttr
-        >>> from typing import Any, Dict
         >>> class LazyTest(BaseModel):
         ...     _extra: Dict[str, Any] = PrivateAttr(default_factory = dict)
+        ...     @property
+        ...     def complicated_property(self):
+        ...         if 'complicated_property' not in self._extra:
+        ...             print('Computing the value for complicated_property...')
+        ...             self._extra['complicated_property'] = 42
+        ...         return self._extra['complicated_property']
         ...
-        ...     @eproperty
+        ...     @eproperty('_extra')
         ...     def complicated_property(self):
         ...         print('Computing the value for complicated_property...')
         ...         return 42
@@ -52,244 +50,129 @@ class eproperty(property):
         42
         >>> lt.complicated_property
         42
+
+    As the example shows, the second time ``complicated_property`` is accessed,
+    the ``print`` statement is not executed.  Only the return value from the
+    first access off ``complicated_property`` is returned.
+
+    By default, a setter and deleter are used which simply overwrite and
+    delete, respectively, the value stored in ``_extra``. Any user-specified
+    setter or deleter is executed before executing these default actions.
+    The one exception is that the default setter is not run if the user setter
+    already sets the new value in ``_extra`` and returns that value and the
+    returned value is not ``None``.
     """
 
-    def __init__(self, fget: t.Callable[[Any], Any], fset: t.Callable[[Any, Any], None] | None = None, fdel: t.Callable[[Any], None] | None = None, doc: str | None = None, key: str | None = None):
-        """Initializes the eproperty.
-
-        Args:
-            fget: The getter function.
-            fset: The setter function (optional).
-            fdel: The deleter function (optional).
-            doc: The docstring (optional, defaults to fget.__doc__).
-            key: The key under which to store the value in the instance's
-                `_extra` dict (optional, defaults to fget.__name__).
-        """
+    def __init__(self, fget, fset=None, fdel=None, doc=None, key: t.Optional[str] = None):
         super().__init__(fget, fset, fdel, doc)
         self._key = key or self.fget.__name__
 
-    def __get__(self, obj: 'BaseModel', owner=None) -> Any:
-        """Gets the property value, computing and caching it if needed.
-
-        Args:
-            obj: The instance on which the property is accessed.
-            owner: The owner class (unused).
-
-        Returns:
-            Any: The computed or cached property value.
-
-        Raises:
-            AttributeError: If accessed on the class directly or if the instance
-                lacks the `_extra` attribute.
+    def __get__(self, obj: 'BaseModel', owner=None):
+        """
+        Returns the value
         """
         try:
-            # Ensure _extra exists and is initialized (handle potential uninitialized PrivateAttr)
-            if not hasattr(obj, '_extra') or getattr(obj, '_extra') is None:
-                 setattr(obj, '_extra', {}) # Or handle based on PrivateAttr's factory if possible
-
-            if self._key not in obj._extra:
+            if self._key not in obj._extra: 
                 obj._extra[self._key] = self.fget(obj)
             return obj._extra.get(self._key)
         except AttributeError:
             if obj is None:
-                # Property accessed on the class, not an instance
                 return self
-            # Reraise if it's a different AttributeError (e.g., within fget)
             raise
 
-
-    def __set__(self, obj: 'BaseModel', val: Any):
-        """Sets the property value.
-
-        Runs the custom setter if provided, then updates the cached value
-        in `_extra`.
-
-        Args:
-            obj: The instance on which to set the value.
-            val: The value to set.
-
-        Raises:
-            AttributeError: If the instance lacks the `_extra` attribute.
+    def __set__(self, obj: 'BaseModel', val):
         """
-        if not hasattr(obj, '_extra') or getattr(obj, '_extra') is None:
-            setattr(obj, '_extra', {}) # Initialize if needed
-
+        Sets the value
+        """
         if self.fset:
             ret = self.fset(obj, val)
-            # Allow setter to signal it handled caching by returning the value
             if ret is not None and obj._extra.get(self._key) is ret:
+                # By returning the value set the setter signals that it
+                # took over setting the value in obj.__dict__; this
+                # mechanism allows it to override the input value
                 return
-            val = ret # Allow setter to modify the value before caching
+            val = ret
         obj._extra[self._key] = val
 
 
     def __delete__(self, obj: 'BaseModel'):
-        """Deletes the cached property value.
-
-        Runs the custom deleter if provided, then removes the value from `_extra`.
-
-        Args:
-            obj: The instance from which to delete the value.
-
-        Raises:
-            AttributeError: If the instance lacks the `_extra` attribute.
         """
-        if not hasattr(obj, '_extra') or getattr(obj, '_extra') is None:
-            return # Nothing to delete if _extra doesn't exist
-
+        Deletes the value
+        """
         if self.fdel: self.fdel(obj)
-        obj._extra.pop(self._key, None)
-
+        obj._extra.pop(self._key, None)    # Delete if present
 
 class xproperty(eproperty):
-    """Generic version of eproperty storing the value in a specified attribute.
-
-    Similar to `eproperty`, but caches the value in an instance attribute
-    whose name is specified during initialization (defaults to `_extra`).
-    The target attribute must be a dictionary.
-    """
-    def __init__(self, fget: t.Callable[[Any], Any], fset: t.Callable[[Any, Any], None] | None = None, fdel: t.Callable[[Any], None] | None = None, doc: str | None = None, attr_name: str = '_extra'):
-        """Initializes the xproperty.
-
-        Args:
-            fget: The getter function.
-            fset: The setter function (optional).
-            fdel: The deleter function (optional).
-            doc: The docstring (optional, defaults to fget.__doc__).
-            attr_name: The name of the dictionary attribute on the instance
-                used for caching (defaults to '_extra').
-        """
+    def __init__(self, fget, fset=None, fdel=None, doc=None, attr_name: t.Optional[str] = '_extra'):
         super().__init__(fget, fset, fdel, doc)
-        self._key = self.fget.__name__ # Use property name as key within the cache dict
+        self._key = self.fget.__name__
         self._attr_name = attr_name
-
-    def __get__(self, obj: 'BaseModel' | 'ObjWithABC', owner=None) -> Any:
-        """Gets the property value, computing and caching it if needed.
-
-        Args:
-            obj: The instance on which the property is accessed.
-            owner: The owner class (unused).
-
-        Returns:
-            Any: The computed or cached property value.
-
-        Raises:
-            AttributeError: If accessed on the class directly or if the instance
-                lacks the specified caching attribute (`attr_name`).
+    
+    def __get__(self, obj: 'BaseModel' | 'ObjWithABC', owner=None):
         """
-        if obj is None:
-            return self # Accessed on class
-
-        _cache = getattr(obj, self._attr_name, None)
-        if _cache is None:
-             # Dynamically create the cache dict if it doesn't exist
-            _cache = {}
-            setattr(obj, self._attr_name, _cache)
-        elif not isinstance(_cache, dict):
-            raise TypeError(f"Attribute '{self._attr_name}' must be a dictionary for xproperty caching.")
-
-
-        if self._key not in _cache:
-            _cache[self._key] = self.fget(obj)
-            # No need to setattr again unless _cache was initially None
-        return _cache.get(self._key)
-
-
-    def __set__(self, obj: 'BaseModel' | 'ObjWithABC', val: Any):
-        """Sets the property value in the specified cache attribute.
-
-        Args:
-            obj: The instance on which to set the value.
-            val: The value to set.
-
-        Raises:
-            AttributeError: If the instance lacks the specified caching attribute.
-            TypeError: If the caching attribute is not a dictionary.
+        Returns the value
         """
-        _cache = getattr(obj, self._attr_name, None)
-        if _cache is None:
-            _cache = {}
-            setattr(obj, self._attr_name, _cache)
-        elif not isinstance(_cache, dict):
-            raise TypeError(f"Attribute '{self._attr_name}' must be a dictionary for xproperty caching.")
+        if not hasattr(obj, self._attr_name): 
+            raise AttributeError(f'Object {obj} does not have attribute {self._attr_name}')
+        try:
+            _attr = getattr(obj, self._attr_name)
+            if _attr is None: _attr = {}
+            if self._key not in _attr:
+                _attr[self._key] = self.fget(obj)
+                setattr(obj, self._attr_name, _attr)
+            return _attr.get(self._key)
+        except AttributeError:
+            if obj is None:
+                return self
+            raise
 
+    def __set__(self, obj: 'BaseModel' | 'ObjWithABC', val):
+        """
+        Sets the value
+        """
+        if not hasattr(obj, self._attr_name): 
+            raise AttributeError(f'Object {obj} does not have attribute {self._attr_name}')
+        _attr = getattr(obj, self._attr_name)
+        if _attr is None: _attr = {}
         if self.fset:
             ret = self.fset(obj, val)
-            if ret is not None and _cache.get(self._key) is ret:
+            if ret is not None and _attr.get(self._key) is ret:
+                # By returning the value set the setter signals that it
+                # took over setting the value in obj.__dict__; this
+                # mechanism allows it to override the input value
                 return
             val = ret
-        _cache[self._key] = val
-        # No need to setattr again unless _cache was initially None
-
+        _attr[self._key] = val
+        setattr(obj, self._attr_name, _attr)
 
     def __delete__(self, obj: 'BaseModel' | 'ObjWithABC'):
-        """Deletes the cached property value from the specified attribute.
-
-        Args:
-            obj: The instance from which to delete the value.
-
-        Raises:
-            AttributeError: If the instance lacks the specified caching attribute.
-            TypeError: If the caching attribute is not a dictionary.
         """
-        _cache = getattr(obj, self._attr_name, None)
-        # Don't raise error if cache or key doesn't exist, just do nothing.
-        if not isinstance(_cache, dict):
-            return
-
+        Deletes the value
+        """
         if self.fdel: self.fdel(obj)
-        _cache.pop(self._key, None)
-        # No need to setattr again
-
-
+        _attr = getattr(obj, self._attr_name)
+        if _attr is None: _attr = {}
+        if self._key in _attr:
+            del _attr[self._key]
+            setattr(obj, self._attr_name, _attr)
+    
 def aproperty(
-    attr_name: str = '_extra',
-) -> t.Callable[[t.Callable], xproperty]:
-    """Decorator factory to create an `xproperty`.
-
-    This is a shortcut for applying the `xproperty` descriptor.
-
-    Args:
-        attr_name (str): The name of the dictionary attribute on the instance
-            to use for caching (defaults to '_extra').
-
-    Returns:
-        Callable[[Callable], xproperty]: A decorator that takes the getter
-            function and returns an `xproperty` instance.
+    attr_name: t.Optional[str] = '_extra',
+):
     """
-    def decorator(func: t.Callable) -> xproperty:
+    A shortcut to create an `xproperty`
+    """
+    def decorator(func):
         return xproperty(func, attr_name = attr_name)
     return decorator
-
+    
 class rproperty(eproperty):
-    """Specialized `eproperty` using `_rxtra` for caching (for non-Pydantic).
-
-    Identical to `eproperty`, but uses an attribute named `_rxtra` instead of
-    `_extra` for storing the cached value. This is intended for use with
-    classes that might not inherit from Pydantic's `BaseModel` but still need
-    lazy property evaluation (like classes using `abc.ABC`).
-
-    Assumes the instance will have a dictionary attribute named `_rxtra`.
-    """
-    def __get__(self, obj: 'ObjWithABC', owner=None) -> Any:
-        """Gets the property value, using `_rxtra` for caching.
-
-        Args:
-            obj: The instance on which the property is accessed.
-            owner: The owner class (unused).
-
-        Returns:
-            Any: The computed or cached property value.
-
-        Raises:
-            AttributeError: If accessed on the class, or `_rxtra` is missing/None.
+    def __get__(self, obj: 'ObjWithABC', owner=None):
+        """
+        Returns the value
         """
         try:
-            # Ensure _rxtra exists and is initialized
-            if not hasattr(obj, '_rxtra') or getattr(obj, '_rxtra') is None:
-                 setattr(obj, '_rxtra', {})
-
-            if self._key not in obj._rxtra:
+            if self._key not in obj._rxtra: 
                 obj._rxtra[self._key] = self.fget(obj)
             return obj._rxtra.get(self._key)
         except AttributeError:
@@ -297,41 +180,27 @@ class rproperty(eproperty):
                 return self
             raise
 
-    def __set__(self, obj: 'ObjWithABC', val: Any):
-        """Sets the property value in `_rxtra`.
-
-        Args:
-            obj: The instance on which to set the value.
-            val: The value to set.
-
-        Raises:
-            AttributeError: If `_rxtra` is missing/None.
+    def __set__(self, obj: 'ObjWithABC', val):
         """
-        if not hasattr(obj, '_rxtra') or getattr(obj, '_rxtra') is None:
-            setattr(obj, '_rxtra', {})
-
+        Sets the value
+        """
         if self.fset:
             ret = self.fset(obj, val)
             if ret is not None and obj._rxtra.get(self._key) is ret:
+                # By returning the value set the setter signals that it
+                # took over setting the value in obj.__dict__; this
+                # mechanism allows it to override the input value
                 return
             val = ret
         obj._rxtra[self._key] = val
 
 
     def __delete__(self, obj: 'ObjWithABC'):
-        """Deletes the cached property value from `_rxtra`.
-
-        Args:
-            obj: The instance from which to delete the value.
-
-        Raises:
-            AttributeError: If `_rxtra` is missing/None.
         """
-        if not hasattr(obj, '_rxtra') or getattr(obj, '_rxtra') is None:
-            return
-
+        Deletes the value
+        """
         if self.fdel: self.fdel(obj)
-        obj._rxtra.pop(self._key, None)
+        obj._rxtra.pop(self._key, None)    # Delete if present
 
 _NotFound = object()
 
@@ -348,83 +217,104 @@ CPR = t.TypeVar('CPR')
     
 
 class classproperty(property):
-    """Creates a read-only class-level property.
+    """
+    Similar to `property`, but allows class-level properties.  That is,
+    a property whose getter is like a `classmethod`.
 
-    Acts like a combination of `@classmethod` and `@property`. Allows accessing
-    a computed value on the class itself or on instances, where the computation
-    depends only on the class.
+    The wrapped method may explicitly use the `classmethod` decorator (which
+    must become before this decorator), or the `classmethod` may be omitted
+    (it is implicit through use of this decorator).
 
-    The wrapped method can optionally be decorated with `@classmethod` (it's
-    implicit otherwise).
+    .. note::
 
-    Note:
-        This descriptor creates *read-only* properties. Attempting to define
-        a setter or deleter will raise `NotImplementedError`.
+        classproperty only works for *read-only* properties.  It does not
+        currently allow writeable/deletable properties, due to subtleties of how
+        Python descriptors work.  In order to implement such properties on a class
+        a metaclass for that class must be implemented.
 
-    Args:
-        fget (Callable): The function to compute the property value. It receives
-            the class as its first argument.
-        doc (str, optional): The docstring for the property. Defaults to
-            `fget.__doc__`.
-        lazy (bool, optional): If True, the value is computed only once per
-            class and cached. Defaults to False.
+    Parameters
+    ----------
+    fget : callable
+        The function that computes the value of this property (in particular,
+        the function when this is used as a decorator) a la `property`.
 
-    Examples:
-        >>> class MyClass:
-        ...     _internal_value = 10
-        ...
+    doc : str, optional
+        The docstring for the property--by default inherited from the getter
+        function.
+
+    lazy : bool, optional
+        If True, caches the value returned by the first call to the getter
+        function, so that it is only called once (used for lazy evaluation
+        of an attribute).  This is analogous to `lazyproperty`.  The ``lazy``
+        argument can also be used when `classproperty` is used as a decorator
+        (see the third example below).  When used in the decorator syntax this
+        *must* be passed in as a keyword argument.
+
+    Examples
+    --------
+
+    ::
+
+        >>> class Foo:
+        ...     _bar_internal = 1
         ...     @classproperty
-        ...     def computed_value(cls):
-        ...         print(f'Computing for {cls.__name__}...')
-        ...         return cls._internal_value * 2
+        ...     def bar(cls):
+        ...         return cls._bar_internal + 1
         ...
-        >>> MyClass.computed_value
-        Computing for MyClass...
-        20
-        >>> MyClass.computed_value # Not computed again
-        20
+        >>> Foo.bar
+        2
+        >>> foo_instance = Foo()
+        >>> foo_instance.bar
+        2
+        >>> foo_instance._bar_internal = 2
+        >>> foo_instance.bar  # Ignores instance attributes
+        2
 
-        >>> instance = MyClass()
-        >>> instance.computed_value # Access via instance
-        20
+    As previously noted, a `classproperty` is limited to implementing
+    read-only attributes::
 
-        Lazy evaluation example:
-        >>> class LazyDemo:
+        >>> class Foo:
+        ...     _bar_internal = 1
+        ...     @classproperty
+        ...     def bar(cls):
+        ...         return cls._bar_internal
+        ...     @bar.setter
+        ...     def bar(cls, value):
+        ...         cls._bar_internal = value
+        ...
+        Traceback (most recent call last):
+        ...
+        NotImplementedError: classproperty can only be read-only; use a
+        metaclass to implement modifiable class-level properties
+
+    When the ``lazy`` option is used, the getter is only called once::
+
+        >>> class Foo:
         ...     @classproperty(lazy=True)
-        ...     def lazy_value(cls):
-        ...         print(f'Calculating lazy value for {cls.__name__}...')
-        ...         return 100
+        ...     def bar(cls):
+        ...         print("Performing complicated calculation")
+        ...         return 1
         ...
-        >>> LazyDemo.lazy_value
-        Calculating lazy value for LazyDemo...
-        100
-        >>> LazyDemo.lazy_value # Cached
-        100
+        >>> Foo.bar
+        Performing complicated calculation
+        1
+        >>> Foo.bar
+        1
 
-        >>> class SubLazyDemo(LazyDemo):
+    If a subclass inherits a lazy `classproperty` the property is still
+    re-evaluated for the subclass::
+
+        >>> class FooSub(Foo):
         ...     pass
         ...
-        >>> SubLazyDemo.lazy_value # Recomputed for subclass
-        Calculating lazy value for SubLazyDemo...
-        100
-        >>> SubLazyDemo.lazy_value # Cached for subclass
-        100
+        >>> FooSub.bar
+        Performing complicated calculation
+        1
+        >>> FooSub.bar
+        1
     """
 
     def __new__(cls: CP, fget=None, doc=None, lazy=False) -> t.Union[t.Callable, CP]:
-        """Handles instantiation and decorator usage.
-
-        Allows `classproperty` to be used as `@classproperty` or
-        `@classproperty(lazy=True)`.
-
-        Args:
-            fget: The getter function (if used directly, not as decorator).
-            doc: The docstring (if used directly).
-            lazy: Whether to enable lazy evaluation (if used as decorator).
-
-        Returns:
-            Union[Callable, CP]: Either a decorator wrapper or a new instance.
-        """
         if fget is None:
             # Being used as a decorator--return a wrapper that implements
             # decorator syntax
@@ -435,18 +325,11 @@ class classproperty(property):
 
         return super().__new__(cls)
 
-    def __init__(self, fget: t.Callable[[t.Type[Any]], CPR], doc: str | None = None, lazy: bool = False) -> None:
-        """Initializes the classproperty descriptor.
-
-        Args:
-            fget: The getter function (receives class as first arg).
-            doc: Optional docstring.
-            lazy: Whether to cache the result (lazy evaluation).
-        """
+    def __init__(self, fget, doc=None, lazy=False) -> None:
         self._lazy = lazy
         if lazy:
             self._lock = threading.RLock()   # Protects _cache
-            self._cache: t.Dict[t.Type[Any], CPR] = {}
+            self._cache = {}
         fget = self._wrap_fget(fget)
 
         super().__init__(fget=fget, doc=doc)
@@ -459,311 +342,173 @@ class classproperty(property):
         if doc is not None:
             self.__doc__ = doc
 
-    def __get__(self, obj: Any, objtype: t.Type[Any]) -> CPR:
-        """Gets the property value, computing/caching as necessary.
-
-        Called when the property is accessed on the class (`obj` is None) or
-        an instance (`obj` is the instance).
-
-        Args:
-            obj: The instance being accessed (or None if accessed on the class).
-            objtype: The class on which the property is accessed.
-
-        Returns:
-            The computed or cached property value.
-        """
+    def __get__(self, obj: Any, objtype: t.Type[CP]) -> CPR:
         if self._lazy:
-            # Lazy evaluation: check cache first
             val = self._cache.get(objtype, _NotFound)
             if val is _NotFound:
-                with self._lock: # Thread-safe check and computation
-                    # Check again inside lock if another thread initialized
+                with self._lock:
+                    # Check if another thread initialised before we locked.
                     val = self._cache.get(objtype, _NotFound)
                     if val is _NotFound:
                         val = self.fget.__wrapped__(objtype)
                         self._cache[objtype] = val
         else:
-            # Non-lazy: compute every time using the class (objtype)
-            # The base property.__get__ would return self if obj is None.
-            # We always call the wrapped getter with the class.
+            # The base property.__get__ will just return self here;
+            # instead we pass objtype through to the original wrapped
+            # function (which takes the class as its sole argument)
             val = self.fget.__wrapped__(objtype)
         return val
 
-    def getter(self, fget: t.Callable[[t.Type[Any]], CPR]) -> CP:
-        """Descriptor to change the getter method.
-
-        Args:
-            fget: The new getter function.
-
-        Returns:
-            classproperty: A new classproperty instance with the updated getter.
-        """
+    def getter(self, fget: t.Callable[[Any], Any]) -> CP:
         return super().getter(self._wrap_fget(fget))
 
 
-    def setter(self, fset: t.Callable) -> None:
-        """Raises NotImplementedError; classproperty is read-only."""
+    def setter(self, fset):
         raise NotImplementedError(
             "classproperty can only be read-only; use a metaclass to "
             "implement modifiable class-level properties")
 
 
-    def deleter(self, fdel: t.Callable) -> None:
-        """Raises NotImplementedError; classproperty is read-only."""
+    def deleter(self, fdel):
         raise NotImplementedError(
             "classproperty can only be read-only; use a metaclass to "
             "implement modifiable class-level properties")
 
 
     @staticmethod
-    def _wrap_fget(orig_fget: t.Callable) -> t.Callable[[Any], CPR]:
-        """Wraps the getter function to handle implicit classmethod behavior.
-
-        Ensures the function receives the class (`objtype`) even when accessed
-        via an instance (`obj`). Also unwraps if `@classmethod` was explicitly used.
-
-        Args:
-            orig_fget: The original getter function provided by the user.
-
-        Returns:
-            Callable: A new getter function compatible with `property.__init__`.
-        """
+    def _wrap_fget(orig_fget) -> t.Callable[[Any], Any]:
         if isinstance(orig_fget, classmethod):
-            # Unwrap the function if @classmethod was used
             orig_fget = orig_fget.__func__
 
         # Using stock functools.wraps instead of the fancier version
         # found later in this module, which is overkill for this purpose
 
         @functools.wraps(orig_fget)
-        def fget(obj_or_type: t.Union[Any, t.Type[Any]]) -> CPR:
-            # When __get__ calls this, it receives the *instance*
-            # if accessed on an instance. We need the *class*.
-            cls = obj_or_type if isinstance(obj_or_type, type) else obj_or_type.__class__
-            return orig_fget(cls)
+        def fget(obj):
+            return orig_fget(obj.__class__)
 
         return fget
 
 
 class lazyclassproperty(classproperty):
-    """A shortcut for creating a lazy-evaluated `classproperty`.
-
-    Equivalent to `@classproperty(lazy=True)`.
-    """
     def __new__(cls, fget=None, doc=None):
-        """Creates a new lazyclassproperty instance.
-
-        Args:
-            fget: The getter function.
-            doc: Optional docstring.
-
-        Returns:
-            classproperty: A new classproperty instance with lazy=True.
-        """
         return super().__new__(cls, fget, doc, lazy=True)
 
-# Note: _CachedClassProperty and cached_classproperty seem like an alternative
-# implementation to classproperty(lazy=True). Consider unifying if appropriate.
 
 class _CachedClassProperty(object):
-    """Cached class property decorator (Alternative Implementation).
-
+    """Cached class property decorator.
     Transforms a class method into a property whose value is computed once
-    per class and then cached. Similar to `functools.cached_property` but
-    for class-level attributes.
-
-    Note:
-        This appears distinct from `classproperty(lazy=True)` and might be
-        redundant or serve a slightly different purpose. It directly manages
-        a `_cache` dict.
-
-    Args:
-        func (Callable): The class method to be turned into a cached property.
-            It receives the class as its argument.
-
-    Examples:
-        >>> class MyClass:
-        ...   @cached_classproperty
-        ...   def value(cls):
-        ...     print("Computing value")
-        ...     return f'<property of {cls.__name__}>'
-        ...
-        >>> class MySubclass(MyClass):
-        ...   pass
-        ...
-        >>> MyClass.value
-        Computing value
-        '<property of MyClass>'
-        >>> MyClass.value  # uses cached value
-        '<property of MyClass>'
-        >>> MySubclass.value
-        Computing value
-        '<property of MySubclass>'
+    and then cached as a normal attribute for the life of the class.  Example
+    usage:
+    >>> class MyClass(object):
+    ...   @cached_classproperty
+    ...   def value(cls):
+    ...     print("Computing value")
+    ...     return '<property of %s>' % cls.__name__
+    >>> class MySubclass(MyClass):
+    ...   pass
+    >>> MyClass.value
+    Computing value
+    '<property of MyClass>'
+    >>> MyClass.value  # uses cached value
+    '<property of MyClass>'
+    >>> MySubclass.value
+    Computing value
+    '<property of MySubclass>'
+    This decorator is similar to `functools.cached_property`, but it adds a
+    property to the class, not to individual instances.
     """
 
-    def __init__(self, func: t.Callable[[t.Type[Any]], CPR]):
-        """Initializes the _CachedClassProperty.
-
-        Args:
-            func: The function to compute the class property value.
-        """
+    def __init__(self, func):
         self._func = func
-        self._cache: t.Dict[t.Type[Any], CPR] = {}
+        self._cache = {}
 
-    def __get__(self, obj: Any, objtype: t.Type[Any]) -> CPR:
-        """Gets the cached or computed class property value.
-
-        Args:
-            obj: The instance (or None if accessed via class).
-            objtype: The class on which the property is accessed.
-
-        Returns:
-            The computed or cached property value for the class.
-        """
-        # Cache is per-class (using objtype as key)
+    def __get__(self, obj, objtype):
         if objtype not in self._cache:
             self._cache[objtype] = self._func(objtype)
         return self._cache[objtype]
 
-    def __set__(self, obj: Any, value: Any) -> None:
-        """Raises AttributeError; property is read-only."""
+    def __set__(self, obj, value):
         raise AttributeError(f'property {self._func.__name__} is read-only')
 
-    def __delete__(self, obj: Any) -> None:
-        """Raises AttributeError; property is read-only."""
+    def __delete__(self, obj):
         raise AttributeError(f'property {self._func.__name__} is read-only')
 
 
-def cached_classproperty(func: t.Callable[[t.Type[Any]], CPR]) -> _CachedClassProperty:
-    """Decorator that creates a cached, read-only class property.
-
-    Args:
-        func: The class method (receiving the class as arg) to decorate.
-
-    Returns:
-        _CachedClassProperty: An instance of the descriptor.
-    """
+def cached_classproperty(func) -> property:
     return _CachedClassProperty(func)
 
 LP = t.TypeVar('LP')
 
 class lazyproperty(property):
-    """Property descriptor that computes the value only once per instance.
+    """
+    Works similarly to property(), but computes the value only once.
 
-    Similar to `@property`, but the result of the first call to the getter
-    is cached in the instance's `__dict__`. Subsequent accesses return the
-    cached value directly.
+    This essentially memorizes the value of the property by storing the result
+    of its computation in the ``__dict__`` of the object instance.  This is
+    useful for computing the value of some property that should otherwise be
+    invariant.  For example::
 
-    Uses a thread-safe lock for computing the value initially.
-    Default setter/deleter operate on the cached value in `__dict__`.
-
-    Example:
-        >>> class DataProcessor:
-        ...     def __init__(self, raw_data):
-        ...         self.raw_data = raw_data
-        ...
+        >>> class LazyTest:
         ...     @lazyproperty
-        ...     def processed_data(self):
-        ...         print(f'Processing data: {self.raw_data}...')
-        ...         # Simulate expensive computation
-        ...         return self.raw_data.upper()
+        ...     def complicated_property(self):
+        ...         print('Computing the value for complicated_property...')
+        ...         return 42
         ...
-        >>> processor = DataProcessor('initial data')
-        >>> processor.processed_data
-        Processing data: initial data...
-        'INITIAL DATA'
-        >>> processor.processed_data # Value is cached
-        'INITIAL DATA'
+        >>> lt = LazyTest()
+        >>> lt.complicated_property
+        Computing the value for complicated_property...
+        42
+        >>> lt.complicated_property
+        42
+
+    As the example shows, the second time ``complicated_property`` is accessed,
+    the ``print`` statement is not executed.  Only the return value from the
+    first access off ``complicated_property`` is returned.
+
+    By default, a setter and deleter are used which simply overwrite and
+    delete, respectively, the value stored in ``__dict__``. Any user-specified
+    setter or deleter is executed before executing these default actions.
+    The one exception is that the default setter is not run if the user setter
+    already sets the new value in ``__dict__`` and returns that value and the
+    returned value is not ``None``.
+
     """
 
-    def __init__(self, fget: t.Callable[..., LP], fset: t.Callable[[Any, LP], None] | None = None, fdel: t.Callable[[Any], None] | None = None, doc: str | None = None):
-        """Initializes the lazyproperty.
-
-        Args:
-            fget: The getter function.
-            fset: The setter function (optional).
-            fdel: The deleter function (optional).
-            doc: The docstring (optional, defaults to fget.__doc__).
-        """
+    def __init__(self, fget: t.Callable[..., LP], fset=None, fdel=None, doc=None):
         super().__init__(fget, fset, fdel, doc)
         self._key = self.fget.__name__
         self._lock = threading.RLock()
 
-    def __get__(self, obj: t.Any, owner=None) -> LP:
-        """Gets the property value, computing and caching it if needed.
-
-        Uses the instance's `__dict__` for caching.
-
-        Args:
-            obj: The instance on which the property is accessed.
-            owner: The owner class (unused).
-
-        Returns:
-            The computed or cached property value.
-
-        Raises:
-            AttributeError: If accessed on the class directly or if `obj` lacks
-                `__dict__`.
-        """
-        if obj is None:
-            return self # Accessed on class
-
+    def __get__(self, obj: t.Any, owner=None):
         try:
             obj_dict = obj.__dict__
-        except AttributeError: # Handle objects without __dict__ (e.g., built-ins with __slots__)
-             raise AttributeError(f"'{type(obj).__name__}' object has no attribute '__dict__', required by lazyproperty") from None
-
-        val = obj_dict.get(self._key, _NotFound)
-        if val is _NotFound:
-            with self._lock: # Thread-safe computation
-                # Check again inside lock if another thread computed it
-                val = obj_dict.get(self._key, _NotFound)
-                if val is _NotFound:
-                    val = self.fget(obj)
-                    obj_dict[self._key] = val
-        return val
-
-    def __set__(self, obj: t.Any, val: LP) -> None:
-        """Sets the property value, updating the cache in `__dict__`.
-
-        Args:
-            obj: The instance on which to set the value.
-            val: The value to set.
-
-        Raises:
-            AttributeError: If `obj` lacks `__dict__`.
-        """
-        try:
-            obj_dict = obj.__dict__
+            val = obj_dict.get(self._key, _NotFound)
+            if val is _NotFound:
+                with self._lock:
+                    # Check if another thread beat us to it.
+                    val = obj_dict.get(self._key, _NotFound)
+                    if val is _NotFound:
+                        val = self.fget(obj)
+                        obj_dict[self._key] = val
+            return val
         except AttributeError:
-            raise AttributeError(f"'{type(obj).__name__}' object has no attribute '__dict__', required by lazyproperty") from None
+            if obj is None:
+                return self
+            raise
 
+    def __set__(self, obj, val):
+        obj_dict = obj.__dict__
         if self.fset:
             ret = self.fset(obj, val)
-            # Allow setter to signal it handled caching
             if ret is not None and obj_dict.get(self._key) is ret:
+                # By returning the value set the setter signals that it
+                # took over setting the value in obj.__dict__; this
+                # mechanism allows it to override the input value
                 return
-            # Allow setter to modify value before caching (if it returns None)
-            # If setter returns a value different from cache check, update val? <= Original logic didn't do this.
-            # Let's keep original logic: setter return value (if not None and not matching cache) is ignored for caching.
-            # If setter returns None, the original `val` is cached.
-
         obj_dict[self._key] = val
 
-    def __delete__(self, obj: t.Any) -> None:
-        """Deletes the cached property value from `__dict__`.
-
-        Args:
-            obj: The instance from which to delete the value.
-
-        Raises:
-            AttributeError: If `obj` lacks `__dict__`.
-        """
-        try:
-            obj_dict = obj.__dict__
-        except AttributeError:
-            raise AttributeError(f"'{type(obj).__name__}' object has no attribute '__dict__', required by lazyproperty") from None
-
+    def __delete__(self, obj):
         if self.fdel:
             self.fdel(obj)
-        obj_dict.pop(self._key, None) # Delete if present
+        obj.__dict__.pop(self._key, None)    # Delete if present

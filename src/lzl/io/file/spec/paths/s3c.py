@@ -18,9 +18,9 @@ from ..path import (
     register_pydantictype,
     CloudPathT,
 )
-from ..cloudfs import BaseFileSystemAccessor
 
 if t.TYPE_CHECKING:
+    from ..providers.main import AWSAccessor
     from ..main import FileLike, PathLike
 
 
@@ -57,35 +57,18 @@ class FileS3CPath(CloudFileSystemPath):
     Our customized class that incorporates both sync and async methods
     """
     _flavour = _pathz_default_flavor
-    _accessor: 'BaseFileSystemAccessor' = BaseFileSystemAccessor()
+    _accessor: 'AWSAccessor' = None
     _pathlike = posixpath
+    _prefix = 's3c'
     _provider = 'S3Compatible'
-    is_fsspec = True
-    scheme: str = None
 
     _win_pathz: t.ModuleType['FileS3CWindowsPath'] = 'FileS3CWindowsPath'
     _posix_pathz: t.ModuleType['FileS3CPosixPath'] = 'FileS3CPosixPath'
 
     def _init(self, template: t.Optional['FileS3CPath'] = None):
-        path_str = self.as_posix()
-        if '://' in path_str:
-            self.scheme = path_str.split('://', 1)[0].lower()
-        else:
-            self.scheme = 's3c' 
-
+        self._accessor = self._get_provider_accessor(self._prefix)
         self._closed = False
         self._fileio = None
-
-    @property
-    def path_as_fsspec(self) -> str:
-        bucket = getattr(self, 'bucket', getattr(self, 'bucket_', None))
-        key = getattr(self, 'key', getattr(self, 'key_', None))
-        
-        if bucket and key:
-            return f"{bucket}/{key}".lstrip('/')
-        elif bucket:
-            return bucket
-        return self.key_ if hasattr(self, 'key_') else str(self)
 
     def __new__(cls, *parts, **kwargs):
         if cls is FileS3CPath or issubclass(cls, FileS3CPath): 

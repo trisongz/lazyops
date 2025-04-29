@@ -1,8 +1,5 @@
 """
-Lzl Types Submodule.
-
-Provides core type definitions, Pydantic compatibility layers, custom properties,
-and common type aliases used throughout the `lzl` and `lzo` packages.
+This submodule only contains a compatiability layer for `pydantic` and `pydantic_settings`
 """
 
 from .base import (

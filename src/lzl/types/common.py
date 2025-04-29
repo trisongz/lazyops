@@ -1,16 +1,12 @@
 """
-Common Type Definitions and Enumerations.
-
-This module provides frequently used type aliases like `Final` and `Literal`,
-base string enumeration classes (`StrEnum`, `UpperStrEnum`), and a specific
-enumeration for application environments (`AppEnv`).
+Common Types
 """
 
 import os
 import sys
 from enum import Enum, EnumMeta
 from functools import singledispatchmethod
-from typing import Any, Union, Dict, Optional, TypeVar, Type, TYPE_CHECKING
+from typing import Any, Union, Dict, Optional, TypeVar, TYPE_CHECKING
 
 if sys.version_info >= (3, 8):
     from typing import Final, Literal
@@ -24,7 +20,6 @@ except ImportError:
     _EXTEND_SUPPORTED = False
 
 class StrEnumMeta(EnumMeta):
-    """Metaclass for StrEnum to allow indexing and reversed members."""
 
     @singledispatchmethod
     def __getitem__(self, key):
@@ -32,94 +27,60 @@ class StrEnumMeta(EnumMeta):
 
     @__getitem__.register
     def _(self, index: int):
-        """Allows accessing enum members by integer index."""
         return list(self)[index]
     
     @property
     def _reversed_members_(cls) -> Dict[str, str]:
-        """Returns a mapping from enum values back to member names."""
+        """
+        Returns the reversed members
+        """
         return {v: k for k, v in cls.__members__.items()}
 
 from .base import PYDANTIC_VERSION
 
 def _get_serialized_value(value: Union[str, 'StrEnum']) -> str:
-    """Returns the serialized value for StrEnum (its name or the string itself).
-
-    Used for Pydantic v2 serialization.
-
-    Args:
-        value: The StrEnum member or a string.
-
-    Returns:
-        str: The name of the enum member or the original string.
+    """
+    Returns the serialized value
     """
     return value.name if hasattr(value, 'name') else value
     
 class StrEnum(str, Enum, metaclass=StrEnumMeta):
-    """String enumeration with case-insensitive comparison and Pydantic v2 support.
-
-    Inherits from `str` and `Enum`. Comparisons with strings ignore case.
-    Includes helper methods for validation and extending the enum dynamically
-    (if `aenum` is installed).
+    """
+    StrEnum is a string enum that allows for case-insensitive comparisons
     """
 
     def __eq__(self, other: Any) -> bool:
-        """Compares with another value, ignoring case if `other` is a string."""
         return self.value.lower() == other.lower() if \
             isinstance(other, str) else \
                 super().__eq__(other)
     
     def __ne__(self, other: Any) -> bool:
-        """Compares with another value for inequality, ignoring case if `other` is a string."""
         return self.value.lower() != other.lower() if \
             isinstance(other, str) else \
                 super().__ne__(other)
 
     def __str__(self) -> str:
-        """Returns the string representation of the enum member's value."""
         return str.__str__(self)
     
     def __hash__(self) -> int:
-        """Returns a unique hash based on the object's identity."""
-        # Use id() for hashing as string value might not be unique if extended
         return id(self)
     
     @classmethod
     def extend(cls, name: str, value: Any):
-        """Dynamically extends the enum with a new member.
-
-        Requires the `aenum` library to be installed.
-
-        Args:
-            name: The name of the new enum member.
-            value: The value of the new enum member.
-
-        Raises:
-            ImportError: If `aenum` is not installed.
+        """
+        Extends the enum with a new value
         """
         if not _EXTEND_SUPPORTED: raise ImportError('aenum is not installed. Please install it to use this feature')
         extend_enum(cls, name, value)
 
     @classmethod
-    def __validate__(cls: Type['StrEnumT'], value: Union[str, 'StrEnumT']) -> 'StrEnumT':
-        """Validates and converts a value to an enum member.
-
-        Used by Pydantic v2. Handles case-insensitive matching against both member
-        names and values.
-
-        Args:
-            value: The input value (string or existing enum member).
-
-        Returns:
-            StrEnumT: The corresponding enum member.
-
-        Raises:
-            ValueError: If the value does not correspond to any enum member.
+    def __validate__(cls, value: Union[str, 'StrEnumT']) -> 'StrEnumT':
         """
-        if isinstance(value, cls): return value # Already the correct type
-        # if hasattr(value, '__members__'): return value
+        Validates the value
+        """
+        if hasattr(value, '__members__'): return value
         # return cls(value.__name__)
-        reversed_members = cls._reversed_members_
+        reversed_members = {v: k for k, v in cls.__members__.items()}
         if value in cls.__members__:
             return cls.__members__[value]
         elif value in reversed_members:
@@ -147,16 +108,8 @@ class StrEnum(str, Enum, metaclass=StrEnumMeta):
             _core_schema: 'core_schema.CoreSchema', 
             _handler: 'GetJsonSchemaHandler'
         ) -> 'JsonSchemaValue':
-            """Generates the Pydantic v2 JSON schema for this enum.
-
-            Returns a schema with an 'enum' list containing member names.
-
-            Args:
-                _core_schema: The Pydantic core schema (unused).
-                _handler: The Pydantic JSON schema handler (unused).
-
-            Returns:
-                JsonSchemaValue: A dictionary representing the JSON schema.
+            """
+            Get the Pydantic JSON Schema for the given source
             """
             return {'enum': [m.name for m in cls], 'type': 'string'}
 
@@ -166,17 +119,8 @@ class StrEnum(str, Enum, metaclass=StrEnumMeta):
             source: type[Any], 
             handler: 'GetCoreSchemaHandler'
         ) -> 'core_schema.CoreSchema':
-            """Generates the Pydantic v2 CoreSchema for validation.
-
-            Uses the `__validate__` method for validation and specifies
-            serialization behavior.
-
-            Args:
-                source: The source type being validated.
-                handler: The Pydantic core schema handler.
-
-            Returns:
-                core_schema.CoreSchema: The Pydantic core schema.
+            """
+            Get the Pydantic CoreSchema for the given source
             """
             from pydantic_core import core_schema, SchemaSerializer
             schema = core_schema.no_info_after_validator_function(
@@ -192,37 +136,30 @@ StrEnumT = TypeVar('StrEnumT', bound = StrEnum)
     
 
 class UpperStrEnum(StrEnum):
-    """String enumeration that performs comparisons in uppercase.
-
-    Inherits from `StrEnum`, but converts both self and the other value
-    to uppercase before comparison if the other value is a string.
+    """
+    UpperStrEnum is a string enum that allows for case-insensitive comparisons
     """
 
     def __eq__(self, other: Any) -> bool:
-        """Compares with another value, converting to uppercase if `other` is a string."""
         return self.value.upper() == other.upper() if \
             isinstance(other, str) else \
                 super().__eq__(other)
     
     def __ne__(self, other: Any) -> bool:
-        """Compares with another value for inequality, converting to uppercase if `other` is a string."""
         return self.value.upper() != other.upper() if \
             isinstance(other, str) else \
                 super().__ne__(other)
     
 
     def __str__(self) -> str:
-        """Returns the string representation of the enum member's value."""
         return str.__str__(self)
     
     def __hash__(self) -> int:
-        """Returns a unique hash based on the object's identity."""
         return id(self)
 
 
 
 class AppEnv(str, Enum):
-    """Enumeration for different application deployment environments."""
     CICD = "cicd"
     DEVELOPMENT = "development"
     STAGING = "staging"
@@ -232,17 +169,8 @@ class AppEnv(str, Enum):
 
     @classmethod
     def from_env(cls, env_value: str) -> "AppEnv":
-        """Determines the AppEnv from a string value (case-insensitive).
-
-        Args:
-            env_value: The string representation of the environment
-                (e.g., "production", "dev", "CICD").
-
-        Returns:
-            AppEnv: The corresponding enum member.
-
-        Raises:
-            ValueError: If the `env_value` does not match any known environment.
+        """
+        Get the app environment from the environment variables
         """
         env_value = env_value.lower()
         if "cicd" in env_value or "ci/cd" in env_value: return cls.CICD
@@ -255,15 +183,8 @@ class AppEnv(str, Enum):
     
     @classmethod
     def from_hostname(cls, hostname: str) -> "AppEnv":
-        """Determines the AppEnv based on keywords in a hostname (case-insensitive).
-
-        Defaults to LOCAL or PRODUCTION if specific keywords aren't found.
-
-        Args:
-            hostname: The hostname string.
-
-        Returns:
-            AppEnv: The inferred enum member.
+        """
+        Get the app environment from the hostname
         """
         hostname = hostname.lower()
         if "dev" in hostname: return cls.DEVELOPMENT
@@ -274,18 +195,8 @@ class AppEnv(str, Enum):
     
     @classmethod
     def from_module_name(cls, module_name: str) -> 'AppEnv':
-        """Determines the AppEnv by checking environment variables or hostname.
-
-        Checks standard environment variables (SERVER_ENV, APP_ENV, etc.) first.
-        If running in Kubernetes, attempts to parse the hostname.
-        Falls back to LOCAL.
-
-        Args:
-            module_name: The name of the calling module, used to construct
-                potential environment variable names (e.g., MYMODULE_ENV).
-
-        Returns:
-            AppEnv: The determined application environment.
+        """
+        Retrieves the app environment
         """
         module_name = module_name.replace(".", "_").upper()
         for key in {
@@ -309,68 +220,60 @@ class AppEnv(str, Enum):
                     ):
                         parts.remove(p)
                 return cls.from_env(parts[0]) if len(parts) > 0 else cls.PRODUCTION
+                # return cls.PRODUCTION
+                # return cls.from_env(parts[2]) if len(parts) > 3 else cls.PRODUCTION
             except Exception as e:
                 return cls.from_hostname(hn)
 
         return cls.LOCAL
     
     def __eq__(self, other: Any) -> bool:
-        """Compares AppEnv with another value (string or AppEnv), ignoring case for strings."""
+        """
+        Equality operator
+        """
         if isinstance(other, str): return self.value == other.lower()
         return self.value == other.value if isinstance(other, AppEnv) else False
 
     @property
     def is_devel(self) -> bool:
-        """Checks if the environment is considered a development/testing environment."""
+        """
+        Returns True if the app environment is development
+        """
         return self in [self.LOCAL, self.CICD, self.DEVELOPMENT, self.STAGING, self.TEST]
 
     @property
     def is_local(self) -> bool:
-        """Checks if the environment is considered local (incl. CI/CD)."""
+        """
+        Returns True if the app environment is local
+        """
         return self in [self.LOCAL, self.CICD]
 
     @property
     def name(self) -> str:
-        """Returns the lowercase string value of the environment name."""
+        """
+        Returns the name in lower
+        """
         return self.value.lower()
 
     @property
     def short_name(self) -> str:
-        """Returns a shortened lowercase name ('dev', 'prod', or the full name)."""
+        """
+        Returns the short name in lower
+        """
         if self == self.DEVELOPMENT: return 'dev'
         return 'prod' if self == self.PRODUCTION else self.name
     
     def select(self, values: Dict[Union[str, 'AppEnv'], Any], default: Optional[Any] = None) -> Any:
-        """Selects a value from a dictionary based on the current AppEnv.
-
-        Allows matching the dictionary keys against the current environment
-        enum member.
-
-        Args:
-            values: A dictionary mapping environment names (str or AppEnv)
-                to corresponding values.
-            default: The default value to return if the current environment
-                is not found in the keys. Defaults to None.
-
-        Returns:
-            The value associated with the current environment, or the default.
         """
-        # Use self (the AppEnv member) directly for comparison thanks to __eq__
+        Returns the value for the app env
+        """
         return next((value for key, value in values.items() if key == self), default)
 
 
     @classmethod
     def extend(cls, name: str, value: Any):
-        """Dynamically extends the AppEnv enum with a new member.
-
-        Requires the `aenum` library to be installed.
-
-        Args:
-            name: The name of the new enum member.
-            value: The value of the new enum member.
-
-        Raises:
-            ImportError: If `aenum` is not installed.
+        """
+        Extends the enum with a new value
         """
         if not _EXTEND_SUPPORTED: raise ImportError('aenum is not installed. Please install it to use this feature')
         extend_enum(cls, name, value)
@@ -381,20 +284,9 @@ class AppEnv(str, Enum):
 def get_app_env(
     module_name: str,
 ) -> AppEnv:
-    """Retrieves the current application environment.
-
-    Alias for `AppEnv.from_module_name`.
-
-    Args:
-        module_name: The name of the calling module, used to construct
-            potential environment variable names.
-
-    Returns:
-        AppEnv: The determined application environment.
     """
-    # This function seems to duplicate the logic of AppEnv.from_module_name,
-    # including the Kubernetes check. Consider calling cls.from_module_name here.
-    # Keeping original logic for now, but flagging for potential refactor.
+    Retrieves the app environment
+    """
     module_name = module_name.replace(".", "_").upper()
     for key in {
         "SERVER_ENV",
@@ -417,5 +309,7 @@ def get_app_env(
             return AppEnv.from_env(parts[1]) if len(parts) > 2 else AppEnv.PRODUCTION
         except Exception as e:
             return AppEnv.from_hostname(hn)
+        # parts = get_host_name().split("-")
+        # return AppEnv.from_env(parts[2]) if len(parts) > 3 else AppEnv.PRODUCTION
     
     return AppEnv.LOCAL

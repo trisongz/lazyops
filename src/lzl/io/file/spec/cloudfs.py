@@ -1,19 +1,22 @@
 from __future__ import annotations
 
 """"
-Cloud Filesystem Abstraction Layer
+Cloud Filesystem
 """
 
-import os
 import atexit
 import functools
 import typing as t
-from urllib.parse import urlparse
 from lzl.require import LazyLib
-from lzl.logging import logger
-from ..path import NormalAccessor # Keep inheriting for local file methods
-# from ..utils.logs import logger # Already imported from lzl.logging
-from .utils import rewrite_async_syntax # Keep this specific utility
+from ..path import NormalAccessor
+from ..utils.logs import logger
+from .utils import (
+    rewrite_async_syntax,
+    create_method_fs,
+    create_async_method_fs,
+    create_staticmethod,
+    create_async_coro,
+)
 
 if t.TYPE_CHECKING:
     from ..configs.main import FileIOConfig, ProviderConfig
@@ -21,439 +24,373 @@ if t.TYPE_CHECKING:
     from fsspec.asyn import AsyncFileSystem
     from s3transfer.manager import TransferManager
     from boto3.session import Session
-    from ..types import FileLikePath
 
     _FST = t.TypeVar('_FST', bound=AbstractFileSystem)
     _ASFST = t.TypeVar('_ASFST', bound=AsyncFileSystem)
 
-# --- Filesystem Instance Management ---
+_MappedProviderAliases: t.Dict[str, str] = {
+    's3fs': 'aws',
+    'mc': 'minio',
+}
 
-class FilesystemBundle(t.NamedTuple):
-    """Holds related filesystem objects for a specific scheme."""
-    scheme: str
-    fs: t.Optional[_FST] = None
-    fsa: t.Optional[_ASFST] = None
-    boto: t.Optional[Session] = None
-    s3t_creator: t.Optional[t.Callable[..., TransferManager]] = None
-    s3t: t.Optional[TransferManager] = None
-    config: t.Optional[ProviderConfig] = None
+_SupportedProviders: t.List[str] = [
+    'aws',
+    'gcp',
+    'minio',
+    's3c',
+    'r2',
+]
 
+class CloudFileSystemMeta(type):
+    """
+    The Cloud File System
+    """
 
-class CloudFileManager:
-    """Manages cloud filesystem instances keyed by URI scheme."""
-    _instances: t.Dict[str, FilesystemBundle] = {}
+    fs: t.Optional['_FST'] = None
+    fsa: t.Optional['_ASFST'] = None
+    fs_name: t.Optional[str] = None
+    fsconfig: t.Optional['ProviderConfig'] = None
+
+    boto: t.Optional['Session'] = None
+
+    _s3t: t.Optional[t.Callable[..., 'TransferManager']] = None
+    s3t: t.Optional['TransferManager'] = None
+    # s3t: t.Optional[t.Union['TransferManager', t.Callable[..., 'TransferManager']]] = None
+    
     _settings: t.Optional['FileIOConfig'] = None
-    _creating: t.Set[str] = set() # To prevent recursive creation loops
+    
 
     @property
-    def settings(self) -> 'FileIOConfig':
-        """Lazily retrieves the global FileIOConfig."""
-        if self._settings is None:
-            from ..utils import get_settings # Use the central settings getter
-            self._settings = get_settings()
-        return self._settings
+    def settings(cls) -> 'FileIOConfig':
+        """
+        Returns the settings of the Cloud File System
+        """
+        if cls._settings is None:
+            from lzl.io.file.utils import get_settings
+            cls._settings = get_settings()
+        return cls._settings
+    
+    def is_ready(cls) -> bool:
+        """
+        Returns whether the Cloud File System is ready
+        """
+        return bool(cls.fsa and cls.fs)
+    
 
-    def get_bundle(self, scheme: str, create: bool = True) -> t.Optional[FilesystemBundle]:
-        """Gets the FilesystemBundle for a scheme, optionally creating it."""
-        if scheme not in self._instances and create:
-            if scheme in self._creating:
-                logger.warning(f"Recursive creation detected for scheme: {scheme}")
-                return None
-            self._creating.add(scheme)
-            try:
-                self._create_bundle(scheme)
-            finally:
-                 self._creating.remove(scheme)
+    def build_s3c(
+        cls,
+        provider: t.Optional[str] = 'aws',
+        **auth_config: t.Any,
+    ):
+        """
+        Builds the S3 Client
+        """
+        LazyLib.import_lib('s3fs')
+        LazyLib.import_lib('boto3')
 
-        bundle = self._instances.get(scheme)
-        # Lazy S3T creation logic added back
-        if bundle and bundle.s3t_creator and not bundle.s3t:
-            # Lazily create S3 Transfer Manager
-            try:
-                logger.debug(f"Lazily creating S3 Transfer Manager for scheme: {scheme}")
-                s3t = bundle.s3t_creator()
-                # Update the bundle in the dictionary
-                self._instances[scheme] = bundle._replace(s3t=s3t, s3t_creator=None) # Clear creator after creation
-                atexit.register(self._atexit_s3t, scheme) # Register specific shutdown
-                logger.debug(f"Registered S3 Transfer Manager shutdown for scheme: {scheme}")
-                return self._instances[scheme] # Return updated bundle
-            except Exception as e:
-                 logger.error(f"Failed to create S3 Transfer Manager for scheme {scheme}: {e}", exc_info=True)
-                 # Return bundle without s3t if creation fails
-                 return bundle
-        return bundle
+        import s3fs
+        import boto3
+        import boto3.s3.transfer as s3transfer
+        from botocore.config import Config as BotoConfig
 
-    def _create_bundle(self, scheme: str):
-        """Creates and stores the filesystem instances for a given scheme."""
-        logger.info(f"Attempting to create filesystem bundle for scheme: {scheme}")
-        config_tuple = self.settings.get_fsspec_config_by_scheme(scheme)
-        if not config_tuple:
-            # Don't raise error, just log and return, get_bundle handles None
-            logger.warning(f"Configuration for scheme '{scheme}' not found. Cannot create bundle.")
-            self._instances[scheme] = None # Mark as checked but not found
+        fsspec_fs = s3fs.S3FileSystem
+        if provider == 'r2':
+            from .compat.r2 import R2FileSystem
+            fsspec_fs = R2FileSystem
+
+        config, pconfig = cls.settings.get_provider_config(provider, **auth_config)
+        cls.fs = fsspec_fs(asynchronous = False, **config)
+        cls.fsa = rewrite_async_syntax(fsspec_fs(asynchronous=True, **config))
+
+        boto_config = BotoConfig(**pconfig.get_boto_config())
+        cls.boto = boto3.client(
+            's3',
+            config = boto_config,
+            **pconfig.get_boto_client_config()
+        )
+        transfer_config = s3transfer.TransferConfig(
+            use_threads = True,
+            max_concurrency = cls.settings.max_pool_connections
+        )
+        create_s3t = functools.partial(
+            s3transfer.create_transfer_manager,
+            cls.boto, 
+            transfer_config
+        )
+        cls._s3t = create_s3t
+        # cls.s3t = create_s3t()
+        # if provider == 'r2':
+        #     s3tm = create_s3t()
+        #     cls.s3t = s3tm
+        #     cls.fs.s3tm = s3tm
+        #     cls.fsa.s3tm = s3tm
+        # else:
+        #     cls.s3t = property(create_s3t)
+        cls.fsconfig = pconfig.model_copy()
+
+
+    def build_filesystems(self, force: bool = False, **auth_config):
+        """
+        Lazily inits the filesystems
+        """
+        if self.fs is not None and self.fsa is not None and not force: 
             return
-
-        fsspec_config, provider_config = config_tuple
-        provider_name = provider_config.__class__.__name__.lower().replace('config', '') # e.g., 'aws'
-
-        fs = None
-        fsa = None
-        boto_client = None
-        s3t_creator = None
-
-        try:
-            # --- Filesystem Creation Logic ---
-            if provider_name in ['aws', 'minio', 's3c', 'r2']:
-                LazyLib.import_lib('s3fs', require_missing=True)
-                import s3fs
-                fs_cls = s3fs.S3FileSystem
-                if provider_name == 'r2':
-                    # Attempt to import R2 compatibility layer if needed
-                    try:
-                        from .compat.r2 import R2FileSystem
-                        fs_cls = R2FileSystem
-                        logger.debug(f"Using R2FileSystem for scheme: {scheme}")
-                    except ImportError:
-                         logger.warning("R2FileSystem not found in .compat.r2, falling back to s3fs.S3FileSystem for R2.")
-                
-                fs = fs_cls(asynchronous=False, **fsspec_config)
-                fsa = rewrite_async_syntax(fs_cls(asynchronous=True, **fsspec_config))
-                logger.debug(f"Created s3fs instances for scheme: {scheme}")
-
-                # --- Boto3 Client and S3 Transfer Manager ---
-                if hasattr(provider_config, 'get_boto_config') and hasattr(provider_config, 'get_boto_client_config'):
-                    LazyLib.import_lib('boto3', require_missing=True)
-                    LazyLib.import_lib('botocore.config', require_missing=True)
-                    import boto3
-                    import boto3.s3.transfer as s3transfer
-                    from botocore.config import Config as BotoConfig
-
-                    try:
-                        boto_conf = BotoConfig(**provider_config.get_boto_config())
-                        boto_client = boto3.client(
-                            's3', config=boto_conf, **provider_config.get_boto_client_config()
-                        )
-                        logger.debug(f"Created boto3 client for scheme: {scheme}")
-                        transfer_conf = s3transfer.TransferConfig(
-                             use_threads = True, # Make this configurable?
-                             max_concurrency = self.settings.max_pool_connections # Use global setting
-                        )
-                        # Store the creator function for lazy instantiation
-                        s3t_creator = functools.partial(
-                            s3transfer.create_transfer_manager, boto_client, transfer_conf
-                        )
-                        logger.debug(f"Prepared S3 Transfer Manager creator for scheme: {scheme}")
-                    except Exception as e:
-                         logger.error(f"Failed during boto3/s3t setup for scheme {scheme}: {e}", exc_info=True)
-                         boto_client = None # Ensure partial setup doesn't persist
-                         s3t_creator = None
-
-            elif provider_name == 'gcp':
-                LazyLib.import_lib('gcsfs', require_missing=True)
-                import gcsfs
-                fs = gcsfs.GCSFileSystem(asynchronous=False, **fsspec_config)
-                fsa = rewrite_async_syntax(gcsfs.GCSFileSystem(asynchronous=True, **fsspec_config))
-                logger.debug(f"Created gcsfs instances for scheme: {scheme}")
-            
-            # Add other providers (Azure, etc.) here if needed
-
-            else:
-                logger.error(f"Unsupported provider type '{provider_name}' for scheme '{scheme}'.")
-                self._instances[scheme] = None # Mark as checked but not supported
-                return
-
-            # Store the created bundle
-            self._instances[scheme] = FilesystemBundle(
-                scheme=scheme, fs=fs, fsa=fsa, boto=boto_client, s3t_creator=s3t_creator, config=provider_config
-            )
-            logger.info(f"Successfully created filesystem bundle for scheme: {scheme}")
-
-        except Exception as e:
-             logger.error(f"Failed to create filesystem bundle for scheme '{scheme}': {e}", exc_info=True)
-             self._instances[scheme] = None # Mark as failed
-
-    def get_fs(self, scheme: str) -> t.Optional[_FST]:
-        """Gets the synchronous filesystem instance for the scheme."""
-        bundle = self.get_bundle(scheme)
-        return bundle.fs if bundle else None
-
-    def get_fsa(self, scheme: str) -> t.Optional[_ASFST]:
-        """Gets the asynchronous filesystem instance for the scheme."""
-        bundle = self.get_bundle(scheme)
-        return bundle.fsa if bundle else None
-
-    def get_s3t(self, scheme: str) -> t.Optional[TransferManager]:
-        """Gets the S3 Transfer Manager for the scheme (if applicable and created)."""
-        bundle = self.get_bundle(scheme) # Ensures lazy creation if needed
-        return bundle.s3t if bundle else None
-    
-    def get_config(self, scheme: str) -> t.Optional[ProviderConfig]:
-        """Gets the ProviderConfig for the scheme."""
-        bundle = self.get_bundle(scheme)
-        return bundle.config if bundle else None
-
-    def _atexit_s3t(self, scheme: str):
-        """Shutdown hook for a specific S3 Transfer Manager."""
-        bundle = self._instances.get(scheme)
-        if bundle and bundle.s3t:
-            logger.info(f"Shutting down S3 Transfer Manager for scheme: {scheme}")
-            try:
-                 bundle.s3t.shutdown()
-                 # Avoid modifying bundle in place during shutdown?
-                 # self._instances[scheme] = bundle._replace(s3t=None) # Mark as shut down
-            except Exception as e:
-                 logger.error(f"Error shutting down S3 Transfer Manager for {scheme}: {e}", exc_info=True)
-
-# Instantiate the manager (singleton pattern)
-cloud_file_manager = CloudFileManager()
-
-# --- Helper Functions for Dynamic Accessor Methods ---
-
-def _extract_scheme_and_path(path_obj_or_str: t.Union[str, 'FileLikePath']) -> t.Tuple[str, str, t.Any]:
-    """
-    Extracts scheme, adjusted path for fsspec, and original path object.
-    Returns: (scheme, adjusted_path, original_path)
-    """
-    original_path = path_obj_or_str
-    if hasattr(path_obj_or_str, 'scheme') and hasattr(path_obj_or_str, 'path_as_fsspec'):
-        # Assumes FileLikePath object duck typing
-        scheme = path_obj_or_str.scheme
-        adjusted_path = path_obj_or_str.path_as_fsspec
-        return scheme, adjusted_path, original_path
-    elif isinstance(path_obj_or_str, str):
-        if '://' in path_obj_or_str:
-            parts = path_obj_or_str.split('://', 1)
-            scheme = parts[0]
-            # Basic adjustment: remove scheme. fsspec usually handles bucket/key from path string.
-            # For s3, s3://bucket/key -> bucket/key
-            # For gs, gs://bucket/key -> bucket/key
-            # For file, file:///path -> /path
-            # urlparse can help handle file:// paths better
-            parsed = urlparse(path_obj_or_str)
-            adjusted_path = f"{parsed.netloc}{parsed.path}".lstrip('/') if parsed.netloc else parsed.path.lstrip('/')
-            # Handle edge case for file scheme where path might be relative or absolute
-            if scheme == 'file': 
-                # If original path was file:///abs/path, netloc is empty, path is /abs/path
-                # If original path was file://rel/path, netloc is rel, path is /path (urlparse quirk)
-                # If original path was file:/abs/path, netloc empty, path /abs/path
-                # If original path was /abs/path (no scheme), scheme is 'file', adjusted_path is /abs/path
-                # We want absolute paths to start with /, relative paths not to.
-                # The most reliable way is to use the original path for 'file'
-                adjusted_path = original_path # Use original path for NormalAccessor
-            
-            return scheme, adjusted_path, original_path
-        else:
-            # Assume local file path if no scheme provided
-            # Pass original path, NormalAccessor handles it
-            return 'file', path_obj_or_str, original_path
-    else:
-        raise TypeError(f"Unsupported path type for scheme extraction: {type(path_obj_or_str)}")
-
-
-def create_dynamic_sync_method(manager: CloudFileManager, method_name: str):
-    """Creates a wrapper for synchronous fsspec methods."""
-    def sync_wrapper(path_obj_or_str, *args, **kwargs):
-        scheme, adjusted_path, original_path = _extract_scheme_and_path(path_obj_or_str)
-
-        if scheme == 'file':
-            # Delegate to NormalAccessor for local files using the original path
-            if hasattr(NormalAccessor, method_name):
-                 actual_method = getattr(NormalAccessor, method_name)
-                 # NormalAccessor methods expect the standard path, not adjusted
-                 return actual_method(original_path, *args, **kwargs)
-            else:
-                 # NormalAccessor might not have all fsspec methods (e.g., checksum)
-                 # Should we attempt to use fsspec 'file' backend here? 
-                 # For now, raise error for missing methods on NormalAccessor.
-                 raise NotImplementedError(f"Sync method '{method_name}' not available for local 'file' scheme via NormalAccessor.")
-
-        fs = manager.get_fs(scheme)
-        if not fs:
-            raise ValueError(f"Synchronous filesystem for scheme '{scheme}' not available or failed to initialize.")
         
-        try:
-            actual_method = getattr(fs, method_name)
-        except AttributeError:
-             raise NotImplementedError(f"Sync method '{method_name}' not found on filesystem for scheme '{scheme}'.")
-        
-        # Pass the fsspec-adjusted path to the filesystem method
-        return actual_method(adjusted_path, *args, **kwargs)
-    
-    # Try to preserve docstrings if possible
-    sync_wrapper.__doc__ = f"Dynamically calls '{method_name}' on the appropriate sync filesystem based on path scheme."
-    sync_wrapper.__name__ = method_name
-    return sync_wrapper
+        if self.fs_name in _SupportedProviders:
+            provider = _MappedProviderAliases.get(self.fs_name, self.fs_name)
+            return self.build_s3c(provider = provider, **auth_config)
+        raise NotImplementedError(f'Cloud File System `{self.fs_name}` is not supported')
 
 
-def create_dynamic_async_method(manager: CloudFileManager, fsspec_method_names: t.List[str]):
-    """Creates a wrapper for asynchronous fsspec methods."""
-    requested_name = fsspec_method_names[0] # Name used for docstring/error reporting
-
-    async def async_wrapper(path_obj_or_str, *args, **kwargs):
-        scheme, adjusted_path, original_path = _extract_scheme_and_path(path_obj_or_str)
-
-        if scheme == 'file':
-             # Async local file operations are complex, delegate or raise
-             # Consider using aiofiles if needed, but fsspec doesn't guarantee async file ops
-             raise NotImplementedError(f"Async method '{requested_name}' not currently supported for local 'file' scheme.")
-
-        fsa = manager.get_fsa(scheme)
-        if not fsa:
-            raise ValueError(f"Asynchronous filesystem for scheme '{scheme}' not available or failed to initialize.")
-
-        actual_method = None
-        tried_names = []
-        for name in fsspec_method_names:
-            tried_names.append(name)
-            if hasattr(fsa, name):
-                actual_method = getattr(fsa, name)
-                break
-        
-        if not actual_method:
-            raise NotImplementedError(f"Async method '{requested_name}' (tried: {tried_names}) not found on filesystem for scheme '{scheme}'.")
-
-        # Pass the fsspec-adjusted path
-        return await actual_method(adjusted_path, *args, **kwargs)
-
-    async_wrapper.__doc__ = f"Dynamically calls async method '{requested_name}' (e.g., {fsspec_method_names}) on the appropriate async filesystem."
-    async_wrapper.__name__ = requested_name # Keep original name for identification
-    return async_wrapper
+    def reload_filesystem(cls):
+        """ 
+        Reinitializes the Filesystem
+        """
+        raise NotImplementedError
 
 
-# --- Base Accessor using Dynamic Methods ---
 
 class BaseFileSystemAccessor(NormalAccessor):
     """
-    Provides a unified accessor interface for file operations, dynamically
-    routing calls to the appropriate filesystem (local or cloud) based on
-    the path's URI scheme. Inherits local file methods from NormalAccessor.
+    Base File System Accessor
     """
+
+    class CloudFileSystem(metaclass = CloudFileSystemMeta):
+        pass
+
+
+    info: t.Callable = create_staticmethod(CloudFileSystem, 'info')
+    metadata: t.Callable = create_staticmethod(CloudFileSystem, 'metadata')
+    stat: t.Callable = create_staticmethod(CloudFileSystem, 'stat')
+    size: t.Callable = create_staticmethod(CloudFileSystem, 'size')
+    exists: t.Callable = create_staticmethod(CloudFileSystem, 'exists')
+    is_dir: t.Callable = create_staticmethod(CloudFileSystem, 'isdir')
+    is_file: t.Callable = create_staticmethod(CloudFileSystem, 'isfile')
+    copy: t.Callable = create_staticmethod(CloudFileSystem, 'copy')
+    copy_file: t.Callable = create_staticmethod(CloudFileSystem, 'cp_file')
+    get_file: t.Callable = create_staticmethod(CloudFileSystem, 'get_file')
+    put_file: t.Callable = create_staticmethod(CloudFileSystem, 'put_file')
+    metadata: t.Callable = create_staticmethod(CloudFileSystem, ['metadata', 'info'])
+    checksum: t.Callable = create_staticmethod(CloudFileSystem, 'checksum')
+
+    get: t.Callable = create_staticmethod(CloudFileSystem, 'get')
+    put: t.Callable = create_staticmethod(CloudFileSystem, 'put')
+
+    open: t.Callable = create_method_fs(CloudFileSystem, 'open')
+    listdir: t.Callable = create_staticmethod(CloudFileSystem, 'ls')    
+    walk: t.Callable = create_staticmethod(CloudFileSystem, 'walk')
+
+    glob: t.Callable = create_method_fs(CloudFileSystem, 'glob')
+    find: t.Callable = create_method_fs(CloudFileSystem, 'find')
+    touch: t.Callable = create_method_fs(CloudFileSystem, 'touch')
+    cat: t.Callable = create_method_fs(CloudFileSystem, 'cat')
+    cat_file: t.Callable = create_method_fs(CloudFileSystem, 'cat_file')
     
-    # Use the dynamic creators for cloud methods
-    # Pass the target fsspec method name(s)
-
-    # Sync Methods (delegated to cloud_file_manager or NormalAccessor)
-    info = create_dynamic_sync_method(cloud_file_manager, 'info')
-    metadata = create_dynamic_sync_method(cloud_file_manager, 'metadata') # Often alias for info
-    stat = create_dynamic_sync_method(cloud_file_manager, 'stat')
-    size = create_dynamic_sync_method(cloud_file_manager, 'size')
-    exists = create_dynamic_sync_method(cloud_file_manager, 'exists')
-    isdir = create_dynamic_sync_method(cloud_file_manager, 'isdir') # Map accessor name to fsspec name
-    is_dir = isdir # Alias
-    isfile = create_dynamic_sync_method(cloud_file_manager, 'isfile') # Map accessor name to fsspec name
-    is_file = isfile # Alias
-    copy = create_dynamic_sync_method(cloud_file_manager, 'copy')
-    cp = copy # Alias
-    copy_file = create_dynamic_sync_method(cloud_file_manager, 'cp_file') # Map accessor name to fsspec name
-    cp_file = copy_file # Alias
-    get = create_dynamic_sync_method(cloud_file_manager, 'get')
-    get_file = create_dynamic_sync_method(cloud_file_manager, 'get_file')
-    put = create_dynamic_sync_method(cloud_file_manager, 'put')
-    put_file = create_dynamic_sync_method(cloud_file_manager, 'put_file')
-    checksum = create_dynamic_sync_method(cloud_file_manager, 'checksum')
-    open = create_dynamic_sync_method(cloud_file_manager, 'open')
-    ls = create_dynamic_sync_method(cloud_file_manager, 'ls') # Map accessor name to fsspec name
-    listdir = ls # Alias
-    walk = create_dynamic_sync_method(cloud_file_manager, 'walk')
-    glob = create_dynamic_sync_method(cloud_file_manager, 'glob')
-    find = create_dynamic_sync_method(cloud_file_manager, 'find')
-    touch = create_dynamic_sync_method(cloud_file_manager, 'touch')
-    cat = create_dynamic_sync_method(cloud_file_manager, 'cat')
-    cat_file = create_dynamic_sync_method(cloud_file_manager, 'cat_file')
-    pipe = create_dynamic_sync_method(cloud_file_manager, 'pipe')
-    pipe_file = create_dynamic_sync_method(cloud_file_manager, 'pipe_file')
-    mkdir = create_dynamic_sync_method(cloud_file_manager, 'mkdir')
-    mkdirs = create_dynamic_sync_method(cloud_file_manager, 'mkdirs') # fsspec uses mkdirs or makedirs
-    makedirs = mkdirs # Alias
-    # Map rm/unlink/rmdir to appropriate fsspec methods (rm, rm_file, rmdir)
-    rm = create_dynamic_sync_method(cloud_file_manager, 'rm') 
-    remove = rm # Alias
-    rm_file = create_dynamic_sync_method(cloud_file_manager, 'rm_file')
-    unlink = rm_file # Alias for consistency with os module
-    rmdir = create_dynamic_sync_method(cloud_file_manager, 'rmdir')
-    rename = create_dynamic_sync_method(cloud_file_manager, 'rename') # fsspec often uses mv or rename
-    replace = rename # Alias for consistency with os module
-    modified = create_dynamic_sync_method(cloud_file_manager, 'modified')
-    url = create_dynamic_sync_method(cloud_file_manager, 'url')
-    ukey = create_dynamic_sync_method(cloud_file_manager, 'ukey')
-    setxattr = create_dynamic_sync_method(cloud_file_manager, 'setxattr')
-    invalidate_cache = create_dynamic_sync_method(cloud_file_manager, 'invalidate_cache')
-
-    # Async Methods (delegated to cloud_file_manager)
-    # Provide list of potential fsspec async method names
-    ainfo = create_dynamic_async_method(cloud_file_manager, ['info', 'stat']) # Async info might be just stat
-    astat = ainfo # Alias
-    ametadata = ainfo # Alias
-    asize = create_dynamic_async_method(cloud_file_manager, ['size'])
-    aexists = create_dynamic_async_method(cloud_file_manager, ['exists'])
-    aisdir = create_dynamic_async_method(cloud_file_manager, ['isdir'])
-    ais_dir = aisdir
-    aisfile = create_dynamic_async_method(cloud_file_manager, ['isfile'])
-    ais_file = aisfile
-    acopy = create_dynamic_async_method(cloud_file_manager, ['copy', 'cp'])
-    acp = acopy
-    acopy_file = create_dynamic_async_method(cloud_file_manager, ['cp_file'])
-    acp_file = acopy_file
-    aget = create_dynamic_async_method(cloud_file_manager, ['get'])
-    aget_file = create_dynamic_async_method(cloud_file_manager, ['get_file'])
-    aput = create_dynamic_async_method(cloud_file_manager, ['put'])
-    aput_file = create_dynamic_async_method(cloud_file_manager, ['put_file'])
-    achecksum = create_dynamic_async_method(cloud_file_manager, ['checksum'])
-    # Note: fsspec async open is often _open
-    aopen = create_dynamic_async_method(cloud_file_manager, ['_open']) 
-    als = create_dynamic_async_method(cloud_file_manager, ['ls', 'listdir']) # s3fs uses ls, gcsfs uses listdir?
-    alistdir = als
-    awalk = create_dynamic_async_method(cloud_file_manager, ['walk'])
-    aglob = create_dynamic_async_method(cloud_file_manager, ['glob'])
-    afind = create_dynamic_async_method(cloud_file_manager, ['find'])
-    atouch = create_dynamic_async_method(cloud_file_manager, ['touch'])
-    acat = create_dynamic_async_method(cloud_file_manager, ['cat'])
-    acat_file = create_dynamic_async_method(cloud_file_manager, ['cat_file'])
-    apipe = create_dynamic_async_method(cloud_file_manager, ['pipe'])
-    apipe_file = create_dynamic_async_method(cloud_file_manager, ['pipe_file'])
-    amkdir = create_dynamic_async_method(cloud_file_manager, ['mkdir'])
-    amakedirs = create_dynamic_async_method(cloud_file_manager, ['mkdirs', 'makedirs']) # fsspec uses mkdirs or makedirs
-    amkdirs = amakedirs
-    arm = create_dynamic_async_method(cloud_file_manager, ['rm'])
-    aremove = arm
-    arm_file = create_dynamic_async_method(cloud_file_manager, ['rm_file'])
-    aunlink = arm_file
-    armdir = create_dynamic_async_method(cloud_file_manager, ['rmdir'])
-    arename = create_dynamic_async_method(cloud_file_manager, ['rename', 'mv']) # fsspec often uses mv or rename
-    areplace = arename
-    amodified = create_dynamic_async_method(cloud_file_manager, ['modified'])
-    aurl = create_dynamic_async_method(cloud_file_manager, ['url'])
-    aukey = create_dynamic_async_method(cloud_file_manager, ['ukey'])
-    asetxattr = create_dynamic_async_method(cloud_file_manager, ['setxattr'])
-    ainvalidate_cache = create_dynamic_async_method(cloud_file_manager, ['invalidate_cache'])
-
-
-    is_fsspec: bool = True # Indicates this accessor potentially uses fsspec
-
-    # Method to get underlying filesystem - useful for advanced usage
-    @classmethod
-    def get_filesystem(cls, scheme: str) -> t.Optional[AbstractFileSystem]:
-         """Gets the underlying sync fsspec filesystem instance for a scheme."""
-         return cloud_file_manager.get_fs(scheme)
-
-    @classmethod
-    def get_async_filesystem(cls, scheme: str) -> t.Optional[AsyncFileSystem]:
-         """Gets the underlying async fsspec filesystem instance for a scheme."""
-         return cloud_file_manager.get_fsa(scheme)
     
-    @classmethod
-    def get_s3_transfer_manager(cls, scheme: str) -> t.Optional[TransferManager]:
-         """Gets the S3 Transfer Manager instance for an S3-like scheme."""
-         return cloud_file_manager.get_s3t(scheme)
+    pipe: t.Callable = create_method_fs(CloudFileSystem, 'pipe')
+    pipe_file: t.Callable = create_method_fs(CloudFileSystem, 'pipe_file')
+    
+    mkdir: t.Callable = create_method_fs(CloudFileSystem, 'mkdir')
+    makedirs: t.Callable = create_method_fs(CloudFileSystem, ['makedirs', 'mkdirs'])
+    unlink: t.Callable = create_method_fs(CloudFileSystem, 'rm_file')
+    rmdir: t.Callable = create_method_fs(CloudFileSystem, 'rmdir')
+    rename: t.Callable = create_method_fs(CloudFileSystem, 'rename')
+    replace: t.Callable = create_method_fs(CloudFileSystem, 'rename')
+    remove: t.Callable = create_method_fs(CloudFileSystem, 'rm')
+    rm: t.Callable = create_staticmethod(CloudFileSystem, 'rm')
+    rm_file: t.Callable = create_staticmethod(CloudFileSystem, 'rm_file')
+    
+    modified: t.Callable = create_method_fs(CloudFileSystem, 'modified')
+    url: t.Callable = create_method_fs(CloudFileSystem, 'url')
+    ukey: t.Callable = create_method_fs(CloudFileSystem, 'ukey')
+    setxattr: t.Callable = create_method_fs(CloudFileSystem, 'setxattr')
+    invalidate_cache: t.Callable = create_method_fs(CloudFileSystem, 'invalidate_cache')
+    
+    filesys: '_FST' = CloudFileSystem.fs
+    afilesys: '_ASFST' = CloudFileSystem.fsa
+    fsconfig: t.Optional['ProviderConfig'] = CloudFileSystem.fsconfig
+
+    boto: t.Optional['Session'] = CloudFileSystem.boto
+    _s3t: t.Optional[t.Callable[..., 'TransferManager']] = CloudFileSystem._s3t
+    s3t: t.Optional['TransferManager'] = None 
+    # CloudFileSystem.s3t
+    # s3t: t.Optional[t.Union['TransferManager', t.Callable[..., 'TransferManager']]] = CloudFileSystem.s3t
+    
+    
+    # Async Methods
+    astat: t.Callable = create_async_coro(CloudFileSystem, 'stat')
+    atouch: t.Callable = create_async_coro(CloudFileSystem, 'touch')
+    aukey: t.Callable = create_async_coro(CloudFileSystem, 'ukey')
+    asize: t.Callable = create_async_coro(CloudFileSystem, 'size')
+    # aurl: t.Callable = create_async_coro(CloudFileSystem, 'url')
+    # asetxattr: t.Callable = create_async_coro(CloudFileSystem, 'setxattr')
+    aurl: t.Callable = create_async_method_fs(CloudFileSystem, 'url')
+    asetxattr: t.Callable = create_async_method_fs(CloudFileSystem, 'setxattr')
+
+    amodified: t.Callable = create_async_coro(CloudFileSystem, 'modified')
+    ainvalidate_cache: t.Callable = create_async_coro(CloudFileSystem, 'invalidate_cache')
+    arename: t.Callable = create_async_coro(CloudFileSystem, 'rename')
+    areplace: t.Callable = create_async_coro(CloudFileSystem, 'rename')
+
+    ainfo: t.Callable = create_async_method_fs(CloudFileSystem, 'ainfo')
+    ametadata: t.Callable = create_async_method_fs(CloudFileSystem, 'ametadata')
+    aexists: t.Callable = create_async_method_fs(CloudFileSystem, 'aexists')
+    aglob: t.Callable = create_async_method_fs(CloudFileSystem, 'aglob')
+    afind: t.Callable = create_async_method_fs(CloudFileSystem, 'afind')
+    ais_dir: t.Callable = create_async_method_fs(CloudFileSystem, 'aisdir')
+    ais_file: t.Callable = create_async_method_fs(CloudFileSystem, 'ais_file')
+    acopy: t.Callable = create_async_method_fs(CloudFileSystem, 'acopy')
+    acopy_file: t.Callable = create_async_method_fs(CloudFileSystem, 'acp_file')
+
+    apipe: t.Callable = create_async_method_fs(CloudFileSystem, 'apipe')
+    apipe_file: t.Callable = create_async_method_fs(CloudFileSystem, 'apipe_file')
+
+    aget: t.Callable = create_async_coro(CloudFileSystem, 'aget')
+    aget_file: t.Callable = create_async_coro(CloudFileSystem, 'aget_file')
+    
+    aput: t.Callable = create_async_method_fs(CloudFileSystem, 'aput')
+    aput_file: t.Callable = create_async_method_fs(CloudFileSystem, 'aput_file')
+    # ametadata: t.Callable = create_async_method_fs(CloudFileSystem, 'ametadata')
+    aopen: t.Callable = create_async_method_fs(CloudFileSystem, '_open')
+    amkdir: t.Callable = create_async_method_fs(CloudFileSystem, 'amkdir')
+    amakedirs: t.Callable = create_async_method_fs(CloudFileSystem, 'amakedirs')
+    aunlink: t.Callable = create_async_method_fs(CloudFileSystem, 'arm_file')
+    armdir: t.Callable = create_async_method_fs(CloudFileSystem, 'armdir')
+    aremove: t.Callable = create_async_method_fs(CloudFileSystem, 'arm')
+    arm: t.Callable = create_async_method_fs(CloudFileSystem, 'arm')
+    arm_file: t.Callable = create_async_coro(CloudFileSystem, 'arm_file')
+    alistdir: t.Callable = create_async_method_fs(CloudFileSystem, ['alistdir', 'alist_objects'])
+    awalk: t.Callable = create_async_method_fs(CloudFileSystem, 'awalk')
+
+    is_fsspec: bool = True
+
 
     @classmethod
-    def get_provider_config(cls, scheme: str) -> t.Optional[ProviderConfig]:
-         """Gets the ProviderConfig instance for a scheme."""
-         return cloud_file_manager.get_config(scheme)
+    def reload_cfs(cls, **kwargs):
+        """
+        Reloads the Cloud File System
+        """
+        cls.CloudFileSystem.build_filesystems(**kwargs)
+        cls.info: t.Callable = create_staticmethod(cls.CloudFileSystem, 'info')
+        cls.stat: t.Callable = create_staticmethod(cls.CloudFileSystem, 'stat')
+        cls.size: t.Callable = create_staticmethod(cls.CloudFileSystem, 'size')
+        cls.exists: t.Callable = create_staticmethod(cls.CloudFileSystem, 'exists')
+        cls.is_dir: t.Callable = create_staticmethod(cls.CloudFileSystem, 'isdir')
+        cls.is_file: t.Callable = create_staticmethod(cls.CloudFileSystem, 'isfile')
+        cls.copy: t.Callable = create_staticmethod(cls.CloudFileSystem, 'copy')
+        cls.copy_file: t.Callable = create_staticmethod(cls.CloudFileSystem, 'cp_file')
+        cls.get_file: t.Callable = create_staticmethod(cls.CloudFileSystem, 'get_file')
+        cls.put_file: t.Callable = create_staticmethod(cls.CloudFileSystem, 'put_file')
+        cls.metadata: t.Callable = create_staticmethod(cls.CloudFileSystem, ['metadata', 'info'])
 
+        cls.open: t.Callable = create_method_fs(cls.CloudFileSystem, 'open')
+        cls.listdir: t.Callable = create_staticmethod(cls.CloudFileSystem, 'ls')    
+        cls.walk: t.Callable = create_staticmethod(cls.CloudFileSystem, 'walk')
+        cls.glob: t.Callable = create_staticmethod(cls.CloudFileSystem, 'glob')
+        cls.get: t.Callable = create_staticmethod(cls.CloudFileSystem, 'get')
+        cls.put: t.Callable = create_staticmethod(cls.CloudFileSystem, 'put')
+        
+        cls.checksum: t.Callable = create_method_fs(cls.CloudFileSystem, 'checksum')
+        cls.cat: t.Callable = create_staticmethod(cls.CloudFileSystem, 'cat')
+        cls.cat_file: t.Callable = create_staticmethod(cls.CloudFileSystem, 'cat_file')
+        
+        cls.pipe: t.Callable = create_staticmethod(cls.CloudFileSystem, 'pipe')
+        cls.pipe_file: t.Callable = create_staticmethod(cls.CloudFileSystem, 'pipe_file')
+    
 
-# Ensure manager is initialized (optional, depends on import time vs first use)
-# try:
-#      cloud_file_manager.settings 
-# except Exception as e:
-#      logger.error(f"Error during initial CloudFileManager setup: {e}", exc_info=True)
+        cls.find: t.Callable = create_method_fs(cls.CloudFileSystem, 'find')
+        cls.touch: t.Callable = create_method_fs(cls.CloudFileSystem, 'touch')
+        
+        
+        cls.mkdir: t.Callable = create_method_fs(cls.CloudFileSystem, 'mkdir')
+        cls.makedirs: t.Callable = create_method_fs(cls.CloudFileSystem, ['makedirs', 'mkdirs'])
+        cls.unlink: t.Callable = create_method_fs(cls.CloudFileSystem, 'rm_file')
+        cls.rmdir: t.Callable = create_method_fs(cls.CloudFileSystem, 'rmdir')
+        cls.rename : t.Callable = create_method_fs(cls.CloudFileSystem, 'rename')
+        cls.replace : t.Callable = create_method_fs(cls.CloudFileSystem, 'rename')
+        cls.rm : t.Callable = create_staticmethod(cls.CloudFileSystem, 'rm')
+        cls.rm_file : t.Callable = create_staticmethod(cls.CloudFileSystem, 'rm_file')
+        
+        cls.remove : t.Callable = create_method_fs(cls.CloudFileSystem, 'rm')
+        cls.modified: t.Callable = create_method_fs(cls.CloudFileSystem, 'modified')
+        cls.setxattr: t.Callable = create_method_fs(cls.CloudFileSystem, 'setxattr')
+        cls.url: t.Callable = create_method_fs(cls.CloudFileSystem, 'url')
+        cls.ukey: t.Callable = create_method_fs(cls.CloudFileSystem, 'ukey')
+        cls.invalidate_cache: t.Callable = create_method_fs(cls.CloudFileSystem, 'invalidate_cache')
+        
+        cls.filesys = cls.CloudFileSystem.fs
+        cls.afilesys = cls.CloudFileSystem.fsa
+        cls.fsconfig = cls.CloudFileSystem.fsconfig
+
+        cls.boto = cls.CloudFileSystem.boto
+        # cls.s3t = None #  cls.CloudFileSystem.s3t
+        cls._s3t = cls.CloudFileSystem._s3t
+        
+        # Async Methods
+        cls.astat: t.Callable = create_async_coro(cls.CloudFileSystem, 'stat')
+        cls.atouch: t.Callable = create_async_coro(cls.CloudFileSystem, 'touch')
+        cls.aukey: t.Callable = create_async_coro(cls.CloudFileSystem, 'ukey')
+        cls.asize: t.Callable = create_async_coro(cls.CloudFileSystem, 'size')
+        # cls.aurl: t.Callable = create_async_coro(cls.CloudFileSystem, 'url')
+        cls.asetxattr: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'setxattr')
+        cls.aurl: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'url')
+        # cls.asetxattr: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'setxattr')
+
+        cls.amodified: t.Callable = create_async_coro(cls.CloudFileSystem, 'modified')
+        cls.ainvalidate_cache: t.Callable = create_async_coro(cls.CloudFileSystem, 'invalidate_cache')
+        cls.arename: t.Callable = create_async_coro(cls.CloudFileSystem, 'rename')
+        cls.areplace: t.Callable = create_async_coro(cls.CloudFileSystem, 'rename')
+
+        cls.ainfo: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'ainfo')
+        cls.aexists: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'aexists')
+
+        cls.aglob: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'aglob')
+        cls.afind: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'afind')
+        
+        cls.acat: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'acat')
+        cls.acat_file: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'acat_file')
+        
+        cls.apipe: t.Callable = create_async_coro(cls.CloudFileSystem, 'apipe')
+        cls.apipe_file: t.Callable = create_async_coro(cls.CloudFileSystem, 'apipe_file')
+        
+        cls.ais_dir: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'aisdir')
+        cls.ais_file: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'aisfile')
+        cls.acopy: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'acopy')
+        cls.acopy_file: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'acp_file')
+        cls.aget: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'aget')
+        cls.aget_file: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'aget_file')
+        cls.aput: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'aput')
+        cls.aput_file: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'aput_file')
+        cls.ametadata: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'ametadata')
+        cls.aopen: t.Callable = create_async_method_fs(cls.CloudFileSystem, '_open')
+        cls.amkdir: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'amkdir')
+        cls.amakedirs: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'amakedirs')
+        cls.aunlink: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'arm_file')
+        cls.arm_file: t.Callable = create_async_coro(cls.CloudFileSystem, 'arm_file')
+        cls.armdir: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'armdir')
+        cls.aremove: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'arm')
+        cls.arm: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'arm')
+        cls.alistdir: t.Callable = create_async_method_fs(cls.CloudFileSystem, ['alistdir', 'alist_objects'])
+        cls.awalk: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'awalk')
+
+    @classmethod
+    def get_s3t(cls) -> 'TransferManager':
+        """
+        Returns the s3t transfer manager
+        """
+        if cls.s3t is None:
+            cls.s3t = cls._s3t()
+            atexit.register(cls._atexit_)
+        return cls.s3t
+    
+
+    @classmethod
+    def _atexit_(cls):
+        """
+        Cleans up the Cloud File System
+        """
+        if cls.s3t is not None:
+            logger.info('Shutting Down S3 Transfer Manager')
+            cls.s3t.shutdown()
+            cls.s3t = None
+    
