@@ -4,3 +4,4 @@ recursive-exclude * *.py[co]
 recursive-include src/lazyops *
 recursive-include src/lzl *
 recursive-include src/lzo *
+include src/version.py
