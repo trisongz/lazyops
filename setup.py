@@ -101,7 +101,7 @@ args = {
     'long_description': root.joinpath('README.md').read_text(encoding='utf-8'),
     'entry_points': {
         "console_scripts": [
-            'lazyops-build = lazyops.libs.abc.builder:main',
+            # 'lazyops-build = lazyops.libs.abc.builder:main',
             'lzl = lzl.cmd:main'
         ]
     },
