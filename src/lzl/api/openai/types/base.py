@@ -12,7 +12,7 @@ from enum import Enum
 from lzo.types.base import BaseModel, Field, eproperty
 from lzl.types.base import get_pydantic_field_names, ByteSize, validator, get_pydantic_fields
 from lzl.api.openai.version import DEFAULT_AZURE_VERSION
-from lazyops.utils import ObjectDecoder, ObjectEncoder
+from lzo.utils.serialization.serialization import ObjectDecoder, ObjectEncoder
 from ..utils.helpers import aparse_stream, parse_stream
 from ..utils.logs import logger
 from typing import Optional, Union, Dict, List, Any, Type, Tuple, Iterator, AsyncIterator, TYPE_CHECKING
