@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import re
+import warnings
+
+warnings.filterwarnings("ignore", category=SyntaxWarning)
+
 from .static import DEFAULT_STATUS_COLORS, COLORED_MESSAGE_MAP, RESET_COLOR, LOGLEVEL_MAPPING
 from typing import Optional, Dict, Any, Union, Type, Callable, Set, List, Tuple, TYPE_CHECKING
 

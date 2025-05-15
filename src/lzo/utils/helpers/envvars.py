@@ -10,6 +10,8 @@ import json
 import subprocess
 import warnings
 warnings.filterwarnings("ignore", message = "invalid escape sequence")
+warnings.filterwarnings("ignore", category=SyntaxWarning)
+
 from pathlib import Path
 from .formatting import build_dict_from_str
 from typing import Any, Dict, List, Optional, Tuple, Union, Type, TypeVar, TYPE_CHECKING
