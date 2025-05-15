@@ -8,3 +8,8 @@ from .base import (
     register_object_class,
     register_schema_mapping,
 )
+
+from .serialization import (
+    ObjectDecoder,
+    ObjectEncoder
+)

@@ -225,9 +225,10 @@ def object_deserializer(obj: typing.Dict) -> typing.Dict:
 
 
 if typing.TYPE_CHECKING:
-    from lazyops.types import BaseModel
+    from lzl.types import BaseModel
 
-from .lazy import lazy_import, get_obj_class_name
+from lzl.load import lazy_import
+from lzl.load.utils import get_obj_class_name
 
 def object_model_serializer(obj: typing.Union['BaseModel', typing.Any]) -> typing.Any:
     """
