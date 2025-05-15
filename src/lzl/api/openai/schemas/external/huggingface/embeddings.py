@@ -16,7 +16,6 @@ from ...embeddings import (
 from lzl.types import validator, eproperty, Field
 from lzl.api.openai.types.handlers import ModelContextHandler
 from lzl.api.openai.types.base import Usage
-# from lazyops.types import validator, eproperty, Field
 # from async_openai.types.context import ModelContextHandler
 # from async_openai.types.resources import Usage
 from typing import Any, Dict, List, Optional, Union, Set, Type, TYPE_CHECKING

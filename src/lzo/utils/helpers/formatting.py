@@ -62,6 +62,7 @@ alphanumeric_pattern = re.compile(r'[^a-zA-Z0-9]')
 dba_pattern = re.compile(r'(.+?)(?:\s+d[/]b[/]a|[/]d[/]b[/]a|[/]dba|[/]DBA)(?:\s+(.+))?$')
 url_pattern = re.compile(r'(https?://\S+)')
 name_pattern_regex = re.compile(r'(?:(?<=^)|(?<=[^A-Za-z.,]))[A-Za-z.,]+(?: [A-Za-z.,]+)*(?:(?=[^A-Za-z.,])|(?=$))')
+underscore_pattern = re.compile("___+")
 
 def clean_html(text: str) -> str:
     """
@@ -69,6 +70,14 @@ def clean_html(text: str) -> str:
     """
     return html_re_pattern.sub('', html.unescape(text))
 
+
+def cleanup_dots(text: str) -> str:
+    """
+    Cleans up the dots found in table of contents
+
+    INTRODUCTION............................................ > INTRODUCTION.
+    """
+    return re.sub(r'\.+', '.', text).strip()
 
 def extract_urls(text: str) -> List[str]:
     """
@@ -256,3 +265,22 @@ def combine_parts(*parts: Optional[str], sep: Optional[str] = '.') -> str:
     Combines the parts into a single string
     """
     return sep.join(p for p in parts if p)
+
+
+def clean_text(text: str) -> str:
+    """
+    Cleans the text
+    """
+    if '�' in text: text = text.replace('�', '')
+    
+    # Find and remove double underscores
+    if underscore_pattern.search(text):
+        text = underscore_pattern.sub(' ', text)
+    
+    # Cleanup HTML
+    if '<' in text and '>' in text: 
+        with contextlib.suppress(Exception):
+            from markdownify import markdownify
+            text = markdownify(text)
+    
+    return cleanup_whitespace(text)

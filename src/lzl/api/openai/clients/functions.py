@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from lzl.api.openai.configs import OpenAISettings
     from lzl.api.openai.clients import OpenAIManager as OpenAISessionManager
     from lzl.logging import Logger
-    from lazyops.libs.persistence import PersistentDict
+    from lzl.io import PersistentDict
 
 
 
@@ -146,7 +146,7 @@ class FunctionManager(ABC):
                 import kvdb
                 self._cache = kvdb.create_persistence(session_name = 'openai', **kwargs)
             except ImportError:
-                from lazyops.libs.persistence import PersistentDict
+                from lzl.io.persistence import PersistentDict
                 self._cache = PersistentDict(**kwargs)
         return self._cache
 
@@ -165,7 +165,6 @@ class FunctionManager(ABC):
         """
         if isinstance(func, str):
             from lzl.load import lazy_import
-            # from lazyops.utils.lazy import lazy_import
             func = lazy_import(func)
         if isinstance(func, type) and initialize:
             func = func(**kwargs)

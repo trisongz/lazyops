@@ -12,7 +12,7 @@ from lzo.types import (
     Field,
 )
 from lzo.utils import timed_cache, create_unique_id
-from lazyops.utils import ObjectEncoder
+from lzo.utils.serialization import ObjectEncoder
 from typing import Dict, Optional, Any, List, Type, Callable, Union
 
 from lzl.api.openai.utils.logs import logger
@@ -1339,9 +1339,9 @@ class BaseRoute(BaseModel):
         The callback should be a function that takes the response object as the first argument
         """
         if self.client_callbacks:
-            from lazyops.libs.pooler import ThreadPooler
+            from lzl.pool import ThreadPool
             for callback in self.client_callbacks:
-                ThreadPooler.background(callback, response_object, **kwargs)
+                ThreadPool.background(callback, response_object, **kwargs)
         
     def handle_response(
         self, 

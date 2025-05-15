@@ -1045,7 +1045,7 @@ class BaseFunction(ABC):
         """
         Applies text cleaning
         """
-        from lazyops.utils.format_utils import clean_html, clean_text, cleanup_dots
+        from lzo.utils.helpers.formatting import clean_html, clean_text, cleanup_dots
         if "..." in text: text = cleanup_dots(text)
         return clean_html(clean_text(text))
     

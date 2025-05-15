@@ -19,7 +19,6 @@ from lzo.types import (
     Field,
 )
 from lzl.api.openai.types.handlers import ModelContextHandler
-# from lazyops.types import validator, root_validator, BaseModel, lazyproperty, Field, PYD_VERSION
 # from async_openai.types.context import ModelContextHandler
 from typing import Any, Dict, List, Optional, Union, Set, Type, TYPE_CHECKING
 
