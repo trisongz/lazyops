@@ -342,13 +342,15 @@ class Logger(_Logger, LoggingMixin):
         max_length: Optional[int] = None,
         colored: Optional[bool] = False,
         hook: Optional[Union[Callable, List[Callable]]] = None,
+        exc_info: Optional[bool] = False,
         **kwargs
     ) -> None:
         """
         Log ``message.format(*args, **kwargs)`` with severity ``'ERROR'``.
         """
         message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored, level = 'ERROR')
-    
+        if exc_info: message += f"\n{traceback.format_exc()}"
+
         try:
             self._log("ERROR", False, self._get_opts(colored = colored), message, args, kwargs)
         except TypeError:

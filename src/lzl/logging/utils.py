@@ -23,8 +23,7 @@ def find_and_format_seps(msg: str) -> str:
       |em,b| -> |em||b|
       
     """
-    # v2
-    for sep_match in re.finditer(r'\|\w+,(\w+,*)+\|', msg):
+    for sep_match in re.finditer(r'\|\w+,(\w+,*)+\|', msg): # v2
         s = sep_match.group()
         if len(s) >= 10: continue
         msg = msg.replace(s, "||".join(s.split(",")))
