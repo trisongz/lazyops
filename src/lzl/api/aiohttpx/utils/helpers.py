@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import httpx
-import backoff
 import functools
 import contextlib
 import asyncio
@@ -13,8 +12,10 @@ from httpx._exceptions import HTTPError, HTTPStatusError
 
 if load.TYPE_CHECKING:
     import bs4
+    import backoff
 else:
     bs4 = load.LazyLoad("bs4", install_missing=True)
+    backoff = load.LazyLoad("backoff", install_missing=True)
 
 
 def fatal_http_exception(exc: Exception | HTTPError) -> bool:
