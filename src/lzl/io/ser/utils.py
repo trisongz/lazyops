@@ -406,8 +406,12 @@ def deserialize_object(
 
         if obj_type == "set":
             return set(obj_value)
+        
 
-        raise TypeError(f"Cannot deserialize object of type {obj_type}")
+        if obj_type == "tensor":
+            return float(obj_value) if (isinstance(obj_value, (int, float)) or not np) else np.array(obj_value)
+
+        raise TypeError(f"Cannot deserialize object of type {obj_type} - {obj_class_type} with value {obj_value}")
 
     if isinstance(obj, bytes):
         # Try to deserialize with pickle
