@@ -2,4 +2,4 @@
 Modal Utilities
 """
 
-from .types import ModalClass
+from .types import ModalClass, NoStdStreams

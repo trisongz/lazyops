@@ -3,7 +3,8 @@ from __future__ import annotations
 """
 Modal Classes and Objects that serve as the base class that can be subclassed
 """
-
+import os
+import sys
 import contextlib
 import typing as t
 from lzl import load
@@ -12,6 +13,21 @@ if load.TYPE_CHECKING:
     import torch
 else:
     torch = load.LazyLoad("torch", install_missing=True)
+
+
+class NoStdStreams(object):
+    def __init__(self):
+        self.devnull = open(os.devnull, "w")
+
+    def __enter__(self):
+        self._stdout, self._stderr = sys.stdout, sys.stderr
+        self._stdout.flush(), self._stderr.flush()
+        sys.stdout, sys.stderr = self.devnull, self.devnull
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        sys.stdout, sys.stderr = self._stdout, self._stderr
+        self.devnull.close()
+
 
 class ModalClass:
     """
@@ -29,9 +45,9 @@ class ModalClass:
         self.t = Timer()
         self.timer = Timer
         self.logger = logger
-        self._load_model_(**kwargs)
 
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.device_name = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = torch.device(self.device_name)
         self.has_gpu = torch.cuda.is_available()
         self.gpu_device_name: t.Optional[str] = None
         self.gpu_cost_per_sec: float = 0.0
@@ -41,18 +57,16 @@ class ModalClass:
             gpu_data = get_gpu_data()
             self.gpu_device_name = gpu_data['name'] if gpu_data else None
             self.gpu_cost_per_sec = MODAL_GPU_PRICING.get(self.gpu_device_name, 0.0)
-
             self.logger.info(f"Using GPU: |g|{self.gpu_device_name}|e|", colored = True, prefix = self.model_name)
         
         self.cold_start_time = self.t.total
         self.cold_start_time_str = self.timer.pformat_duration(self.cold_start_time)
-        
         self.last_req_duration: float = 0.0
         self.last_req_batch_size: int = 0
         self.last_req_cost: float = 0.0
         self.last_gpu_memory: t.Optional[str] = None
-
-        self.logger.info(f"Loading Model: {self.model_id} in |g|{self.t.total_s}|e|", colored = True, prefix = self.model_name)
+        self._load_model_(**kwargs)
+        self.logger.info(f"Loading Model: {self.model_id} in |g|{self.t.total_s}|e| on {self.device_name}", colored = True, prefix = self.model_name)
         self.num_requests: int = 0
         self.batches_handled: int = 0
         self.total_duration: float = 0.0
