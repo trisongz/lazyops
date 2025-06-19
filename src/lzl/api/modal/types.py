@@ -123,6 +123,32 @@ class ModalClass:
             self.logger.info(f"|r|[Shutting Down]|e| {self.get_gpu_memory_nvidia_smi(colored = True)}", colored = True, prefix = self.model_name)
 
 
+    @contextlib.contextmanager
+    def default_mode(self):
+        """
+        Handles the default mode
+        """
+        t = self.timer(format_ms = True, format_short = 1)
+        try:
+            yield
+        except Exception as e:
+            self.logger.error(f"[{self.model_id}] Error in default mode: {e}")
+            raise e
+        finally:
+            total_s = t.total
+            self.last_req_duration = total_s
+            self.total_duration += total_s
+            self.num_requests += 1
+            if self.gpu_cost_per_sec:
+                self.last_req_cost = total_s * self.gpu_cost_per_sec
+            if self.has_gpu:
+                self.last_gpu_memory = self.get_gpu_memory_nvidia_smi(colored = False)
+            self.logger.info(f"Total Requests: |g|{self.num_requests}|e|. Total Batches Handled: |g|{self.batches_handled}|e|. Handled Last Batch Size of |g|{self.last_req_batch_size}|e| in |g|{t.total_s}|e|", colored = True, prefix = self.model_name)
+            self.logger.info(f"Total Inference Duration: |g|{self.timer.pformat_duration(self.total_duration)}|e|. Total Time Alive: |g|{self.t.total_s}|e|", colored = True, prefix = self.model_name)
+            self.logger.info(f"Total Cost: |y|${self.last_req_cost:,.5f}|e|", colored = True, prefix = self.model_name)
+            if self.has_gpu:
+                self.logger.info(f"{self.get_gpu_memory_nvidia_smi(colored = True)}", colored = True, prefix = self.model_name)
+
     
     @contextlib.contextmanager
     def inference_mode(self):
