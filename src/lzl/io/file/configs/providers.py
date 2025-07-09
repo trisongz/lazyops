@@ -600,6 +600,7 @@ class CloudflareR2Config(ConfigMixin):
 
     r2_endpoint: Optional[str] = None
     r2_config: Optional[Union[str, Dict[str, Any]]] = None
+    r2_signature_ver: Optional[str] = 's3v4'
     r2_fs_config: Optional[Union[str, Dict[str, Any]]] = None
 
     @model_validator(mode = 'before')
@@ -643,7 +644,9 @@ class CloudflareR2Config(ConfigMixin):
                 "endpoint_url": self.r2_endpoint,
                 "region_name": self.r2_region,
             },
-            "config_kwargs": {},
+            "config_kwargs": {
+                "signature_version": self.r2_signature_ver,
+            },
             "fixed_upload_size": True,
             **(self.r2_fs_config or {})
         }

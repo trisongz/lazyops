@@ -62,6 +62,18 @@ class PkgInstall:
             b = b.replace('[flags]', flag_str)
         return shlex.split(b)
         
+# Switching to using UV by default
+_has_uv_available = None
+
+def _has_uv():
+    """
+    Checks if the UV package is installed.
+    """
+    global _has_uv_available
+    if _has_uv_available is None:
+        _has_uv_available = LazyLib.is_exec_available('uv')
+    return _has_uv_available
+    
 
 class LazyLibType(type):
     
@@ -80,6 +92,16 @@ class LazyLibType(type):
     
     @classmethod
     def install_library(cls, library: str, upgrade: bool = True):
+
+        if _has_uv():
+            try:
+                pip_exec = ['uv', 'pip', 'install']
+                if '=' not in library or upgrade: pip_exec.append('--upgrade')
+                pip_exec.append(library)
+                return subprocess.check_call(pip_exec, stdout=subprocess.DEVNULL)
+            except Exception as e:
+                logger.warning(f"Failed to install {library} using uv: {e}. Falling back to pip.")
+
         pip_exec = [sys.executable, '-m', 'pip', 'install']
         if '=' not in library or upgrade: pip_exec.append('--upgrade')
         pip_exec.append(library)
@@ -92,6 +114,22 @@ class LazyLibType(type):
         version: typing.Optional[str] = None, 
         **options,
     ):
+        if _has_uv():
+            try:
+                if version: 
+                    if '=' not in version: version = f'=={version}'
+                    package = f'{package}{version}'
+                pip_exec = ['uv', 'pip', 'install', package]
+                if options:
+                    for k, v in options.items():
+                        if '--' not in k: k = f'--{k}'
+                        if v and not isinstance(v, bool): pip_exec.append(f'{k}={v}')
+                        else: pip_exec.append(k)
+                return subprocess.check_call(pip_exec, stdout=subprocess.DEVNULL)
+            except Exception as e:
+                logger.warning(f"Failed to install {package} using uv: {e}. Falling back to pip.")
+
+
         pip_exec = [sys.executable, '-m', 'pip', 'install']
         if options:
             # for example, options = {'extra_index_url': 'https://example.com/simple', 'no_deps': True, 'upgrade': True}
