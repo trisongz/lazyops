@@ -117,8 +117,9 @@ else:
             from pydantic.annotated_handlers import GetCoreSchemaHandler, GetJsonSchemaHandler
             from pydantic.json_schema import JsonSchemaValue
 
+            @classmethod
             def __get_pydantic_json_schema__(
-                self, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
+                cls, core_schema: core_schema.CoreSchema, handler: GetJsonSchemaHandler
             ) -> JsonSchemaValue:
                 
                 field_schema = handler(core_schema)
