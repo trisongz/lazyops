@@ -17,6 +17,7 @@ class MLContext(abc.ABC):
         """
         from lzo.utils import Timer
         from lzl.logging import logger
+        from pydantic.types import ByteSize
         from lzo.utils.system import get_gpu_data, aget_gpu_data
 
         self._extra: t.Dict[str, t.Any] = {}
@@ -24,6 +25,7 @@ class MLContext(abc.ABC):
 
         self.timer = Timer
         self.logger = logger
+        self._bs = ByteSize
 
         self.get_gpu_data = get_gpu_data
         self.aget_gpu_data = aget_gpu_data
@@ -89,11 +91,12 @@ class MLContext(abc.ABC):
         if compare:
             if previous_usage:
                 # Compare current usage with previous usage
-                comparison = {k: current_usage[k] - previous_usage.get(k, 0) for k in current_usage if isinstance(current_usage[k], (int, float))}
-                if curr_mem_used > previous_usage.get('memory_used', 0):
-                    comparison['memory_used'] = curr_mem_used - previous_usage['memory_used']
-                if curr_mem_percent > previous_usage.get('utilization_memory', 0):
-                    comparison['utilization_memory'] = curr_mem_percent - previous_usage['utilization_memory']
+                # comparison = {k: current_usage[k] - previous_usage.get(k, 0) for k in current_usage if isinstance(current_usage[k], (int, float))}
+                comparison = {}
+                # if curr_mem_used > previous_usage.get('memory_used', 0):
+                comparison['memory_used'] = self._bs(curr_mem_used - previous_usage['memory_used'])
+                # if curr_mem_percent > previous_usage.get('utilization_memory', 0):
+                comparison['utilization_memory'] = curr_mem_percent - previous_usage['utilization_memory']
                 if not colored: return f"{gpu_name}: {previous_usage['memory_used'].human_readable()} -> {curr_mem_used.human_readable()} / {curr_mem_total.human_readable()} + {comparison['memory_used'].human_readable()} ({comparison['utilization_memory']} -> {curr_mem_percent}%)"
                 return f"{gpu_name}: |y|{previous_usage['memory_used'].human_readable()}|e| -> |g|{curr_mem_used.human_readable()}|e| / {curr_mem_total.human_readable()} + |b|{comparison['memory_used'].human_readable()}|e|  ({comparison['utilization_memory']} -> {curr_mem_percent}%)"
 
@@ -122,11 +125,16 @@ class MLContext(abc.ABC):
         if compare:
             if previous_usage:
                 # Compare current usage with previous usage
-                comparison = {k: current_usage[k] - previous_usage.get(k, 0) for k in current_usage if isinstance(current_usage[k], (int, float))}
-                if curr_mem_used > previous_usage.get('memory_used', 0):
-                    comparison['memory_used'] = curr_mem_used - previous_usage['memory_used']
-                if curr_mem_percent > previous_usage.get('utilization_memory', 0):
-                    comparison['utilization_memory'] = curr_mem_percent - previous_usage['utilization_memory']
+                # comparison = {k: current_usage[k] - previous_usage.get(k, 0) for k in current_usage if isinstance(current_usage[k], (int, float))}
+                # if curr_mem_used > previous_usage.get('memory_used', 0):
+                #      comparison['memory_used'] = curr_mem_used - previous_usage['memory_used']
+                # if curr_mem_percent > previous_usage.get('utilization_memory', 0):
+                #     comparison['utilization_memory'] = curr_mem_percent - previous_usage['utilization_memory']
+                comparison = {}
+                # if curr_mem_used > previous_usage.get('memory_used', 0):
+                comparison['memory_used'] = self._bs(curr_mem_used - previous_usage['memory_used'])
+                # if curr_mem_percent > previous_usage.get('utilization_memory', 0):
+                comparison['utilization_memory'] = curr_mem_percent - previous_usage['utilization_memory']
                 if not colored: return f"{gpu_name}: {previous_usage['memory_used'].human_readable()} -> {curr_mem_used.human_readable()} / {curr_mem_total.human_readable()} + {comparison['memory_used'].human_readable()} ({comparison['utilization_memory']} -> {curr_mem_percent}%)"
                 return f"{gpu_name}: |y|{previous_usage['memory_used'].human_readable()}|e| -> |g|{curr_mem_used.human_readable()}|e| / {curr_mem_total.human_readable()} + |b|{comparison['memory_used'].human_readable()}|e|  ({comparison['utilization_memory']} -> {curr_mem_percent}%)"
 
