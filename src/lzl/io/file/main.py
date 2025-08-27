@@ -111,6 +111,14 @@ else:
             return new if new.is_dir() else new.parent
         
             
+        @classmethod
+        def register_loader(cls, ext: str, loader: t.Union[t.Callable[['FileLike'], None], t.Awaitable['FileLike', None]], overwrite: t.Optional[bool] = None) -> None:
+            """
+            Registers a file loader for a specific file extension.
+            """
+            from lzl.io.file.registry import register_loader
+            register_loader(ext, loader, overwrite)
+
         # Pydantic methods
         if PYDANTIC_VERSION == 2:
             from pydantic_core import core_schema, SchemaSerializer

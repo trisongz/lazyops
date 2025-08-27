@@ -1930,7 +1930,46 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             import json
             return json.loads(await self.aread_text( **kwargs))
 
+    @classmethod
+    def register_loader(cls, ext: str, loader: t.Union[t.Callable[['FileLike'], None], t.Awaitable['FileLike', None]], overwrite: t.Optional[bool] = None) -> None:
+        """
+        Registers a file loader for a specific file extension.
+        """
+        from lzl.io.file.registry import register_loader
+        register_loader(ext, loader, overwrite)
+
+    def loads(self, *args, **kwargs) -> t.Any:
+        """
+        Automatically Load this File using the registered loaders based on the extension.
+
+        If no loader is found, an error is raised.
+
+        Use `File.register_loader` to register a new loader.
+        """
+        from lzl.io.file.registry import get_file_loader
+        loader_func = get_file_loader(self.suffix)
+        if ThreadPool.is_coro(loader_func):
+            return ThreadPool.run_sync(loader_func, self, *args, **kwargs)
+        return loader_func(self, *args, **kwargs)
     
+    async def aloads(self, *args, **kwargs) -> t.Any:
+        """
+        Automatically Load this File using the registered loaders based on the extension.
+
+        If no loader is found, an error is raised.
+
+        Use `File.register_loader` to register a new loader.
+        """
+        from lzl.io.file.registry import get_file_loader
+        loader_func = get_file_loader(self.suffix)
+        if ThreadPool.is_coro(loader_func):
+            return await loader_func(self, *args, **kwargs)
+        return ThreadPool.arun(loader_func, self, *args, **kwargs)
+
+    """
+    End Serialization Helpers
+    """
+
     def _download_with_tmgr(
         self, 
         dest: 'FileLike',
