@@ -6,6 +6,11 @@ import contextlib
 import typing as t
 from lzl.types import eproperty
 
+if t.TYPE_CHECKING:
+    from pydantic.types import ByteSize
+    
+GPUData = t.Union[t.List[t.Dict[str, t.Any]], t.Dict[str, t.Union[str, int, float, 'ByteSize']]]
+
 class MLContext(abc.ABC):
     """
     Base Machine Learning Context Handler
@@ -67,8 +72,29 @@ class MLContext(abc.ABC):
         Returns the name of the current model.
         """
         return self._extra.get('model_name')
+    
+    def build_gpu_data_string(self, current_usage: GPUData, compare: t.Optional[bool] = None, previous_usage: t.Optional[GPUData] = None, colored: bool = False) -> t.Optional[str]:
+        """
+        Constructs the GPU Data String
+        """
+        curr_mem_used = current_usage['memory_used']
+        curr_mem_percent = current_usage['utilization_memory']
+        curr_mem_total = current_usage['memory_total']
+        gpu_name = current_usage['name']
+        
+        previous_usage = previous_usage or self.last_gpu_data
+        self.last_gpu_data = current_usage
+        if compare and previous_usage:
+            comparison: GPUData = {
+                'memory_used': self._bs(curr_mem_used - previous_usage['memory_used']),
+                'utilization_memory': curr_mem_percent - previous_usage['utilization_memory']
+            }
+            if not colored: return f"{gpu_name}: {previous_usage['memory_used'].human_readable()} -> {curr_mem_used.human_readable()} / {curr_mem_total.human_readable()} + {comparison['memory_used'].human_readable()} ({comparison['utilization_memory']} -> {curr_mem_percent}%)"
+            return f"{gpu_name}: {previous_usage['memory_used'].human_readable()} -> |y|{curr_mem_used.human_readable()}|e| / |g|{curr_mem_total.human_readable()}|e| + |r|{comparison['memory_used'].human_readable()}|e|  ({comparison['utilization_memory']} -> {curr_mem_percent}%)"
+        if not colored: return f"{gpu_name}: {curr_mem_used.human_readable()} / {curr_mem_total.human_readable()} ({curr_mem_percent}%)"
+        return f"{gpu_name}: |y|{curr_mem_used.human_readable()}|e| / |g|{curr_mem_total.human_readable()}|e| ({curr_mem_percent}%)"
 
-    def get_gpu_memory(self, compare: t.Optional[bool] = None, previous_usage: t.Optional[t.Dict[str, t.Any]] = None, colored: bool = False) -> t.Optional[str]:
+    def get_gpu_memory(self, compare: t.Optional[bool] = None, previous_usage: t.Optional[GPUData] = None, colored: bool = False) -> t.Optional[str]:
         """
         Returns the GPU memory usage information.
 
@@ -79,32 +105,9 @@ class MLContext(abc.ABC):
         """
         current_usage = self.get_gpu_data()
         if not current_usage: return None
+        return self.build_gpu_data_string(current_usage, compare = compare, previous_usage = previous_usage, colored = colored)
 
-        curr_mem_used = current_usage['memory_used']
-        curr_mem_percent = current_usage['utilization_memory']
-        curr_mem_total = current_usage['memory_total']
-        gpu_name = current_usage['name']
-        
-        previous_usage = previous_usage or self.last_gpu_data
-        self.last_gpu_data = current_usage
-
-        if compare:
-            if previous_usage:
-                # Compare current usage with previous usage
-                # comparison = {k: current_usage[k] - previous_usage.get(k, 0) for k in current_usage if isinstance(current_usage[k], (int, float))}
-                comparison = {}
-                # if curr_mem_used > previous_usage.get('memory_used', 0):
-                comparison['memory_used'] = self._bs(curr_mem_used - previous_usage['memory_used'])
-                # if curr_mem_percent > previous_usage.get('utilization_memory', 0):
-                comparison['utilization_memory'] = curr_mem_percent - previous_usage['utilization_memory']
-                if not colored: return f"{gpu_name}: {previous_usage['memory_used'].human_readable()} -> {curr_mem_used.human_readable()} / {curr_mem_total.human_readable()} + {comparison['memory_used'].human_readable()} ({comparison['utilization_memory']} -> {curr_mem_percent}%)"
-                return f"{gpu_name}: |y|{previous_usage['memory_used'].human_readable()}|e| -> |g|{curr_mem_used.human_readable()}|e| / {curr_mem_total.human_readable()} + |b|{comparison['memory_used'].human_readable()}|e|  ({comparison['utilization_memory']} -> {curr_mem_percent}%)"
-
-        if not colored: return f"{gpu_name}: {curr_mem_used.human_readable()} / {curr_mem_total.human_readable()} ({curr_mem_percent}%)"
-        return f"{gpu_name}: |g|{curr_mem_used.human_readable()}|e| / |y|{curr_mem_total.human_readable()}|e| ({curr_mem_percent}%)"
-
-
-    async def aget_gpu_memory(self, compare: t.Optional[bool] = None, previous_usage: t.Optional[t.Dict[str, t.Any]] = None, colored: bool = False) -> t.Optional[str]:
+    async def aget_gpu_memory(self, compare: t.Optional[bool] = None, previous_usage: t.Optional[GPUData] = None, colored: bool = False) -> t.Optional[str]:
         """
         Returns the GPU memory usage information.
 
@@ -115,31 +118,7 @@ class MLContext(abc.ABC):
         """
         current_usage = await self.aget_gpu_data()
         if not current_usage: return None
-        curr_mem_used = current_usage['memory_used']
-        curr_mem_percent = current_usage['utilization_memory']
-        curr_mem_total = current_usage['memory_total']
-        gpu_name = current_usage['name']
-        
-        previous_usage = previous_usage or self.last_gpu_data
-        self.last_gpu_data = current_usage
-        if compare:
-            if previous_usage:
-                # Compare current usage with previous usage
-                # comparison = {k: current_usage[k] - previous_usage.get(k, 0) for k in current_usage if isinstance(current_usage[k], (int, float))}
-                # if curr_mem_used > previous_usage.get('memory_used', 0):
-                #      comparison['memory_used'] = curr_mem_used - previous_usage['memory_used']
-                # if curr_mem_percent > previous_usage.get('utilization_memory', 0):
-                #     comparison['utilization_memory'] = curr_mem_percent - previous_usage['utilization_memory']
-                comparison = {}
-                # if curr_mem_used > previous_usage.get('memory_used', 0):
-                comparison['memory_used'] = self._bs(curr_mem_used - previous_usage['memory_used'])
-                # if curr_mem_percent > previous_usage.get('utilization_memory', 0):
-                comparison['utilization_memory'] = curr_mem_percent - previous_usage['utilization_memory']
-                if not colored: return f"{gpu_name}: {previous_usage['memory_used'].human_readable()} -> {curr_mem_used.human_readable()} / {curr_mem_total.human_readable()} + {comparison['memory_used'].human_readable()} ({comparison['utilization_memory']} -> {curr_mem_percent}%)"
-                return f"{gpu_name}: |y|{previous_usage['memory_used'].human_readable()}|e| -> |g|{curr_mem_used.human_readable()}|e| / {curr_mem_total.human_readable()} + |b|{comparison['memory_used'].human_readable()}|e|  ({comparison['utilization_memory']} -> {curr_mem_percent}%)"
-
-        if not colored: return f"{gpu_name}: {curr_mem_used.human_readable()} / {curr_mem_total.human_readable()} ({curr_mem_percent}%)"
-        return f"{gpu_name}: |g|{curr_mem_used.human_readable()}|e| / |y|{curr_mem_total.human_readable()}|e| ({curr_mem_percent}%)"
+        return self.build_gpu_data_string(current_usage, compare = compare, previous_usage = previous_usage, colored = colored)
 
 
     @contextlib.contextmanager
@@ -237,3 +216,35 @@ class MLContext(abc.ABC):
             self.logger.info(await self.aget_gpu_memory(compare = True, previous_usage = start_gpu_data, colored = True), colored = True, prefix = self.model_name)
 
             
+
+    @contextlib.contextmanager
+    def capture(
+        self, 
+        message: t.Optional[str] = None,
+        prefix: t.Optional[str] = None,
+        **kwargs,
+    ):
+        """
+        Context manager to capture
+
+        Args:
+            prefix (str, optional): The prefix for log messages.
+        """
+        ts = self.timer(format_ms = True, format_short = 1)
+        prefix = f'{prefix} {self.model_name}' if prefix else self.model_name
+        start_gpu_data = self.get_gpu_data()
+        try:
+            yield
+        except Exception as e:
+            self.logger.trace(f'[{prefix}] Error in Capture: ', e)
+            raise e
+        finally:
+            message = message or "Capture Complete"
+            message += f" in {ts.total_s}"
+            self.logger.info(message, colored = True, prefix = prefix)
+            self.logger.info(self.get_gpu_memory(compare = True, previous_usage = start_gpu_data, colored = True), colored = True, prefix = prefix)
+
+
+    def __enter__(self):
+        return self
+    
