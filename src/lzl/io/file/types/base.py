@@ -412,6 +412,13 @@ class FilePath(Path, FilePurePath):
         from lzl.io.file.spec.main import get_pathlike
         return get_pathlike(path)
     
+    @classmethod
+    def get_tempdir_(cls):
+        """
+        Returns the temporary directory for the current user.
+        """
+        return cls.get_pathlike_(tempfile.gettempdir())
+
     def open(self, mode: FileMode = 'r', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, **kwargs) -> t.IO[t.Union[str, bytes]]:
         """
         Open the file pointed by this path and return a file object, as
@@ -902,6 +909,134 @@ class FilePath(Path, FilePurePath):
             return dest
         await dest._accessor.aput_file(self.path_, dest.path_, recursive = recursive)
         return dest
+    
+
+    def localize(self, filename: t.Optional[str] = None, output_dir: t.Optional[Paths] = None, unique: t.Optional[bool] = False, **kwargs) -> 'FileLike':
+        """
+        Localize the file - If this is already a local file (not cloud - it doesn't do anything)
+
+        Otherwise, it will copy the file to the specified output directory or temporary directory.
+        """
+        if not self.is_fsspec: return self
+        if output_dir is None: output_dir = self.get_tempdir_()
+        else: output_dir = self.get_pathlike_(output_dir)
+        if not filename:
+            if unique:
+                from lzo.utils import create_unique_id
+                filename = f'{create_unique_id()}{self.suffix}'
+            else:
+                filename = self.name
+        output_f = output_dir.joinpath(filename)
+        if not output_f.is_fsspec:
+            self._accessor.copy_file(self.path_, output_f.path_, **kwargs)
+        else:
+            output_f._accessor.put_file(self.path_, output_f.path_, **kwargs)
+        return output_f
+    
+
+    async def alocalize(self, filename: t.Optional[str] = None, output_dir: t.Optional[Paths] = None, unique: t.Optional[bool] = False, **kwargs) -> 'FileLike':
+        """
+        Localize the file - If this is already a local file (not cloud - it doesn't do anything)
+
+        Otherwise, it will copy the file to the specified output directory or temporary directory.
+        """
+        if not self.is_fsspec: return self
+        if output_dir is None: output_dir = self.get_tempdir_()
+        else: output_dir = self.get_pathlike_(output_dir)
+        if not filename:
+            if unique:
+                from lzo.utils import create_unique_id
+                filename = f'{create_unique_id()}{self.suffix}'
+            else:
+                filename = self.name
+        output_f = output_dir.joinpath(filename)
+        if not output_f.is_fsspec:
+            await self._accessor.acopy_file(self.path_, output_f.path_, **kwargs)
+        else:
+            await output_f._accessor.aput_file(self.path_, output_f.path_, **kwargs)
+        return output_f
+    
+    def bytesio(self, **kwargs) -> io.BytesIO:
+        """
+        Convert the file to a BytesIO object.
+        """
+        bytes_obj = io.BytesIO()
+        bytes_obj.write(self.read_bytes())
+        bytes_obj.seek(0)
+        return bytes_obj
+    
+    async def abytesio(self, **kwargs) -> io.BytesIO:
+        """
+        Convert the file to a BytesIO object.
+        """
+        bytes_obj = io.BytesIO()
+        bytes_obj.write(await self.aread_bytes())
+        bytes_obj.seek(0)
+        return bytes_obj
+
+    def textio(self, **kwargs) -> io.StringIO:
+        """
+        Convert the file to a StringIO object.
+        """
+        string_obj = io.StringIO()
+        string_obj.write(self.read_text())
+        string_obj.seek(0)
+        return string_obj
+
+    async def atextio(self, **kwargs) -> io.StringIO:
+        """
+        Convert the file to a StringIO object.
+        """
+        string_obj = io.StringIO()
+        string_obj.write(await self.aread_text())
+        string_obj.seek(0)
+        return string_obj
+    
+
+    """
+    Serialization Helper for file-like objects.
+    """
+    def yaml(self, **kwargs) -> t.Union[t.Dict[str, t.Any], t.List[t.Any]]:
+        """
+        Parses the file contents as yaml
+        """
+        import yaml
+        return yaml.safe_load(self.read_text( **kwargs))
+    
+    async def ayaml(self, **kwargs) -> t.Union[t.Dict[str, t.Any], t.List[t.Any]]:
+        """
+        Parses the file contents as yaml
+        """
+        import yaml
+        return yaml.safe_load(await self.aread_text( **kwargs))
+
+    def json(self, **kwargs) -> t.Union[t.Dict[str, t.Any], t.List[t.Any]]:
+        """
+        Parses the file contents as json
+        """
+        from lzl.io.registry import json_ser
+        try:
+            return json_ser.loads(self.read_text( **kwargs))
+        except Exception as e:
+            from lzl.logging import logger
+            logger.trace(f"Failed to parse JSON from {self.path_}", e)
+            import json
+            return json.loads(self.read_text( **kwargs))
+        
+    
+    async def ajson(self, **kwargs) -> t.Union[t.Dict[str, t.Any], t.List[t.Any]]:
+        """
+        Parses the file contents as json
+        """
+        from lzl.io.registry import json_ser
+        try:
+            return await json_ser.aloads(await self.aread_text( **kwargs))
+        except Exception as e:
+            from lzl.logging import logger
+            logger.trace(f"Failed to parse JSON from {self.path_}", e)
+            import json
+            return json.loads(await self.aread_text( **kwargs))
+        
 
     def download(
         self, 

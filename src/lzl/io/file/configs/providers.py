@@ -5,6 +5,7 @@ import os
 import json
 import pathlib
 import multiprocessing as mp
+from pydantic import AliasChoices, Field
 from lzo.types import BaseSettings, eproperty, model_validator, field_validator, Literal
 
 from typing import Optional, Dict, Any, List, Union, TYPE_CHECKING
@@ -152,8 +153,8 @@ class AWSConfig(ConfigMixin):
     The AWS Config
     """
     aws_access_token: Optional[str] = None
-    aws_access_key_id: Optional[str] = None
-    aws_secret_access_key: Optional[str] = None
+    aws_access_key_id: Optional[str] = Field(None, validation_alias=AliasChoices('AWS_ACCESS_KEY_ID', 'AWS_ACCESS_KEY'))
+    aws_secret_access_key: Optional[str] = Field(None, validation_alias=AliasChoices('AWS_SECRET_ACCESS_KEY', 'AWS_SECRET_KEY'))
     aws_region: Optional[str] = "us-east-1"
     aws_s3_endpoint: Optional[str] = None
     set_s3_endpoint: Optional[bool] = False
@@ -357,8 +358,8 @@ class MinioConfig(ConfigMixin):
     The Minio Config
     """
     minio_endpoint: Optional[str] = None
-    minio_access_key: Optional[str] = None
-    minio_secret_key: Optional[str] = None
+    minio_access_key: Optional[str] = Field(None, validation_alias=AliasChoices('MINIO_ACCESS_KEY', 'MINIO_ACCESS_KEY_ID'))
+    minio_secret_key: Optional[str] = Field(None, validation_alias=AliasChoices('MINIO_SECRET_KEY', 'MINIO_SECRET_ACCESS_KEY'))
     minio_access_token: Optional[str] = None
     minio_secure: Optional[bool] = True
     minio_region: Optional[str] = 'us-east-1'
@@ -469,8 +470,8 @@ class S3CompatConfig(ConfigMixin):
     """
 
     s3c_endpoint: Optional[str] = None
-    s3c_access_key: Optional[str] = None
-    s3c_secret_key: Optional[str] = None
+    s3c_access_key: Optional[str] = Field(None, validation_alias=AliasChoices('S3C_ACCESS_KEY', 'S3_COMPAT_ACCESS_KEY'))
+    s3c_secret_key: Optional[str] = Field(None, validation_alias=AliasChoices('S3C_SECRET_KEY', 'S3_COMPAT_SECRET_KEY'))
     s3c_access_token: Optional[str] = None
     s3c_secure: Optional[bool] = True
     s3c_region: Optional[str] = None
@@ -593,8 +594,8 @@ class CloudflareR2Config(ConfigMixin):
     The Cloudflare R2 Config
     """
     r2_account_id: Optional[str] = None
-    r2_access_key_id: Optional[str] = None
-    r2_secret_access_key: Optional[str] = None
+    r2_access_key_id: Optional[str] = Field(None, validation_alias=AliasChoices('R2_ACCESS_KEY_ID', 'R2_ACCESS_KEY'))
+    r2_secret_access_key: Optional[str] = Field(None, validation_alias=AliasChoices('R2_SECRET_ACCESS_KEY', 'R2_SECRET_KEY'))
     r2_access_token: Optional[str] = None
     r2_region: Optional[str] = None
 

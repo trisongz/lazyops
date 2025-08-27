@@ -4,11 +4,17 @@ Local Persistence Types
 
 import os
 import json
-import filelock
+# import filelock
 import binascii
+from lzl import load
 from pathlib import Path, PurePath
 from typing import TypeVar, Generic, Any, Dict, Optional, Union, Iterable, List, Type, TYPE_CHECKING
 from .base import BaseStatefulBackend, SchemaType, create_unique_id, logger
+
+if load.TYPE_CHECKING:
+    import filelock
+else:
+    filelock = load.lazy_load("filelock")
 
 try:
     from fileio import File, FileLike
