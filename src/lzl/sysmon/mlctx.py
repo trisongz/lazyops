@@ -122,7 +122,7 @@ class MLContext(abc.ABC):
         if compare:
             if previous_usage:
                 # Compare current usage with previous usage
-                comparison = {k: current_usage[k] - previous_usage.get(k, 0) for k in current_usage}
+                comparison = {k: current_usage[k] - previous_usage.get(k, 0) for k in current_usage if isinstance(current_usage[k], (int, float))}
                 if curr_mem_used > previous_usage.get('memory_used', 0):
                     comparison['memory_used'] = curr_mem_used - previous_usage['memory_used']
                 if curr_mem_percent > previous_usage.get('utilization_memory', 0):
