@@ -128,6 +128,7 @@ class MLContext(abc.ABC):
         obj_name: t.Optional[str] = None,
         enable_gc: t.Optional[bool] = None,
         enable_summary: t.Optional[bool] = None,
+        hook: t.Optional[t.Callable[[t.Dict[str, t.Any]], None]] = None,
         **kwargs,
     ):
         """
@@ -142,12 +143,12 @@ class MLContext(abc.ABC):
         start_text = "Starting Inference"
         if obj_name: start_text += f" for |g|{obj_name}|e|"
         start_text += f" ({batch_size})"
-        self.logger.info(start_text, prefix = self.model_name, colored = True)
+        self.logger.info(start_text, prefix = self.model_name, colored = True, hook = hook)
         start_gpu_data = self.get_gpu_data()
         try:
             yield
         except Exception as e:
-            self.logger.trace(f'[{self.model_name}] Error in Inference Mode: ', e)
+            self.logger.trace(f'[{self.model_name}] Error in Inference Mode: ', e, hook = hook)
             raise e
         finally:
             total_s = ts.total
@@ -161,11 +162,11 @@ class MLContext(abc.ABC):
             end_text += f" ({batch_size}) in {ts.total_s}"
             if enable_gc: gc.collect()
             
-            self.logger.info(end_text, colored = True, prefix = self.model_name)
+            self.logger.info(end_text, colored = True, prefix = self.model_name, hook = hook)
             if enable_summary:
-                self.logger.info(f"Total Requests: |g|{self.idx}|e|. Total Batches Handled: |g|{self.num_batches}|e|. Handled Last Batch Size of |g|{self.last_batch_size}|e|", colored = True, prefix = self.model_name)
-                self.logger.info(f"Total Inference Duration: |g|{self.timer.pformat_duration(self.total_duration)}|e|. Total Time Alive: |g|{self.t.total_s}|e|", colored = True, prefix = self.model_name)
-            self.logger.info(self.get_gpu_memory(compare = True, previous_usage = start_gpu_data, colored = True), colored = True, prefix = self.model_name)
+                self.logger.info(f"Total Requests: |g|{self.idx}|e|. Total Batches Handled: |g|{self.num_batches}|e|. Handled Last Batch Size of |g|{self.last_batch_size}|e|", colored = True, prefix = self.model_name, hook = hook)
+                self.logger.info(f"Total Inference Duration: |g|{self.timer.pformat_duration(self.total_duration)}|e|. Total Time Alive: |g|{self.t.total_s}|e|", colored = True, prefix = self.model_name, hook = hook)
+            self.logger.info(self.get_gpu_memory(compare = True, previous_usage = start_gpu_data, colored = True), colored = True, prefix = self.model_name, hook = hook)
 
 
 
@@ -176,6 +177,7 @@ class MLContext(abc.ABC):
         obj_name: t.Optional[str] = None,
         enable_gc: t.Optional[bool] = None,
         enable_summary: t.Optional[bool] = None,
+        hook: t.Optional[t.Callable[[t.Dict[str, t.Any]], None]] = None,
         **kwargs,
     ):
         """
@@ -195,7 +197,7 @@ class MLContext(abc.ABC):
         try:
             yield
         except Exception as e:
-            self.logger.trace(f'[{self.model_name}] Error in Inference Mode: ', e)
+            self.logger.trace(f'[{self.model_name}] Error in Inference Mode: ', e, hook = hook)
             raise e
         finally:
             total_s = ts.total
@@ -208,12 +210,12 @@ class MLContext(abc.ABC):
             if obj_name: end_text += f" for |g|{obj_name}|e|"
             end_text += f" ({batch_size}) in {ts.total_s}"
             if enable_gc: gc.collect()
-            
-            self.logger.info(end_text, colored = True, prefix = self.model_name)
+
+            self.logger.info(end_text, colored = True, prefix = self.model_name, hook = hook)
             if enable_summary:
-                self.logger.info(f"Total Requests: |g|{self.idx}|e|. Total Batches Handled: |g|{self.num_batches}|e|. Handled Last Batch Size of |g|{self.last_batch_size}|e|", colored = True, prefix = self.model_name)
-                self.logger.info(f"Total Inference Duration: |g|{self.timer.pformat_duration(self.total_duration)}|e|. Total Time Alive: |g|{self.t.total_s}|e|", colored = True, prefix = self.model_name)
-            self.logger.info(await self.aget_gpu_memory(compare = True, previous_usage = start_gpu_data, colored = True), colored = True, prefix = self.model_name)
+                self.logger.info(f"Total Requests: |g|{self.idx}|e|. Total Batches Handled: |g|{self.num_batches}|e|. Handled Last Batch Size of |g|{self.last_batch_size}|e|", colored = True, prefix = self.model_name, hook = hook)
+                self.logger.info(f"Total Inference Duration: |g|{self.timer.pformat_duration(self.total_duration)}|e|. Total Time Alive: |g|{self.t.total_s}|e|", colored = True, prefix = self.model_name, hook = hook)
+            self.logger.info(await self.aget_gpu_memory(compare = True, previous_usage = start_gpu_data, colored = True), colored = True, prefix = self.model_name, hook = hook)
 
             
 
@@ -222,6 +224,7 @@ class MLContext(abc.ABC):
         self, 
         message: t.Optional[str] = None,
         prefix: t.Optional[str] = None,
+        hook: t.Optional[t.Callable[[t.Dict[str, t.Any]], None]] = None,
         **kwargs,
     ):
         """
@@ -236,13 +239,13 @@ class MLContext(abc.ABC):
         try:
             yield
         except Exception as e:
-            self.logger.trace(f'[{prefix}] Error in Capture: ', e)
+            self.logger.trace(f'[{prefix}] Error in Capture: ', e, hook = hook)
             raise e
         finally:
             message = message or "Capture Complete"
             message += f" in {ts.total_s}"
-            self.logger.info(message, colored = True, prefix = prefix)
-            self.logger.info(self.get_gpu_memory(compare = True, previous_usage = start_gpu_data, colored = True), colored = True, prefix = prefix)
+            self.logger.info(message, colored = True, prefix = prefix, hook = hook)
+            self.logger.info(self.get_gpu_memory(compare = True, previous_usage = start_gpu_data, colored = True), colored = True, prefix = prefix, hook = hook)
 
 
     def __enter__(self):
