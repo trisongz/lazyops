@@ -1604,6 +1604,8 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
     def info(self) -> t.Dict[str, t.Union[str, int, float, datetime.datetime, datetime.timedelta, t.List[str], t.Any]]:
         """
         Return the result of the info() system call on this path, like
+
+        >>> {'ETag': '"etag"', 'LastModified': datetime.datetime(2025, 8, 14, 21, 10, 28, tzinfo=tzutc()), 'size': 78, 'name': 'path/in/bucket/key', 'type': 'file', 'StorageClass': 'STANDARD', 'VersionId': None, 'ContentType': 'binary/octet-stream'}        
         """
         return self._accessor.info(self.fspath_)
 
@@ -1611,6 +1613,8 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         """
         Return the result of the info() system call on this path, like
         os.stat() does.
+
+        >>> {'ETag': '"etag"', 'LastModified': datetime.datetime(2025, 8, 14, 21, 10, 28, tzinfo=tzutc()), 'size': 78, 'name': 'path/in/bucket/key', 'type': 'file', 'StorageClass': 'STANDARD', 'VersionId': None, 'ContentType': 'binary/octet-stream'}
         """
         return await self._accessor.ainfo(self.fspath_)
 

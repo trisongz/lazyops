@@ -330,7 +330,7 @@ class BaseFileSystemAccessor(NormalAccessor):
         cls.astat: t.Callable = create_async_coro(cls.CloudFileSystem, 'stat')
         cls.atouch: t.Callable = create_async_coro(cls.CloudFileSystem, 'touch')
         cls.aukey: t.Callable = create_async_coro(cls.CloudFileSystem, 'ukey')
-        cls.asize: t.Callable = create_async_coro(cls.CloudFileSystem, 'size')
+        
         # cls.aurl: t.Callable = create_async_coro(cls.CloudFileSystem, 'url')
         cls.asetxattr: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'setxattr')
         cls.aurl: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'url')
@@ -342,6 +342,7 @@ class BaseFileSystemAccessor(NormalAccessor):
         cls.areplace: t.Callable = create_async_coro(cls.CloudFileSystem, 'rename')
 
         cls.ainfo: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'ainfo')
+        cls.asize: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'size')
         cls.aexists: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'aexists')
 
         cls.aglob: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'aglob')
