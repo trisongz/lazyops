@@ -135,6 +135,7 @@ class WorkerContext(abc.ABC):
         return self.build_gpu_data_string(current_usage, compare = compare, previous_usage = previous_usage, colored = colored)
 
 
+
     def build_resource_data_string(self, current_usage: 'ResourceData', compare: t.Optional[bool] = None, previous_usage: t.Optional['ResourceData'] = None, colored: bool = False) -> t.Optional[str]:
         """
         Constructs the Resource Data String
@@ -152,13 +153,13 @@ class WorkerContext(abc.ABC):
         if compare and previous_usage:
             comparison: 'ResourceData' = {
                 'memory_used': self._bs(curr_mem_used - previous_usage['memory_used']),
-                'utilization_memory': curr_mem_percent - previous_usage['utilization_memory'],
+                # 'utilization_memory': curr_mem_percent - previous_usage['utilization_memory'],
                 # 'utilization_cpu': curr_cpu_percent - previous_usage['utilization_cpu']
             }
-            if not colored: return f"{num_cpu}vCPU: {curr_cpu_percent}% |  RAM: {previous_usage['memory_used'].human_readable()} -> {curr_mem_used.human_readable()} / {curr_mem_total.human_readable()} + {comparison['memory_used'].human_readable()} ({comparison['utilization_memory']} -> {curr_mem_percent}%)"
-            return f"{num_cpu}vCPU: |g|{curr_cpu_percent}%|e| |  RAM: {previous_usage['memory_used'].human_readable()} -> |y|{curr_mem_used.human_readable()}|e| / |g|{curr_mem_total.human_readable()}|e| + |r|{comparison['memory_used'].human_readable()}|e|  ({comparison['utilization_memory']} -> {curr_mem_percent}%)"
-        if not colored: return f"{num_cpu}vCPU: {curr_cpu_percent}% |  RAM: {curr_mem_used.human_readable()} / {curr_mem_total.human_readable()} ({curr_mem_percent}%)"
-        return f"{num_cpu}vCPU: |g|{curr_cpu_percent}%|e|  RAM: |y|{curr_mem_used.human_readable()}|e| / |g|{curr_mem_total.human_readable()}|e| ({curr_mem_percent}%)"
+            if not colored: return f"{num_cpu} vCPU: {curr_cpu_percent}% | RAM: {previous_usage['memory_used'].human_readable()} -> {curr_mem_used.human_readable()} / {curr_mem_total.human_readable()} + {comparison['memory_used'].human_readable()} ({curr_mem_percent}%)"
+            return f"{num_cpu} vCPU: |g|{curr_cpu_percent}%|e| | RAM: {previous_usage['memory_used'].human_readable()} -> |y|{curr_mem_used.human_readable()}|e| / |g|{curr_mem_total.human_readable()}|e| + |r|{comparison['memory_used'].human_readable()}|e| ({curr_mem_percent}%)"
+        if not colored: return f"{num_cpu} vCPU: {curr_cpu_percent}% | RAM: {curr_mem_used.human_readable()} / {curr_mem_total.human_readable()} ({curr_mem_percent}%)"
+        return f"{num_cpu} vCPU: |g|{curr_cpu_percent}%|e| RAM: |y|{curr_mem_used.human_readable()}|e| / |g|{curr_mem_total.human_readable()}|e| ({curr_mem_percent}%)"
 
     def get_resource_info(self, compare: t.Optional[bool] = None, previous_usage: t.Optional['ResourceData'] = None, colored: bool = False) -> t.Optional[str]:
         """
@@ -341,7 +342,7 @@ class WorkerContext(abc.ABC):
         if obj_name: start_text += f" for |g|{obj_name}|e|"
         start_text += f" ({batch_size})"
         self.logger.info(start_text, prefix = base_name, colored = True, hook = hook)
-        start_resource_data = self.get_resource_data()
+        # start_resource_data = self.get_resource_data()
         if self.has_gpu: start_gpu_data = self.get_gpu_data()
         try:
             yield
@@ -365,7 +366,8 @@ class WorkerContext(abc.ABC):
             if enable_summary:
                 self.logger.info(f"Total Tasks: |g|{self.idx}|e|. Total Batches Handled: |g|{self.num_batches}|e|. Handled Last Batch Size of |g|{self.last_batch_size}|e|", colored = True, prefix = base_name, hook = hook)
                 self.logger.info(f"Total Task Duration: |g|{self.timer.pformat_duration(self.total_duration)}|e|. Total Time Alive: |g|{self.t.total_s}|e|", colored = True, prefix = base_name, hook = hook)
-            self.logger.info(self.get_resource_info(compare = True, previous_usage = start_resource_data, colored = True), colored = True, prefix = base_name, hook = hook)
+            # self.logger.info(self.get_resource_info(compare = True, previous_usage = start_resource_data, colored = True), colored = True, prefix = base_name, hook = hook)
+            self.logger.info(self.get_resource_info(compare = False, colored = True), colored = True, prefix = base_name, hook = hook)
             if self.has_gpu:
                 self.logger.info(self.get_gpu_memory(compare = True, previous_usage = start_gpu_data, colored = True), colored = True, prefix = base_name, hook = hook)
 
