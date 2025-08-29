@@ -4,7 +4,6 @@ from __future__ import annotations
 Lazy Function Wrappers
 """
 import functools
-from lzl.pool import is_coro_func, ThreadPool
 from typing import TypeVar, Callable, Any
 
 WrappedFnReturnT = TypeVar("WrappedFnReturnT")
@@ -33,6 +32,8 @@ def lazy_function_wrapper(
         """
         Wrapper Function
         """
+        from lzl.pool import is_coro_func, ThreadPool
+
         if is_coro_func(func):
             @functools.wraps(func)
             async def _wrapper(*args, **kwargs) -> ReturnT:
