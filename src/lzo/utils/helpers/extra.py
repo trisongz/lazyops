@@ -10,9 +10,10 @@ import shutil
 from lzl import load
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-if load.TYPE_CHECKING:
+if t.TYPE_CHECKING:
     import browserforge.download
     from lzl.api import aiohttpx
+    from pydantic import BaseModel
 else:
     browserforge = load.LazyLoad("browserforge", install_missing=True)
     aiohttpx = load.lazy_load('lzl.api.aiohttpx', install_missing = False)
@@ -90,3 +91,21 @@ def browserforge_download(
 
 
 
+_json_schemas: t.Dict[str, str] = {}
+
+def generate_json_schema_from_model(model: t.Type['BaseModel']) -> str:
+    """
+    Generates a JSON schema from a Pydantic model.
+    
+    Args:
+        model (t.Type[BaseModel]): The Pydantic model class to generate the schema from.
+    
+    Returns:
+        str: The generated JSON schema as a string.
+    """
+    if model.__name__ in _json_schemas:
+        return _json_schemas[model.__name__]
+    from lzl.api.openai.utils.schemas import generate_json_schema
+    schema = generate_json_schema(model)
+    _json_schemas[model.__name__] = schema
+    return schema

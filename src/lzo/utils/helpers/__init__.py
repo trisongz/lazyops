@@ -48,3 +48,5 @@ from .timing import (
     timer,
     DynamicInterval,
 )
+
+from .extra import generate_json_schema_from_model
