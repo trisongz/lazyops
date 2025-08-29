@@ -19,10 +19,15 @@ from .kube import (
     get_local_kubeconfig_dir,
     is_in_kubernetes,
 )
-
-from .gpu import (
+from .utils import (
     parse_memory_metric,
     parse_memory_metric_to_bs,
+)
+from .gpu import (
     get_gpu_data,
     aget_gpu_data,
+)
+
+from .resources import (
+    get_resource_data
 )

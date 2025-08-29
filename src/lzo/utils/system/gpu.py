@@ -3,30 +3,10 @@ from __future__ import annotations
 import os
 from typing import Union, Dict, Any, List, TYPE_CHECKING
 from functools import lru_cache
+from .utils import parse_memory_metric_to_bs, safe_float
 
-
-def parse_memory_metric(data: Union[int, float, str]):
-    """
-    Parses memory to full memory
-    """
-    if isinstance(data, (int, float)): return data
-    if data.endswith('B'): 
-        data = data[:-1]
-    cast_type = float if '.' in data else int
-    if data.endswith('Ki') or data.endswith('KiB'):
-        return cast_type(data.split('Ki')[0].strip()) * 1024
-    if data.endswith('Mi') or data.endswith('MiB'):
-        return cast_type(data.split('Mi')[0].strip()) * (1024 * 1024)
-    if data.endswith('Gi') or data.endswith('GiB'):
-        return cast_type(data.split('Gi')[0].strip()) * (1024 * 1024 * 1024)
-    if data.endswith('Ti') or data.endswith('TiB'):
-        return cast_type(data.split('Ti')[0].strip()) * (1024 * 1024 * 1024 * 1024)
-    if data.endswith('Pi') or data.endswith('PiB'):
-        return cast_type(data.split('Pi')[0].strip()) * (1024 * 1024 * 1024 * 1024 * 1024)
-    if data.endswith('Ei') or data.endswith('EiB'):
-        return cast_type(data.split('Ei')[0].strip()) * (1024 * 1024 * 1024 * 1024 * 1024 * 1024)
-    return cast_type(data.strip())
-
+if TYPE_CHECKING:
+    from pydantic.types import ByteSize
 
 @lru_cache()
 def get_nvidia_smi_cmd() -> str:
@@ -47,25 +27,6 @@ def get_nvidia_smi_cmd() -> str:
     return nvidia_smi
 
 
-
-if TYPE_CHECKING:
-    from pydantic.types import ByteSize
-
-def parse_memory_metric_to_bs(data: Union[int, float, str]) -> 'ByteSize':
-    """
-    Parses memory to ByteSize
-    """
-    from pydantic.types import ByteSize
-    if isinstance(data, (int, float)): 
-        return ByteSize(data)
-    data = parse_memory_metric(f'{data} MiB')
-    return ByteSize(data)
-
-def safe_float(item: str) -> float:
-    try: number = float(item)
-    except ValueError: number = float('nan')
-    return number
-
 _nvidia_smi_dict_mapping = {
     'index': str,
     'name': str,
@@ -76,6 +37,8 @@ _nvidia_smi_dict_mapping = {
     'memory_used': parse_memory_metric_to_bs,
     'memory_free': parse_memory_metric_to_bs,
 }
+
+GPUData = Union[List[Dict[str, Any]], Dict[str, Union[str, int, float, 'ByteSize']]]
 
 def map_nvidia_smi_result_values(data: List[str]) -> Dict[str, Any]:
     """
@@ -88,7 +51,7 @@ def map_nvidia_smi_result_values(data: List[str]) -> Dict[str, Any]:
     return result
 
 
-async def aget_gpu_data() -> Union[List[Dict[str, Any]], Dict[str, Union[str, int, float, 'ByteSize']]]:
+async def aget_gpu_data() -> GPUData:
     """
     Returns the GPU Data
     """
@@ -115,7 +78,7 @@ async def aget_gpu_data() -> Union[List[Dict[str, Any]], Dict[str, Union[str, in
     if len(gpu_data) == 1: gpu_data = gpu_data[0]
     return gpu_data
 
-def get_gpu_data() -> Union[List[Dict[str, Any]], Dict[str, Union[str, int, float, 'ByteSize']]]:
+def get_gpu_data() -> GPUData:
     """
     Gets the GPU data
     """

@@ -9,7 +9,7 @@ ThreadPool Implementation
 import os
 import abc
 import sys
-import anyio
+# import anyio
 import inspect
 import asyncio
 import shlex
@@ -17,12 +17,22 @@ import functools
 import subprocess
 import contextvars
 import contextlib
-import anyio.from_thread
+# import anyio.from_thread
 import typing as t
 from concurrent import futures
-from anyio._core._eventloop import threadlocals
+# from anyio._core._eventloop import threadlocals
 from lzl.proxied import proxied
-from typing import Callable, Coroutine, Any, Union, List, Set, Tuple, TypeVar, Optional, Generator, Awaitable, Iterable, AsyncGenerator, Dict
+from lzl import load
+from typing import Callable, Coroutine, Any, Union, List, Set, Tuple, TypeVar, Optional, Generator, Awaitable, Iterable, AsyncGenerator, Dict, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import anyio
+    import anyio.from_thread
+    import anyio._core._eventloop
+
+else:
+    anyio = load.lazy_load("anyio")
+
 
 if sys.version_info < (3, 10):
     # Add aiter and anext to asyncio
@@ -328,7 +338,7 @@ class ThreadPool(abc.ABC):
         """
         Runs an Async Function as a Sync Function
         """
-        current_async_module = getattr(threadlocals, "current_async_module", None)
+        current_async_module = getattr(anyio._core._eventloop.threadlocals, "current_async_module", None)
         partial_f = functools.partial(func, *args, **kwargs)
         if current_async_module is None:
             return anyio.run(partial_f)
