@@ -19,7 +19,7 @@ from aiopath.handle import IterableAIOFile
 from pydantic.types import ByteSize
 from lzl.pool import ThreadPool
 from lzl.io import aio
-from lzl.types import PYDANTIC_VERSION
+from lzl.types import PYDANTIC_VERSION, eproperty
 
 from ..types.errors import FileExistsError
 from ..types.misc import ObjectSize
@@ -69,56 +69,6 @@ class CloudFileSystemPurePath(PurePath):
         from .providers.main import ProviderManager
         return ProviderManager.get_accessor(prefix)
     
-    # if PYDANTIC_VERSION == 2:
-    #     from pydantic_core import core_schema
-    #     from pydantic.annotated_handlers import GetCoreSchemaHandler, GetJsonSchemaHandler
-    #     from pydantic.json_schema import JsonSchemaValue
-
-
-    #     @classmethod
-    #     def _get_filelike(cls, *args, **kwargs) -> 'FileLike':
-    #         """
-    #         Returns the FileLike
-    #         """
-    #         from .main import get_filelike
-    #         return get_filelike(*args, **kwargs)
-        
-    #     def __get_pydantic_json_schema__(
-    #         self, 
-    #         core_schema: core_schema.CoreSchema, 
-    #         handler: GetJsonSchemaHandler
-    #     ) -> JsonSchemaValue:
-            
-    #         field_schema = handler(core_schema)
-    #         field_schema.update(format = 'path', type = 'string')
-    #         return field_schema
-
-    #     @classmethod
-    #     def __get_pydantic_core_schema__(
-    #         cls, 
-    #         source: type[t.Any], 
-    #         handler: 'GetCoreSchemaHandler'
-    #     ) -> core_schema.CoreSchema:
-    #         """
-    #         Get the Pydantic CoreSchema for the given source
-    #         """
-    #         from pydantic_core import core_schema
-    #         return core_schema.with_info_plain_validator_function(
-    #             cls._validate,
-    #             serialization = core_schema.to_string_ser_schema(),
-    #         )
-        
-
-    #     @classmethod
-    #     def _validate(cls, __input_value: t.Any, _: core_schema.ValidationInfo) -> 'FileLike':
-    #         """
-    #         Validator for Pydantic v2
-    #         """
-    #         return cls._get_filelike(__input_value) if __input_value is not None else None
-        
-
-    #     def __hash__(self: 'FileLike') -> int:
-    #         return hash(self.as_posix())
     
 
 class PureCloudFileSystemPosixPath(CloudFileSystemPurePath):
@@ -160,6 +110,7 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         self._accessor = self._get_provider_accessor(self._prefix)
         self._closed = False
         self._fileio = None
+        self._extra: t.Dict[str, t.Any] = {}
 
     def __new__(cls: t.Union[t.Type['CloudFileSystemPath'], t.Type[CloudPathT]], *parts, **kwargs) -> t.Union['CloudFileSystemPath', CloudPathT]:
         if cls is CloudFileSystemPath or issubclass(cls, CloudFileSystemPath):
@@ -268,6 +219,13 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         """
         return self._accessor.is_fsspec
     
+    @property
+    def is_cloud_obj_(self) -> bool:
+        """
+        Returns True if the path is a cloud object
+        """
+        return self.is_fsspec
+
     @property
     def fspath_(self) -> str:
         """
@@ -409,6 +367,13 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         Size in bytes of file
         """
         return self._accessor.size(self.fspath_) if self.is_file() else None
+
+    @property
+    def bytesize_(self) -> t.Optional['ByteSize']:
+        """
+        ByteSize in bytes of file
+        """
+        return self.bytesize()
     
     @property
     def fss3tm(self) -> t.Optional['TransferManager']:
@@ -418,6 +383,43 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         if self._accessor._s3t is not None:
             return self._accessor.get_s3t()
         raise NotImplementedError('S3 Transfer Manager is not Supported for this File System')
+    
+    
+    @property
+    def etag(self) -> t.Optional[str]:
+        """
+        Returns the etag of the file
+
+        Cleans up the quoted string
+        """
+        _info = self.info()
+        etag = _info.get('ETag', _info.get('etag'))
+        return etag.strip('"') if etag else None
+    
+    @eproperty
+    def checksum(self) -> str:
+        """
+        Returns the checksum of the file
+        """
+        from lzl.io.file.types.utils import generate_checksum
+        return generate_checksum(self)
+    
+    @property
+    def last_modified_(self) -> t.Optional[datetime.datetime]:
+        """
+        Returns the last modified time of the file
+        """
+        _info = self.info()
+        return _info.get('LastModified', _info.get('last_modified'))
+    
+    @eproperty
+    def content_type_(self) -> t.Optional[str]:
+        """
+        Returns the content type of the file
+        """
+        _info = self.info()
+        return _info.get('ContentType', _info.get('content_type'))
+
 
     def open(self, mode: FileMode = 'r', buffering: int = -1, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, block_size: int = 5242880, compression: str = None, **kwargs: t.Any) -> t.IO[t.Union[str, bytes]]:
         """

@@ -76,6 +76,7 @@ class FileR2Path(CloudFileSystemPath):
         self._accessor = self._get_provider_accessor(self._prefix)
         self._closed = False
         self._fileio = None
+        self._extra: t.Dict[str, t.Any] = {}
 
     def __new__(cls, *parts, **kwargs):
         if cls is FileR2Path or issubclass(cls, FileR2Path): 

@@ -6,7 +6,8 @@ import shutil
 import tempfile
 import pathlib
 import typing as t
-import anyio
+import datetime
+from lzl.types import eproperty
 from pydantic.types import ByteSize
 # from aiopath.selectors import _make_selector
 # from aiopath.scandir import EntryWrapper, scandir_async
@@ -231,6 +232,7 @@ class FilePath(Path, FilePurePath):
         self._accessor = _pathz_accessor
         self._closed = False
         self._fileio = None
+        self._extra: t.Dict[str, t.Any] = {}
 
     def __new__(cls: t.Union['FilePath', t.Type[_FilePathT]], *args, **kwargs):
         #if cls is FilePath: cls = FileWindowsPath if os.name == 'nt' else FilePosixPath
@@ -266,6 +268,14 @@ class FilePath(Path, FilePurePath):
         """
         return self._accessor.is_fsspec
 
+
+    @property
+    def is_cloud_obj_(self) -> bool:
+        """
+        Returns True if the path is a cloud object
+        """
+        return self.is_fsspec
+
     @property
     def parent(self) -> 'FilePath':
         """
@@ -273,21 +283,44 @@ class FilePath(Path, FilePurePath):
         """
         return super().parent
     
-    @property
+    @eproperty
     def checksum(self):
         """
         Returns the checksum of the file
         """
         return generate_checksum(self)
     
-    @property
+    @eproperty
     def etag(self):
         """
-        Returns the etag of the file
+        Returns the etag of the file with the quoted stripped
         """
-        return calc_etag(self)
+        return calc_etag(self).strip('"')
     
+    @property
+    def last_modified_(self) -> t.Optional[datetime.datetime]:
+        """
+        Returns the last modified time of the file
+        """
+        file_stats = os.stat(self.as_posix())
+        return datetime.datetime.fromtimestamp(file_stats.st_mtime)
     
+    @eproperty
+    def content_type_(self) -> t.Optional[str]:
+        """
+        Returns the content type of the file
+
+        This can't be determined automatically for local files.
+        """
+        return self._extra.get('content_type_')
+    
+    @property
+    def bytesize_(self) -> t.Optional['ByteSize']:
+        """
+        ByteSize in bytes of file
+        """
+        return self.bytesize()
+
     @property
     def string(self) -> str:
         """
