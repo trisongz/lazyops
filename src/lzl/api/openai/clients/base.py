@@ -441,6 +441,8 @@ class OpenAIClient:
         # with contextlib.suppress(Exception):
             response = self.client.get(base_url or '/', timeout = timeout)
             try:
+                if response.is_success:
+                    return True
                 data = response.json()
                 # we should expect a 404 with a json response
                 # if self.debug_enabled: logger.info(f"API Ping: {data}\n{response.headers}")
@@ -459,6 +461,8 @@ class OpenAIClient:
         try:
             response = await self.client.async_get(base_url or '/', timeout = timeout)
             try:
+                if response.is_success:
+                    return True
                 data = response.json()
                 # we should expect a 404 with a json response
                 if data.get('error'): return True
