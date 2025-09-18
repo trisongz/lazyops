@@ -1,26 +1,30 @@
 from __future__ import annotations
 
-"""
-Aggregate of all the DB Configs
-"""
+"""Adapter-specific configuration registries for LazyOps databases."""
 
-from typing import Optional, Dict, Any, Union, Type, TYPE_CHECKING
+import typing as t
 from .base.config import BaseDBConfig, BaseDBSettings, DBConfigT, DBSettingsT
 # from .pg.config import PostgresConfig, PostgresSettings
 from .postgres.config import PostgresConfig, PostgresSettings
 from .sqlite.config import SqliteConfig, SqliteSettings
 
-ADAPTER_TO_CONFIG: Dict[str, Type[DBConfigT]] = {
+ADAPTER_TO_CONFIG: t.Dict[str, t.Type[DBConfigT]] = {
     'postgres': PostgresConfig,
     'postgresql': PostgresConfig,
 
     'sqlite': SqliteConfig,
 }
-ADAPTER_TO_SETTINGS: Dict[str, Type[DBSettingsT]] = {
+ADAPTER_TO_SETTINGS: t.Dict[str, t.Type[DBSettingsT]] = {
     'postgres': PostgresSettings,
     'postgresql': PostgresSettings,
 
     'sqlite': SqliteSettings,
 }
 
-DATABASE_CONFIG_CLASSES = Union[PostgresConfig, SqliteConfig]
+DATABASE_CONFIG_CLASSES = t.Union[PostgresConfig, SqliteConfig]
+
+__all__ = [
+    "ADAPTER_TO_CONFIG",
+    "ADAPTER_TO_SETTINGS",
+    "DATABASE_CONFIG_CLASSES",
+]

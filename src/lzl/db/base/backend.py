@@ -10,12 +10,12 @@ import asyncio
 import contextlib
 
 from lzl.logging import logger, null_logger, Logger
-from lzl.types import eproperty, Literal
+from lzl.types import eproperty
 from .config import BackendType, DBConfigT
 from .utils import SQLAlchemyUtilities
-from typing import List, Optional, Dict, Any, Union, Type, TypeVar, Callable, Tuple, AsyncGenerator, Generator, overload, TYPE_CHECKING
+import typing as t
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from sqlalchemy import Connection, Engine
     from sqlalchemy.orm import Session, session, sessionmaker, scoped_session
     from sqlalchemy.ext.asyncio import async_sessionmaker, async_scoped_session
@@ -24,8 +24,8 @@ if TYPE_CHECKING:
     from sqlmodel import Session as SMSession
     from sqlmodel.ext.asyncio.session import AsyncSession as SMAsyncSession
 
-    SessionT = Union[SMSession, Session]
-    AsyncSessionT = Union[SMAsyncSession, AsyncSession]
+    SessionT = t.Union[SMSession, Session]
+    AsyncSessionT = t.Union[SMAsyncSession, AsyncSession]
 
     SessionMakerT = sessionmaker[SessionT]
     AsyncSessionMakerT = async_sessionmaker[AsyncSessionT]
@@ -33,10 +33,10 @@ if TYPE_CHECKING:
     ScopedSessionMakerT = scoped_session[SessionT]
     AsyncScopedSessionMakerT = async_scoped_session[AsyncSessionT]
 
-    SessionGetT = Union[SessionMakerT, ScopedSessionMakerT]
-    AsyncSessionGetT = Union[AsyncSessionMakerT, AsyncScopedSessionMakerT]
+    SessionGetT = t.Union[SessionMakerT, ScopedSessionMakerT]
+    AsyncSessionGetT = t.Union[AsyncSessionMakerT, AsyncScopedSessionMakerT]
 
-    SessionGetterT = Union[SessionGetT, AsyncSessionGetT]
+    SessionGetterT = t.Union[SessionGetT, AsyncSessionGetT]
 
     SMSessionMakerT = sessionmaker[SMSession]
     SMAsyncSessionMakerT = async_sessionmaker[SMAsyncSession]
@@ -44,9 +44,9 @@ if TYPE_CHECKING:
     SMScopedSessionMakerT = scoped_session[SMSession]
     SMAsyncScopedSessionMakerT = async_scoped_session[SMAsyncSession]
 
-    SMSessionGetT = Union[SMSessionMakerT, SMScopedSessionMakerT]
-    SMAsyncSessionGetT = Union[SMAsyncSessionMakerT, SMAsyncScopedSessionMakerT]
-    SMSessionGetterT = Union[SMSessionGetT, SMAsyncSessionGetT]
+    SMSessionGetT = t.Union[SMSessionMakerT, SMScopedSessionMakerT]
+    SMAsyncSessionGetT = t.Union[SMAsyncSessionMakerT, SMAsyncScopedSessionMakerT]
+    SMSessionGetterT = t.Union[SMSessionGetT, SMAsyncSessionGetT]
 
     from lzl.pool import ThreadPool
     from sqlalchemy import TextClause
@@ -56,15 +56,15 @@ class BaseDatabaseBackend(abc.ABC):
     """
     Base Database Connection
     """
-    name: Optional[str] = 'default'
-    backend: Optional[BackendType] = None
+    name: t.Optional[str] = 'default'
+    backend: t.Optional[BackendType] = None
     
-    _extra: Dict[str, Any] = {}
+    _extra: t.Dict[str, t.Any] = {}
 
     def __init__(
         self,
         config: DBConfigT,
-        name: Optional[str] = None,
+        name: t.Optional[str] = None,
         **kwargs,
     ) -> None:
         """
@@ -350,10 +350,10 @@ class BaseDatabaseBackend(abc.ABC):
 
     def _get_session_type(
         self,
-        readonly: Optional[bool] = None,
-        scoped: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-    ) -> Tuple['SessionGetT', bool]:
+        readonly: t.Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+    ) -> t.Tuple['SessionGetT', bool]:
         """
         Returns the session
         """
@@ -364,10 +364,10 @@ class BaseDatabaseBackend(abc.ABC):
     
     def _get_async_session_type(
         self,
-        readonly: Optional[bool] = None,
-        scoped: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-    ) -> Tuple['AsyncSessionGetT', bool]:
+        readonly: t.Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+    ) -> t.Tuple['AsyncSessionGetT', bool]:
         """
         Returns the session
         """
@@ -379,11 +379,11 @@ class BaseDatabaseBackend(abc.ABC):
 
     def _get_session(
         self,
-        readonly: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        mode: Optional[Literal['sync', 'async']] = 'sync',
-        scoped: Optional[bool] = None,
-    ) -> Tuple['SessionGetterT', bool]:
+        readonly: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        mode: t.Optional[t.Literal['sync', 'async']] = 'sync',
+        scoped: t.Optional[bool] = None,
+    ) -> t.Tuple['SessionGetterT', bool]:
         """
         Returns the session
         """
@@ -397,11 +397,11 @@ class BaseDatabaseBackend(abc.ABC):
 
     def get_engine(
         self,
-        url: Optional[str] = None,
-        readonly: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        execution_options: Optional[Dict[str, Any]] = None,
-        adapter: Optional[str] = None,
+        url: t.Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        execution_options: t.Optional[t.Dict[str, t.Any]] = None,
+        adapter: t.Optional[str] = None,
         **kwargs,
     ) -> 'Engine':
         """
@@ -421,11 +421,11 @@ class BaseDatabaseBackend(abc.ABC):
     
     def get_aengine(
         self,
-        url: Optional[str] = None,
-        readonly: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        execution_options: Optional[Dict[str, Any]] = None,
-        adapter: Optional[str] = None,
+        url: t.Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        execution_options: t.Optional[t.Dict[str, t.Any]] = None,
+        adapter: t.Optional[str] = None,
         **kwargs,
     ) -> 'AsyncEngine':
         """
@@ -449,9 +449,9 @@ class BaseDatabaseBackend(abc.ABC):
 
     def _get_engine_type(
         self,
-        readonly: Optional[bool] = None,
-        mode: Optional[Literal['sync', 'async']] = 'sync',
-    ) -> Union['Engine', 'AsyncEngine']:
+        readonly: t.Optional[bool] = None,
+        mode: t.Optional[t.Literal['sync', 'async']] = 'sync',
+    ) -> t.Union['Engine', 'AsyncEngine']:
         """
         Returns the session type
         """
@@ -462,15 +462,15 @@ class BaseDatabaseBackend(abc.ABC):
     @contextlib.contextmanager
     def connection(
         self,
-        readonly: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        execution_options: Optional[Dict[str, Any]] = None,
-        url: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        execution_options: t.Optional[t.Dict[str, t.Any]] = None,
+        url: t.Optional[str] = None,
         **kwargs,
-    ) -> Generator['Connection', None, None]:
+    ) -> t.Generator['Connection', None, None]:
         """
         Context Manager for the connection
         """
@@ -511,15 +511,15 @@ class BaseDatabaseBackend(abc.ABC):
     @contextlib.asynccontextmanager
     async def aconnection(
         self,
-        readonly: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        execution_options: Optional[Dict[str, Any]] = None,
-        url: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        execution_options: t.Optional[t.Dict[str, t.Any]] = None,
+        url: t.Optional[str] = None,
         **kwargs,
-    ) -> AsyncGenerator['AsyncConnection', None]:
+    ) -> t.AsyncGenerator['AsyncConnection', None]:
         """
         Context Manager for the connection
         """
@@ -574,11 +574,11 @@ class BaseDatabaseBackend(abc.ABC):
     def dbexec(
         self, 
         sql: str,
-        superuser: Optional[bool] = None,
-        readonly: Optional[bool] = None,
-        database: Optional[str] = None,
-        debug_enabled: Optional[bool] = None,
-        verbose: Optional[bool] = True,
+        superuser: t.Optional[bool] = None,
+        readonly: t.Optional[bool] = None,
+        database: t.Optional[str] = None,
+        debug_enabled: t.Optional[bool] = None,
+        verbose: t.Optional[bool] = True,
         **kwargs,
     ) -> str:
         """
@@ -603,11 +603,11 @@ class BaseDatabaseBackend(abc.ABC):
     async def adbexec(
         self, 
         sql: str,
-        superuser: Optional[bool] = None,
-        readonly: Optional[bool] = None,
-        database: Optional[str] = None,
-        debug_enabled: Optional[bool] = None,
-        verbose: Optional[bool] = True,
+        superuser: t.Optional[bool] = None,
+        readonly: t.Optional[bool] = None,
+        database: t.Optional[str] = None,
+        debug_enabled: t.Optional[bool] = None,
+        verbose: t.Optional[bool] = True,
         **kwargs,
     ) -> str:
         """
@@ -631,8 +631,8 @@ class BaseDatabaseBackend(abc.ABC):
 
     def wait_for_ready(
         self,
-        max_attempts: Optional[int] = 10,
-        interval: Optional[float] = 5.0,
+        max_attempts: t.Optional[int] = 10,
+        interval: t.Optional[float] = 5.0,
     ):
         """
         Waits for the database to be ready
@@ -655,8 +655,8 @@ class BaseDatabaseBackend(abc.ABC):
 
     async def await_for_ready(
         self,
-        max_attempts: Optional[int] = 10,
-        interval: Optional[float] = 5.0,
+        max_attempts: t.Optional[int] = 10,
+        interval: t.Optional[float] = 5.0,
     ):
         """
         Waits for the database to be ready
@@ -680,9 +680,9 @@ class BaseDatabaseBackend(abc.ABC):
     def _execute_scalar(
         self,
         query: 'TextClause',
-        params: Optional[Dict[str, Any]] = None,
+        params: t.Optional[t.Dict[str, t.Any]] = None,
         **kwargs,
-    ) -> Any:
+    ) -> t.Any:
         """
         Executes a scalar query
         """
@@ -693,9 +693,9 @@ class BaseDatabaseBackend(abc.ABC):
     async def _aexecute_scalar(
         self,
         query: 'TextClause',
-        params: Optional[Dict[str, Any]] = None,
+        params: t.Optional[t.Dict[str, t.Any]] = None,
         **kwargs,
-    ) -> Any:
+    ) -> t.Any:
         """
         Executes a scalar query
         """
@@ -742,7 +742,7 @@ class BaseDatabaseBackend(abc.ABC):
     def database_exists(
         self,
         db_name: str,
-        verbose: Optional[bool] = True,
+        verbose: t.Optional[bool] = True,
     ) -> bool:
         """
         Checks if the database exists
@@ -758,7 +758,7 @@ class BaseDatabaseBackend(abc.ABC):
     async def adatabase_exists(
         self,
         db_name: str,
-        verbose: Optional[bool] = True,
+        verbose: t.Optional[bool] = True,
     ) -> bool:
         """
         Checks if the database exists
@@ -773,8 +773,8 @@ class BaseDatabaseBackend(abc.ABC):
 
     def get_table_names(
         self,
-        schema: Optional[str] = None,
-    ) -> List[str]:
+        schema: t.Optional[str] = None,
+    ) -> t.List[str]:
         """
         Returns the table names
         """
@@ -786,9 +786,9 @@ class BaseDatabaseBackend(abc.ABC):
         self,
         table: str,
         column: str,
-        schema: Optional[str] = None,
-        verbose: Optional[bool] = False,
-    ) -> Dict[str, Union[str, float]]:
+        schema: t.Optional[str] = None,
+        verbose: t.Optional[bool] = False,
+    ) -> t.Dict[str, t.Union[str, float]]:
         """
         Displays the table column size
         """
@@ -815,8 +815,8 @@ class BaseDatabaseBackend(abc.ABC):
     def get_table_column_names(
         self,
         table: str,
-        schema: Optional[str] = None,
-    ) -> List[str]:
+        schema: t.Optional[str] = None,
+    ) -> t.List[str]:
         """
         Returns the table column names
         """
@@ -834,10 +834,10 @@ class BaseDatabaseBackend(abc.ABC):
 
     def upgrade_extensions(
         self,
-        extensions: Optional[List[str]] = None,
-        verbose: Optional[bool] = True,
+        extensions: t.Optional[t.List[str]] = None,
+        verbose: t.Optional[bool] = True,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> t.Dict[str, t.Any]:
         """
         Upgrade the extensions
         """
@@ -861,10 +861,10 @@ class BaseDatabaseBackend(abc.ABC):
 
     async def aupgrade_extensions(
         self,
-        extensions: Optional[List[str]] = None,
-        verbose: Optional[bool] = True,
+        extensions: t.Optional[t.List[str]] = None,
+        verbose: t.Optional[bool] = True,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> t.Dict[str, t.Any]:
         """
         Upgrade the extensions
         """
@@ -887,5 +887,4 @@ class BaseDatabaseBackend(abc.ABC):
 
 
 
-BackendClassT = TypeVar('BackendClassT', bound = BaseDatabaseBackend)
-
+BackendClassT = t.TypeVar('BackendClassT', bound = BaseDatabaseBackend)

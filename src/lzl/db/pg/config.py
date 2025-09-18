@@ -10,12 +10,12 @@ import pathlib
 from lzl import load
 from lzl.logging import logger
 from lzl.types import BaseModel, BaseSettings, eproperty, model_validator, AppEnv
-from lzo.types import RBaseModel, Literal, Field
+from lzo.types import RBaseModel, Field
 from pydantic.networks import PostgresDsn
 from .utils import parse_pg_config
-from typing import List, Optional, Dict, Any, Union, Type, Callable, TYPE_CHECKING
+import typing as t
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from lzl.io import TemporaryData, SerT
 
 
@@ -23,9 +23,9 @@ class BasePostgresConfig(RBaseModel):
     """
     The Postgres Config
     """
-    url: Optional[PostgresDsn] = None
-    readonly_url: Optional[PostgresDsn] = None
-    superuser_url: Optional[PostgresDsn] = None
+    url: t.Optional[PostgresDsn] = None
+    readonly_url: t.Optional[PostgresDsn] = None
+    superuser_url: t.Optional[PostgresDsn] = None
 
     @eproperty
     def temp_data(self) -> 'TemporaryData':
@@ -51,21 +51,21 @@ class BasePostgresConfig(RBaseModel):
         return 'POSTGRES'
 
     @eproperty
-    def username(self) -> Optional[str]:
+    def username(self) -> t.Optional[str]:
         """
         The Username for the Default URL
         """
         return self.url.hosts()[0]['username']
     
     @eproperty
-    def password(self) -> Optional[str]:
+    def password(self) -> t.Optional[str]:
         """
         The Password for the Default URL
         """
         return self.url.hosts()[0]['password']
     
     @eproperty
-    def superuser_username(self) -> Optional[str]:
+    def superuser_username(self) -> t.Optional[str]:
         """
         The Username for the Superuser URL
         """
@@ -73,7 +73,7 @@ class BasePostgresConfig(RBaseModel):
         return self.superuser_url.hosts()[0]['username']
     
     @eproperty
-    def superuser_password(self) -> Optional[str]:
+    def superuser_password(self) -> t.Optional[str]:
         """
         The Password for the Superuser URL
         """
@@ -81,14 +81,14 @@ class BasePostgresConfig(RBaseModel):
         return self.superuser_url.hosts()[0]['password']
     
     @eproperty
-    def safe_url(self) -> Optional[str]:
+    def safe_url(self) -> t.Optional[str]:
         """
         The Safe URL
         """
         return str(self.url).replace(self.password, '********') if self.url else None
     
     @eproperty
-    def safe_superuser_url(self) -> Optional[str]:
+    def safe_superuser_url(self) -> t.Optional[str]:
         """
         The Safe Superuser URL
         """
@@ -102,7 +102,7 @@ class BasePostgresConfig(RBaseModel):
         return 'postgres://' + str(self.url).split('://', 1)[-1].strip()
     
     @eproperty
-    def adapterless_ro_url(self) -> Optional[str]:
+    def adapterless_ro_url(self) -> t.Optional[str]:
         """
         Returns the plain url with only postgres://
         """
@@ -128,9 +128,9 @@ class BasePostgresConfig(RBaseModel):
     
     def get_cli_connect_string(
         self,
-        superuser: Optional[bool] = None,
-        readonly: Optional[bool] = None,
-        database: Optional[str] = None,
+        superuser: t.Optional[bool] = None,
+        readonly: t.Optional[bool] = None,
+        database: t.Optional[str] = None,
         **kwargs,
     ) -> str:
         """
@@ -171,7 +171,7 @@ class BasePostgresConfig(RBaseModel):
         """
         return self.temp_data.has_logged(msg)
     
-    def log_readonly_warning(self, verbose: Optional[bool] = True):
+    def log_readonly_warning(self, verbose: t.Optional[bool] = True):
         """
         Logs the readonly warning
         """
@@ -180,7 +180,7 @@ class BasePostgresConfig(RBaseModel):
             safe_url = str(self.url).replace(self.password, '********')  if self.password else str(self.url)
             logger.info(f'|y|Readonly URL not set|e|, using default URL: {safe_url}', colored = True, prefix = 'PostgresDB')
 
-    def log_db_url(self, verbose: Optional[bool] = True):
+    def log_db_url(self, verbose: t.Optional[bool] = True):
         """
         Logs the Database URL
         """
@@ -195,12 +195,12 @@ class PostgresSettings(BasePostgresConfig, BaseSettings):
     The Postgres Settings
     """
     
-    if TYPE_CHECKING:
-        migration_env: Optional[Union[AppEnv, str]] = None
-        target_env: Optional[Union[AppEnv, str]] = None
+    if t.TYPE_CHECKING:
+        migration_env: t.Optional[t.Union[AppEnv, str]] = None
+        target_env: t.Optional[t.Union[AppEnv, str]] = None
     else:
-        migration_env: Optional[Union[str, Any]] = None
-        target_env: Optional[Union[str, Any]] = None
+        migration_env: t.Optional[t.Union[str, t.Any]] = None
+        target_env: t.Optional[t.Union[str, t.Any]] = None
 
     class Config:
         env_prefix = "POSTGRES_"
@@ -214,14 +214,14 @@ class PostgresSettings(BasePostgresConfig, BaseSettings):
         return self.Config.env_prefix.lower().rstrip('_')
     
     @eproperty
-    def config_class(self) -> Type['PostgresConfig']:
+    def config_class(self) -> t.Type['PostgresConfig']:
         """
         Returns the config class
         """
         return PostgresConfig
     
     @classmethod
-    def get_config_file_envvar(cls, values: Optional[Dict[str, Any]] = None, **kwargs) -> str:
+    def get_config_file_envvar(cls, values: t.Optional[t.Dict[str, t.Any]] = None, **kwargs) -> str:
         """
         Returns the Postgres Config File Environment Variable
         """
@@ -229,7 +229,7 @@ class PostgresSettings(BasePostgresConfig, BaseSettings):
         return None
     
     @classmethod
-    def get_config_file_app_name(cls, values: Optional[Dict[str, Any]] = None, **kwargs) -> str:
+    def get_config_file_app_name(cls, values: t.Optional[t.Dict[str, t.Any]] = None, **kwargs) -> str:
         """
         Returns the Postgres App Name
         """
@@ -237,7 +237,7 @@ class PostgresSettings(BasePostgresConfig, BaseSettings):
         return None
     
     @classmethod
-    def get_config_file_env_name(cls, values: Optional[Dict[str, Any]] = None, **kwargs) -> Optional[Union[str, 'AppEnv']]:
+    def get_config_file_env_name(cls, values: t.Optional[t.Dict[str, t.Any]] = None, **kwargs) -> t.Optional[t.Union[str, 'AppEnv']]:
         """
         Returns the Postgres Config File Environment Name
         """
@@ -247,22 +247,22 @@ class PostgresSettings(BasePostgresConfig, BaseSettings):
     @classmethod
     def fetch_from_config_file(
         cls, 
-        env_name: Optional[Union[str, 'AppEnv']] = None, 
-        app_name: Optional[str] = None,
-        config_file: Optional[Union[str, pathlib.Path]] = None,
-        config_file_env_var: Optional[str] = None,
-        in_cluster: Optional[bool] = None,
-        from_init: Optional[bool] = None,
+        env_name: t.Optional[t.Union[str, 'AppEnv']] = None, 
+        app_name: t.Optional[str] = None,
+        config_file: t.Optional[t.Union[str, pathlib.Path]] = None,
+        config_file_env_var: t.Optional[str] = None,
+        in_cluster: t.Optional[bool] = None,
+        from_init: t.Optional[bool] = None,
         **kwargs,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> t.Optional[t.Dict[str, t.Any]]:
         """
         Fetches the config from the config file
 
         Args:
-            env_name (Optional[Union[str, AppEnv]], optional): The environment name. Defaults to None.
-            app_name (Optional[str], optional): The app name. Defaults to None.
-            config_file (Optional[Union[str, pathlib.Path]], optional): The config file. Defaults to None.
-            config_file_env_var (Optional[str], optional): The config file environment variable. Defaults to None.
+            env_name (t.Optional[t.Union[str, AppEnv]], optional): The environment name. Defaults to None.
+            app_name (t.Optional[str], optional): The app name. Defaults to None.
+            config_file (t.Optional[t.Union[str, pathlib.Path]], optional): The config file. Defaults to None.
+            config_file_env_var (t.Optional[str], optional): The config file environment variable. Defaults to None.
         """
         if not config_file:
             if not config_file_env_var: 
@@ -275,7 +275,7 @@ class PostgresSettings(BasePostgresConfig, BaseSettings):
             return
         import yaml
         if not from_init: logger.info(f'Using Postgres Config File: {config_file}', colored = True, prefix = f'{app_name} - {env_name}')
-        config_data: Dict[str, Dict[str, Dict[str, str]]] = yaml.safe_load(config_file.read_text())
+        config_data: t.Dict[str, t.Dict[str, t.Dict[str, str]]] = yaml.safe_load(config_file.read_text())
         if app_name and not config_data.get(app_name): 
             if not from_init: logger.warning(f'Config File Does Not Contain App: {app_name}')
             return
@@ -287,7 +287,7 @@ class PostgresSettings(BasePostgresConfig, BaseSettings):
         )
 
     @model_validator(mode = 'before')
-    def check_for_config_file(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+    def check_for_config_file(cls, values: t.Dict[str, t.Any]) -> t.Dict[str, t.Any]:
         """
         Checks for a config file
         """
@@ -315,7 +315,7 @@ class PostgresSettings(BasePostgresConfig, BaseSettings):
             self.target_env = AppEnv.from_env(self.target_env)
         return self
     
-    def reconfigure(self, app_env: Optional[Union[str, 'AppEnv']] = None):
+    def reconfigure(self, app_env: t.Optional[t.Union[str, 'AppEnv']] = None):
         """
         Reconfigures the Postgres Settings
         """
@@ -337,9 +337,9 @@ class PostgresSettings(BasePostgresConfig, BaseSettings):
 
     def get_backend_config(
         self, 
-        filepath: Optional[Union[str, pathlib.Path]] = None, 
-        env_var: Optional[str] = None,
-        **overrides: Any
+        filepath: t.Optional[t.Union[str, pathlib.Path]] = None, 
+        env_var: t.Optional[str] = None,
+        **overrides: t.Any
     ) -> 'PostgresConfig':
         """
         Returns the backend config
@@ -348,7 +348,7 @@ class PostgresSettings(BasePostgresConfig, BaseSettings):
         return self.config_class.from_settings(self, **overrides)
 
 
-_default_pool_classes: Dict[str, str] = {
+_default_pool_classes: t.Dict[str, str] = {
     'default': {
         'sync': 'sqlalchemy.pool.QueuePool',
         'async': 'sqlalchemy.pool.AsyncAdaptedQueuePool',
@@ -357,13 +357,13 @@ _default_pool_classes: Dict[str, str] = {
     'static': 'sqlalchemy.pool.StaticPool',
 }
 
-_default_adapters: Dict[str, str] = {
+_default_adapters: t.Dict[str, str] = {
     'sync': 'psycopg2',
     'async': 'asyncpg',
 }
 
 
-_default_session_kwargs: Dict[str, Dict[str, Any]] = {
+_default_session_kwargs: t.Dict[str, t.Dict[str, t.Any]] = {
     'kwargs': {
         'sync': {},
         'async': {
@@ -372,33 +372,33 @@ _default_session_kwargs: Dict[str, Dict[str, Any]] = {
     },
 }
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from sqlalchemy.pool import NullPool, AsyncAdaptedQueuePool, StaticPool, QueuePool
 
-    ConnPoolT = Union[QueuePool, AsyncAdaptedQueuePool, NullPool, StaticPool]
+    ConnPoolT = t.Union[QueuePool, AsyncAdaptedQueuePool, NullPool, StaticPool]
 
 class EngineConfig(BaseModel):
     """
     The Postgres Engine Config
     """
     
-    if TYPE_CHECKING:
-        poolclass: Optional[Union[str, Type[ConnPoolT]]] = None
+    if t.TYPE_CHECKING:
+        poolclass: t.Optional[t.Union[str, t.Type[ConnPoolT]]] = None
     else:
-        poolclass: Optional[Union[str, Type]] = None
+        poolclass: t.Optional[t.Union[str, t.Type]] = None
     
-    adapter: Optional[str] = None
-    serializer: Optional[Union[Callable, str]] = 'json'
-    deserializer: Optional[Union[Callable, str]] = 'json'
-    kwargs: Optional[Dict[str, Any]] = Field(default_factory = dict)
-    rw_kwargs: Optional[Dict[str, Any]] = Field(default_factory = dict)
-    ro_kwargs: Optional[Dict[str, Any]] = Field(default_factory = dict)
-    mode: Optional[Literal['sync', 'async']] = 'sync'
+    adapter: t.Optional[str] = None
+    serializer: t.Optional[t.Union[t.Callable, str]] = 'json'
+    deserializer: t.Optional[t.Union[t.Callable, str]] = 'json'
+    kwargs: t.Optional[t.Dict[str, t.Any]] = Field(default_factory = dict)
+    rw_kwargs: t.Optional[t.Dict[str, t.Any]] = Field(default_factory = dict)
+    ro_kwargs: t.Optional[t.Dict[str, t.Any]] = Field(default_factory = dict)
+    mode: t.Optional[t.Literal['sync', 'async']] = 'sync'
 
     def configure_serializers(
         self,
-        serializer: Optional[Union[Callable, str]] = None,
-        deserializer: Optional[Union[Callable, str]] = None,
+        serializer: t.Optional[t.Union[t.Callable, str]] = None,
+        deserializer: t.Optional[t.Union[t.Callable, str]] = None,
     ):
         """
         Configures the engine serializers
@@ -478,10 +478,10 @@ class AsyncEngineConfig(EngineConfig):
     """
     The Async Engine Config
     """
-    mode: Literal['async'] = 'async'
+    mode: t.Literal['async'] = 'async'
 
 
-_default_session_kwargs: Dict[str, Dict[str, Any]] = {
+_default_session_kwargs: t.Dict[str, t.Dict[str, t.Any]] = {
     'rw_kwargs': {
         'sync': {},
         'async': {
@@ -511,36 +511,36 @@ _session_class_mapping = {
         'async': 'sqlmodel.ext.asyncio.session.AsyncSession',
     },
 }
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from sqlalchemy.orm import Session
     from sqlalchemy.ext.asyncio import AsyncSession
     from sqlmodel import Session as SMSession
     from sqlmodel.ext.asyncio.session import AsyncSession as SMAsyncSession
 
-    SessionT = Union[Session, SMSession, AsyncSession, SMAsyncSession]
+    SessionT = t.Union[Session, SMSession, AsyncSession, SMAsyncSession]
 
 
 class SessionConfig(BaseModel):
     """
     The Session Config
     """
-    scoped: Optional[bool] = None
+    scoped: t.Optional[bool] = None
     
-    if TYPE_CHECKING:
-        session_class: Optional[Union[str, Type[SessionT]]] = None
+    if t.TYPE_CHECKING:
+        session_class: t.Optional[t.Union[str, t.Type[SessionT]]] = None
     else:
-        session_class: Optional[Union[str, Type]] = None
+        session_class: t.Optional[t.Union[str, t.Type]] = None
     
-    kwargs: Optional[Dict[str, Any]] = Field(default_factory = dict)
-    ro_kwargs: Optional[Dict[str, Any]] = Field(default_factory = dict)
-    rw_kwargs: Optional[Dict[str, Any]] = Field(default_factory = dict)
-    mode: Optional[Literal['sync', 'async']] = 'sync'
+    kwargs: t.Optional[t.Dict[str, t.Any]] = Field(default_factory = dict)
+    ro_kwargs: t.Optional[t.Dict[str, t.Any]] = Field(default_factory = dict)
+    rw_kwargs: t.Optional[t.Dict[str, t.Any]] = Field(default_factory = dict)
+    mode: t.Optional[t.Literal['sync', 'async']] = 'sync'
 
     def get_session_class(
         self,
-        session_class: Optional[Union[str, Type['SessionT']]] = None,
+        session_class: t.Optional[t.Union[str, t.Type['SessionT']]] = None,
         **kwargs
-    ) -> Type['SessionT']:
+    ) -> t.Type['SessionT']:
         """
         Get the session class
         """
@@ -554,7 +554,7 @@ class SessionConfig(BaseModel):
 
     def configure_session_class(
         self,
-        session_class: Optional[Union[str, Type['SessionT']]] = None,
+        session_class: t.Optional[t.Union[str, t.Type['SessionT']]] = None,
         **kwargs
     ):
         """
@@ -581,7 +581,7 @@ class AsyncSessionConfig(SessionConfig):
     """
     The Async Session Config
     """
-    mode: Literal['async'] = 'async'
+    mode: t.Literal['async'] = 'async'
 
 
 """
@@ -628,27 +628,27 @@ asession:
 
 
 class ConnectionPoolConfig(BaseModel):
-    max_db_pool_size: Optional[int] = 5
+    max_db_pool_size: t.Optional[int] = 5
 
 
-BackendType = Literal['sqlalchemy', 'sqlmodel']
+BackendType = t.Literal['sqlalchemy', 'sqlmodel']
 
 
 class PostgresConfig(BasePostgresConfig):
     """
     The Postgres Config
     """
-    name: Optional[str] = 'default'
-    backend: Optional[BackendType] = None
-    engine: Optional[EngineConfig] = Field(default_factory = EngineConfig)
-    aengine: Optional[AsyncEngineConfig] = Field(default_factory = AsyncEngineConfig)
-    session: Optional[SessionConfig] = Field(default_factory = SessionConfig)
-    asession: Optional[AsyncSessionConfig] = Field(default_factory = AsyncSessionConfig)
-    pgpool: Optional[ConnectionPoolConfig] = Field(default_factory = ConnectionPoolConfig)
+    name: t.Optional[str] = 'default'
+    backend: t.Optional[BackendType] = None
+    engine: t.Optional[EngineConfig] = Field(default_factory = EngineConfig)
+    aengine: t.Optional[AsyncEngineConfig] = Field(default_factory = AsyncEngineConfig)
+    session: t.Optional[SessionConfig] = Field(default_factory = SessionConfig)
+    asession: t.Optional[AsyncSessionConfig] = Field(default_factory = AsyncSessionConfig)
+    pgpool: t.Optional[ConnectionPoolConfig] = Field(default_factory = ConnectionPoolConfig)
     
-    debug_enabled: Optional[bool] = None
-    autocommit_enabled: Optional[bool] = None
-    auto_rollback_enabled: Optional[bool] = True
+    debug_enabled: t.Optional[bool] = None
+    autocommit_enabled: t.Optional[bool] = None
+    auto_rollback_enabled: t.Optional[bool] = True
 
     @classmethod
     def from_settings(cls, settings: 'PostgresSettings', **overrides) -> 'PostgresConfig':
@@ -681,10 +681,10 @@ class PostgresConfig(BasePostgresConfig):
     @classmethod
     def from_config_file(
         cls,
-        filepath: Optional[Union[str, pathlib.Path]] = None,
-        env_var: Optional[str] = None,
-        settings: Optional['PostgresSettings'] = None,
-        **overrides: Any,
+        filepath: t.Optional[t.Union[str, pathlib.Path]] = None,
+        env_var: t.Optional[str] = None,
+        settings: t.Optional['PostgresSettings'] = None,
+        **overrides: t.Any,
     ) -> 'PostgresConfig':
         """
         Creates the Postgres Config from a Config File
@@ -694,7 +694,7 @@ class PostgresConfig(BasePostgresConfig):
         if not filepath: filepath = os.getenv(env_var)
         if not filepath or not filepath.exists(): return cls()
         import yaml
-        config_data: Dict[str, Dict[str, Dict[str, str]]] = yaml.safe_load(filepath.read_text())
+        config_data: t.Dict[str, t.Dict[str, t.Dict[str, str]]] = yaml.safe_load(filepath.read_text())
         if overrides:
             from lzo.utils.helpers import update_dict
             config_data = update_dict(config_data, overrides)
@@ -704,13 +704,13 @@ class PostgresConfig(BasePostgresConfig):
 
     def get_engine_kwargs(
         self,
-        readonly: Optional[bool] = False, 
-        verbose: Optional[bool] = False, 
-        superuser: Optional[bool] = None,
-        adapter: Optional[str] = None,
-        mode: Optional[Literal['sync', 'async']] = 'sync',
+        readonly: t.Optional[bool] = False, 
+        verbose: t.Optional[bool] = False, 
+        superuser: t.Optional[bool] = None,
+        adapter: t.Optional[str] = None,
+        mode: t.Optional[t.Literal['sync', 'async']] = 'sync',
         **engine_kwargs
-    ) -> Dict[str, Any]:
+    ) -> t.Dict[str, t.Any]:
         """
         Get the Engine KWargs
         """
@@ -749,11 +749,11 @@ class PostgresConfig(BasePostgresConfig):
 
     def get_session_kwargs(
         self, 
-        readonly: Optional[bool] = False, 
-        backend: Optional[BackendType] = None,
-        mode: Optional[Literal['sync', 'async']] = 'sync',
+        readonly: t.Optional[bool] = False, 
+        backend: t.Optional[BackendType] = None,
+        mode: t.Optional[t.Literal['sync', 'async']] = 'sync',
         **session_kwargs
-    ) -> Dict[str, Any]:
+    ) -> t.Dict[str, t.Any]:
         """
         Get the Session KWargs
         """

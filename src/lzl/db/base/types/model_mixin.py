@@ -9,18 +9,18 @@ https://psqlpy-python.github.io/benchmarks.html
 
 import abc
 import datetime
-from lzl.types import BaseModel, Field, eproperty, rproperty, Literal
+from lzl.types import BaseModel, Field, eproperty, rproperty
 from lzl.logging import logger, null_logger
 from pydantic.alias_generators import to_snake
-from typing import Any, Dict, List, Optional, Type, Union, Callable, TypeVar, Tuple, Generator, AsyncGenerator, TYPE_CHECKING
+import typing as t
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from lzl.io import SerT
     from psqlpy import QueryResult
     from sqlalchemy.ext.asyncio import AsyncResult
 
 
-SchemaT = TypeVar('SchemaT', bound = BaseModel)
+SchemaT = t.TypeVar('SchemaT', bound = BaseModel)
 
 class DBSchemaHandler(abc.ABC):
     """
@@ -29,20 +29,20 @@ class DBSchemaHandler(abc.ABC):
     It takes an existing BaseModel to handle Retrieval of Objects from the DB
     """
 
-    table: Optional[str] = None
-    schema_name: Optional[str] = None
-    ref: Type[SchemaT] = None
-    _extra: Dict[str, Any] = {}
+    table: t.Optional[str] = None
+    schema_name: t.Optional[str] = None
+    ref: t.Type[SchemaT] = None
+    _extra: t.Dict[str, t.Any] = {}
 
     def __init__(
         self,
-        model: Type[SchemaT],
-        table: Optional[str] = None,
-        schema_name: Optional[str] = None,
-        debug_enabled: Optional[bool] = None,
-        include_auto_types: Optional[bool] = False,
-        autocast_to_schema: Optional[bool] = True,
-        default_engine: Optional[Literal['psqlpy', 'sqlalchemy']] = 'psqlpy',
+        model: t.Type[SchemaT],
+        table: t.Optional[str] = None,
+        schema_name: t.Optional[str] = None,
+        debug_enabled: t.Optional[bool] = None,
+        include_auto_types: t.Optional[bool] = False,
+        autocast_to_schema: t.Optional[bool] = True,
+        default_engine: t.Optional[t.Literal['psqlpy', 'sqlalchemy']] = 'psqlpy',
         **kwargs,
     ):
         """
@@ -77,7 +77,7 @@ class DBSchemaHandler(abc.ABC):
             self.schema_name else self.table
 
     @eproperty
-    def columns(self) -> List[str]:
+    def columns(self) -> t.List[str]:
         """
         Returns the Columns
         """
@@ -97,26 +97,26 @@ class DBSchemaHandler(abc.ABC):
         return ', '.join(self.columns)
     
     @eproperty
-    def ser_columns(self) -> List[str]:
+    def ser_columns(self) -> t.List[str]:
         """
         Returns the columns that are serialized
         """
         return [
             name for name, field in self.ref.model_fields.items()
             if field.annotation not in [
-                str, Optional[str],
-                int, Optional[int],
-                float, Optional[float],
-                bool, Optional[bool],
-                datetime, Optional[datetime.datetime],
-                list, Optional[List],
-                dict, Optional[Dict],
+                str, t.Optional[str],
+                int, t.Optional[int],
+                float, t.Optional[float],
+                bool, t.Optional[bool],
+                datetime, t.Optional[datetime.datetime],
+                list, t.Optional[t.List],
+                dict, t.Optional[t.Dict],
             ]
             and name in self.columns
         ]
 
     @eproperty
-    def _ser_columns_config(self) -> Dict[str, Dict[str, Union[str, int]]]:
+    def _ser_columns_config(self) -> t.Dict[str, t.Dict[str, t.Union[str, int]]]:
         # sourcery skip: dict-comprehension, inline-immediately-returned-variable
         """
         Returns the Columns that are Serialized
@@ -140,7 +140,7 @@ class DBSchemaHandler(abc.ABC):
         return ser_dict
 
     @eproperty
-    def _column_serializers(self) -> Dict[str, 'SerT']:
+    def _column_serializers(self) -> t.Dict[str, 'SerT']:
         """
         Returns the Serializers that are used for the schema
         """
@@ -150,7 +150,7 @@ class DBSchemaHandler(abc.ABC):
         }
 
     @eproperty
-    def custom_decoders(self) -> Dict[str, Callable[..., Any]]:
+    def custom_decoders(self) -> t.Dict[str, t.Callable[..., t.Any]]:
         """
         Returns the Custom Decoders
         """
@@ -164,7 +164,7 @@ class DBSchemaHandler(abc.ABC):
     """
 
     @classmethod
-    def normalize_ids_to_str(cls, ids: List[str]) -> str:
+    def normalize_ids_to_str(cls, ids: t.List[str]) -> str:
         """
         Normalizes the ids to a string
         """
@@ -172,9 +172,9 @@ class DBSchemaHandler(abc.ABC):
 
     def get_column_names(
         self,
-        columns: Optional[List[str]] = None,
+        columns: t.Optional[t.List[str]] = None,
         **kwargs,
-    ) -> List[str]:
+    ) -> t.List[str]:
         """
         Returns the Column Names
         """
@@ -183,9 +183,9 @@ class DBSchemaHandler(abc.ABC):
     
     def get_excluded_column_names(
         self,
-        excluded_columns: Optional[List[str]] = None,
+        excluded_columns: t.Optional[t.List[str]] = None,
         **kwargs,
-    ) -> List[str]:
+    ) -> t.List[str]:
         """
         Returns the Excluded Column Names
         """
@@ -195,11 +195,11 @@ class DBSchemaHandler(abc.ABC):
 
     def build_sql_filter(
         self,
-        conditional: Optional[str] = 'AND',
-        table_name: Optional[str] = None,
-        include_table_name: Optional[bool] = None,
-        **filters: Dict[str, Union[int, float, datetime.datetime, Dict, List, Any]]
-    ) -> Dict[str, Union[List[str], str]]:
+        conditional: t.Optional[str] = 'AND',
+        table_name: t.Optional[str] = None,
+        include_table_name: t.Optional[bool] = None,
+        **filters: t.Dict[str, t.Union[int, float, datetime.datetime, t.Dict, t.List, t.Any]]
+    ) -> t.Dict[str, t.Union[t.List[str], str]]:
         """
         Returns 
         {
@@ -220,11 +220,11 @@ class DBSchemaHandler(abc.ABC):
 
     def build_sql_filters(
         self,
-        and_filters: Optional[Dict[str, Union[int, float, datetime.datetime, Dict, List, Any]]] = None,
-        or_filters: Optional[Dict[str, Union[int, float, datetime.datetime, Dict, List, Any]]] = None,
-        table_name: Optional[str] = None,
-        include_table_name: Optional[bool] = None,
-    ) -> List[Dict[str, Union[List[str], str]]]:
+        and_filters: t.Optional[t.Dict[str, t.Union[int, float, datetime.datetime, t.Dict, t.List, t.Any]]] = None,
+        or_filters: t.Optional[t.Dict[str, t.Union[int, float, datetime.datetime, t.Dict, t.List, t.Any]]] = None,
+        table_name: t.Optional[str] = None,
+        include_table_name: t.Optional[bool] = None,
+    ) -> t.List[t.Dict[str, t.Union[t.List[str], str]]]:
         """
         Creates the proper SQL filters
         [
@@ -256,7 +256,7 @@ class DBSchemaHandler(abc.ABC):
     def build_filter_query(
         self,
         query: str,
-        filters: Dict[str, Union[int, float, datetime.datetime, Dict, List, Any]],
+        filters: t.Dict[str, t.Union[int, float, datetime.datetime, t.Dict, t.List, t.Any]],
     ) -> str:
         """
         Creates the filter query
@@ -273,7 +273,7 @@ class DBSchemaHandler(abc.ABC):
 
     def construct_select_query(
         self,
-        columns: Optional[List[str]] = None,
+        columns: t.Optional[t.List[str]] = None,
         **kwargs,
     ) -> str:
         """
@@ -287,13 +287,13 @@ class DBSchemaHandler(abc.ABC):
 
     def build_select_query(
         self,
-        ids: Optional[List[str]] = None,
-        filters: Optional[Dict[str, Union[int, float, datetime.datetime, Dict, List, Any]]] = None,
-        limit: Optional[int] = None,
-        offset: Optional[int] = None,
-        order_by: Optional[str] = None,
-        order_direction: Optional[str] = 'ASC',
-        columns: Optional[List[str]] = None,
+        ids: t.Optional[t.List[str]] = None,
+        filters: t.Optional[t.Dict[str, t.Union[int, float, datetime.datetime, t.Dict, t.List, t.Any]]] = None,
+        limit: t.Optional[int] = None,
+        offset: t.Optional[int] = None,
+        order_by: t.Optional[str] = None,
+        order_direction: t.Optional[str] = 'ASC',
+        columns: t.Optional[t.List[str]] = None,
         **kwargs,
     ) -> str:
         """
@@ -315,10 +315,10 @@ class DBSchemaHandler(abc.ABC):
 
     def finalize_row(
         self,
-        row: Tuple[Any, ...],
-        new_row: Dict[str, Any],
+        row: t.Tuple[t.Any, ...],
+        new_row: t.Dict[str, t.Any],
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> t.Dict[str, t.Any]:
         """
         Finalizes the row
         """
@@ -326,12 +326,12 @@ class DBSchemaHandler(abc.ABC):
 
     def map_row_sa(
         self,
-        row: Tuple[Any, ...],
-        columns: Optional[List[str]] = None,
-        excluded_columns: Optional[List[str]] = None,
-        cast_to_schema: Optional[bool] = None,
+        row: t.Tuple[t.Any, ...],
+        columns: t.Optional[t.List[str]] = None,
+        excluded_columns: t.Optional[t.List[str]] = None,
+        cast_to_schema: t.Optional[bool] = None,
         **kwargs,
-    ) -> Union[SchemaT, Dict[str, Any]]:
+    ) -> t.Union[SchemaT, t.Dict[str, t.Any]]:
         """
         Maps the row to the schema model (sqlalchemy)
         """
@@ -349,13 +349,13 @@ class DBSchemaHandler(abc.ABC):
 
     async def aiterate_sa(
         self,
-        stream: AsyncGenerator['AsyncResult', None],
-        columns: Optional[List[str]] = None,
-        excluded_columns: Optional[List[str]] = None,
-        extra_data: Optional[Dict[str, List[Any]]] = None,
-        cast_to_schema: Optional[bool] = None,
+        stream: t.AsyncGenerator['AsyncResult', None],
+        columns: t.Optional[t.List[str]] = None,
+        excluded_columns: t.Optional[t.List[str]] = None,
+        extra_data: t.Optional[t.Dict[str, t.List[t.Any]]] = None,
+        cast_to_schema: t.Optional[bool] = None,
         **kwargs
-    ) -> AsyncGenerator[Union[SchemaT, Dict[str, Any]], None]:
+    ) -> t.AsyncGenerator[t.Union[SchemaT, t.Dict[str, t.Any]], None]:
         """
         Iterates the results (sqlalchemy)
         """
@@ -376,12 +376,12 @@ class DBSchemaHandler(abc.ABC):
 
     def map_row_pgp(
         self,
-        row: Dict[str, Any],
-        columns: Optional[List[str]] = None,
-        excluded_columns: Optional[List[str]] = None,
-        cast_to_schema: Optional[bool] = None,
+        row: t.Dict[str, t.Any],
+        columns: t.Optional[t.List[str]] = None,
+        excluded_columns: t.Optional[t.List[str]] = None,
+        cast_to_schema: t.Optional[bool] = None,
         **kwargs,
-    ) -> Union[SchemaT, Dict[str, Any]]:
+    ) -> t.Union[SchemaT, t.Dict[str, t.Any]]:
         """
         Maps the row to the schema model (psqlpy)
         """
@@ -397,19 +397,19 @@ class DBSchemaHandler(abc.ABC):
     
     async def aiterate_pgp(
         self,
-        stream: AsyncGenerator['QueryResult', None],
-        columns: Optional[List[str]] = None,
-        excluded_columns: Optional[List[str]] = None,
-        extra_data: Optional[Dict[str, List[Any]]] = None,
-        cast_to_schema: Optional[bool] = None,
+        stream: t.AsyncGenerator['QueryResult', None],
+        columns: t.Optional[t.List[str]] = None,
+        excluded_columns: t.Optional[t.List[str]] = None,
+        extra_data: t.Optional[t.Dict[str, t.List[t.Any]]] = None,
+        cast_to_schema: t.Optional[bool] = None,
         **kwargs
-    ) -> AsyncGenerator[Union[SchemaT, Dict[str, Any]], None]:
+    ) -> t.AsyncGenerator[t.Union[SchemaT, t.Dict[str, t.Any]], None]:
         """
         Iterates the results (psqlpy)
         """
         if extra_data: extra_data = {k: iter(v) for k, v in extra_data.items()}
         async for result in stream:
-            rows: List[Dict[str, Any]] = result.result(
+            rows: t.List[t.Dict[str, t.Any]] = result.result(
                 custom_decoders = self.custom_decoders,
             )
             for row in rows:
@@ -427,14 +427,14 @@ class DBSchemaHandler(abc.ABC):
 
     def aiterate(
         self,
-        stream: AsyncGenerator[Union['QueryResult', 'AsyncResult'], None],
-        columns: Optional[List[str]] = None,
-        excluded_columns: Optional[List[str]] = None,
-        extra_data: Optional[Dict[str, List[Any]]] = None,
-        cast_to_schema: Optional[bool] = None,
-        engine: Optional[Literal['psqlpy', 'sqlalchemy']] = None,
+        stream: t.AsyncGenerator[t.Union['QueryResult', 'AsyncResult'], None],
+        columns: t.Optional[t.List[str]] = None,
+        excluded_columns: t.Optional[t.List[str]] = None,
+        extra_data: t.Optional[t.Dict[str, t.List[t.Any]]] = None,
+        cast_to_schema: t.Optional[bool] = None,
+        engine: t.Optional[t.Literal['psqlpy', 'sqlalchemy']] = None,
         **kwargs
-    ) -> AsyncGenerator[Union[SchemaT, Dict[str, Any]], None]:
+    ) -> t.AsyncGenerator[t.Union[SchemaT, t.Dict[str, t.Any]], None]:
         """
         Iterates the results and maps it to the proper 
         """

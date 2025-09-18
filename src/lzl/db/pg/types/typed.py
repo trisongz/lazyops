@@ -13,14 +13,14 @@ from sqlalchemy.dialects.postgresql import JSONB, ARRAY, JSON
 from sqlalchemy.dialects.postgresql.base import ischema_names
 
 from lzl import load
-from typing import Any, cast, Optional, Union, Dict, List, Type, TYPE_CHECKING
+import typing as t
 
-# if load.TYPE_CHECKING:
+# if load.t.TYPE_CHECKING:
 #     import fileio
 # else:
 #     fileio = load.LazyLoad("fileio", install_missing=True, install_options={'package': 'file-io'})
 
-# if TYPE_CHECKING:
+# if t.TYPE_CHECKING:
 #     from fileio import FileLike
 
 from lzl.io import File, FileLike
@@ -37,7 +37,7 @@ class FileField(types.TypeDecorator):
         """
         return types.String(length = self.mysql_default_length) if op in (operators.like_op, operators.not_like_op) else self
     
-    def process_bind_param(self, value: Optional[Union[str, 'FileLike']], dialect):
+    def process_bind_param(self, value: t.Optional[t.Union[str, 'FileLike']], dialect):
         """
         Return the value to be stored in the database.
         """
@@ -47,7 +47,7 @@ class FileField(types.TypeDecorator):
             if hasattr(value, 'as_posix') \
                 else str(value)
 
-    def process_result_value(self, value: Optional[Union[str, Any]], dialect):
+    def process_result_value(self, value: t.Optional[t.Union[str, t.Any]], dialect):
         """
         Process the value retrieved from the database.
         """
@@ -68,7 +68,7 @@ class JsonString(types.TypeDecorator):
         **kwargs,
     ) -> None:
         """
-        Initializes the JsonString Type
+        Initializes the JsonString t.Type
         """
         super().__init__(*args, **kwargs)
         from lzl.io.ser import get_serializer
@@ -81,7 +81,7 @@ class JsonString(types.TypeDecorator):
         """
         return dialect.type_descriptor(self.impl)
 
-    def process_bind_param(self, value, dialect) -> Optional[str]:
+    def process_bind_param(self, value, dialect) -> t.Optional[str]:
         """
         Process the value to be stored in the database.
         """
@@ -89,7 +89,7 @@ class JsonString(types.TypeDecorator):
             value = self.ser.dumps(value)
         return value
 
-    def process_result_value(self, value, dialect) ->  Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
+    def process_result_value(self, value, dialect) ->  t.Optional[t.Union[t.Dict[str, t.Any], t.List[t.Dict[str, t.Any]]]]:
         """
         Process the value retrieved from the database.
         """
@@ -109,14 +109,14 @@ class SerializedBinary(types.TypeDecorator):
     def __init__(
         self,
         *args,
-        serializer: Optional[str] = 'json',
-        compression: Optional[str] = 'zstd',
+        serializer: t.Optional[str] = 'json',
+        compression: t.Optional[str] = 'zstd',
         compression_level: int = 3,
-        validate_raw: Optional[bool] = True,
+        validate_raw: t.Optional[bool] = True,
         **kwargs,
     ) -> None:
         """
-        Initializes the SerializedBinary Type
+        Initializes the SerializedBinary t.Type
 
         - Supports Serialization: json, pickle, msgpack
         - Supports Compression: zstd, lz4, zlib, and bz2
@@ -133,7 +133,7 @@ class SerializedBinary(types.TypeDecorator):
         """
         return dialect.type_descriptor(self.impl)
 
-    def process_bind_param(self, value: Union[str, bytes, Any], dialect) -> Optional[bytes]:
+    def process_bind_param(self, value: t.Union[str, bytes, t.Any], dialect) -> t.Optional[bytes]:
         """
         Process the value to be stored in the database.
         """
@@ -144,7 +144,7 @@ class SerializedBinary(types.TypeDecorator):
             value = self.ser.dumps(value)
         return value
 
-    def process_result_value(self, value, dialect) ->  Optional[Union[Dict[str, Any], List[Dict[str, Any]]]]:
+    def process_result_value(self, value, dialect) ->  t.Optional[t.Union[t.Dict[str, t.Any], t.List[t.Dict[str, t.Any]]]]:
         """
         Process the value retrieved from the database.
         """
@@ -161,37 +161,37 @@ StringList: ARRAY = ARRAY(types.Text, dimensions = 1)
 DateTimeUTCList: ARRAY = ARRAY(DateTimeUTC, dimensions = 1)
 # AutoSequence: types.BigInteger = 
 
-if load.TYPE_CHECKING:
+if load.t.TYPE_CHECKING:
     import sqlalchemy_json as sqla_json
     from sqlalchemy_json import NestedMutableJson, MutableDict
 
-    JsonStringField: Type[MutableDict]
-    JsonStringNestedField: Type[NestedMutableJson]
+    JsonStringField: t.Type[MutableDict]
+    JsonStringNestedField: t.Type[NestedMutableJson]
 
-    JSONBField: Type[MutableDict] 
-    JSONBNestedField: Type[NestedMutableJson]
+    JSONBField: t.Type[MutableDict] 
+    JSONBNestedField: t.Type[NestedMutableJson]
 
 else:
     sqla_json = load.lazy_load("sqlalchemy_json", install_missing=True)
 
-    JsonStringField: Type[sqla_json.MutableDict] = sqla_json.mutable_json_type(dbtype = JsonString, nested=True)
-    JsonStringNestedField: Type[sqla_json.NestedMutableJson] = sqla_json.mutable_json_type(dbtype = JsonString, nested = True) # type: ignore
+    JsonStringField: t.Type[sqla_json.MutableDict] = sqla_json.mutable_json_type(dbtype = JsonString, nested=True)
+    JsonStringNestedField: t.Type[sqla_json.NestedMutableJson] = sqla_json.mutable_json_type(dbtype = JsonString, nested = True) # type: ignore
 
 
-    JSONBField: Type[sqla_json.MutableDict] = sqla_json.mutable_json_type(dbtype = JSONB)
-    JSONBNestedField: Type[sqla_json.NestedMutableJson] = sqla_json.mutable_json_type(dbtype = JSONB, nested = True) # type: ignore
+    JSONBField: t.Type[sqla_json.MutableDict] = sqla_json.mutable_json_type(dbtype = JSONB)
+    JSONBNestedField: t.Type[sqla_json.NestedMutableJson] = sqla_json.mutable_json_type(dbtype = JSONB, nested = True) # type: ignore
 
 
 # with contextlib.suppress(ImportError):
 #     from sqlalchemy_json import NestedMutableContainer, MutableContainer, TrackedDict
 #     from sqlalchemy_json import NestedMutableJson, MutableDict, mutable_json_type
 
-#     JsonStringField: Type[MutableDict] = mutable_json_type(dbtype = JsonString, nested=True)
-#     JsonStringNestedField: Type[NestedMutableJson] = mutable_json_type(dbtype = JsonString, nested = True) # type: ignore
+#     JsonStringField: t.Type[MutableDict] = mutable_json_type(dbtype = JsonString, nested=True)
+#     JsonStringNestedField: t.Type[NestedMutableJson] = mutable_json_type(dbtype = JsonString, nested = True) # type: ignore
 
 
-#     JSONBField: Type[MutableDict] = mutable_json_type(dbtype = JSONB)
-#     JSONBNestedField: Type[NestedMutableJson] = mutable_json_type(dbtype = JSONB, nested = True) # type: ignore
+#     JSONBField: t.Type[MutableDict] = mutable_json_type(dbtype = JSONB)
+#     JSONBNestedField: t.Type[NestedMutableJson] = mutable_json_type(dbtype = JSONB, nested = True) # type: ignore
 
 
 # for reflection
@@ -209,7 +209,7 @@ except ImportError:
         import numpy as np
 
         def from_db(value):
-            # could be ndarray if already cast by lower-level driver
+            # could be ndarray if already t.cast by lower-level driver
             if value is None or isinstance(value, np.ndarray):
                 return value
             return np.array(value[1:-1].split(','), dtype=np.float32)

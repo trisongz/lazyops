@@ -12,12 +12,12 @@ import contextlib
 import functools
 from lzl import load
 from lzl.logging import logger, null_logger, Logger
-from lzl.types import eproperty, Literal
+from lzl.types import eproperty
 from .config import PostgresConfig, PostgresSettings, BackendType
 from .utils import SQLAlchemyUtilities
-from typing import List, Optional, Dict, Any, Union, Type, TypeVar, Callable, Tuple, AsyncGenerator, Generator, overload, TYPE_CHECKING
+import typing as t
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from sqlalchemy import Connection, Engine
     from sqlalchemy.orm import Session, session, sessionmaker, scoped_session
     from sqlalchemy.ext.asyncio import async_sessionmaker, async_scoped_session
@@ -26,8 +26,8 @@ if TYPE_CHECKING:
     from sqlmodel import Session as SMSession
     from sqlmodel.ext.asyncio.session import AsyncSession as SMAsyncSession
 
-    SessionT = Union[SMSession, Session]
-    AsyncSessionT = Union[SMAsyncSession, AsyncSession]
+    SessionT = t.Union[SMSession, Session]
+    AsyncSessionT = t.Union[SMAsyncSession, AsyncSession]
 
     SessionMakerT = sessionmaker[SessionT]
     AsyncSessionMakerT = async_sessionmaker[AsyncSessionT]
@@ -35,10 +35,10 @@ if TYPE_CHECKING:
     ScopedSessionMakerT = scoped_session[SessionT]
     AsyncScopedSessionMakerT = async_scoped_session[AsyncSessionT]
 
-    SessionGetT = Union[SessionMakerT, ScopedSessionMakerT]
-    AsyncSessionGetT = Union[AsyncSessionMakerT, AsyncScopedSessionMakerT]
+    SessionGetT = t.Union[SessionMakerT, ScopedSessionMakerT]
+    AsyncSessionGetT = t.Union[AsyncSessionMakerT, AsyncScopedSessionMakerT]
 
-    SessionGetterT = Union[SessionGetT, AsyncSessionGetT]
+    SessionGetterT = t.Union[SessionGetT, AsyncSessionGetT]
 
     SMSessionMakerT = sessionmaker[SMSession]
     SMAsyncSessionMakerT = async_sessionmaker[SMAsyncSession]
@@ -46,15 +46,15 @@ if TYPE_CHECKING:
     SMScopedSessionMakerT = scoped_session[SMSession]
     SMAsyncScopedSessionMakerT = async_scoped_session[SMAsyncSession]
 
-    SMSessionGetT = Union[SMSessionMakerT, SMScopedSessionMakerT]
-    SMAsyncSessionGetT = Union[SMAsyncSessionMakerT, SMAsyncScopedSessionMakerT]
-    SMSessionGetterT = Union[SMSessionGetT, SMAsyncSessionGetT]
+    SMSessionGetT = t.Union[SMSessionMakerT, SMScopedSessionMakerT]
+    SMAsyncSessionGetT = t.Union[SMAsyncSessionMakerT, SMAsyncScopedSessionMakerT]
+    SMSessionGetterT = t.Union[SMSessionGetT, SMAsyncSessionGetT]
 
     from psqlpy import ConnectionPool
     from lzl.pool import ThreadPool
     from sqlalchemy import TextClause
 
-if load.TYPE_CHECKING:
+if load.t.TYPE_CHECKING:
     import psqlpy
 else:
     psqlpy = load.LazyLoad("psqlpy", install_missing=True)
@@ -63,15 +63,15 @@ class BasePostgresBackend(abc.ABC):
     """
     Base Postgres Connection
     """
-    name: Optional[str] = 'default'
-    backend: Optional[BackendType] = None
+    name: t.Optional[str] = 'default'
+    backend: t.Optional[BackendType] = None
     
-    _extra: Dict[str, Any] = {}
+    _extra: t.Dict[str, t.Any] = {}
 
     def __init__(
         self,
         config: PostgresConfig,
-        name: Optional[str] = None,
+        name: t.Optional[str] = None,
         **kwargs,
     ) -> None:
         """
@@ -354,10 +354,10 @@ class BasePostgresBackend(abc.ABC):
 
     def _get_session_type(
         self,
-        readonly: Optional[bool] = None,
-        scoped: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-    ) -> Tuple['SessionGetT', bool]:
+        readonly: t.Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+    ) -> t.Tuple['SessionGetT', bool]:
         """
         Returns the session
         """
@@ -368,10 +368,10 @@ class BasePostgresBackend(abc.ABC):
     
     def _get_async_session_type(
         self,
-        readonly: Optional[bool] = None,
-        scoped: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-    ) -> Tuple['AsyncSessionGetT', bool]:
+        readonly: t.Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+    ) -> t.Tuple['AsyncSessionGetT', bool]:
         """
         Returns the session
         """
@@ -383,11 +383,11 @@ class BasePostgresBackend(abc.ABC):
 
     def _get_session(
         self,
-        readonly: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        mode: Optional[Literal['sync', 'async']] = 'sync',
-        scoped: Optional[bool] = None,
-    ) -> Tuple['SessionGetterT', bool]:
+        readonly: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        mode: t.Optional[t.Literal['sync', 'async']] = 'sync',
+        scoped: t.Optional[bool] = None,
+    ) -> t.Tuple['SessionGetterT', bool]:
         """
         Returns the session
         """
@@ -401,11 +401,11 @@ class BasePostgresBackend(abc.ABC):
 
     def get_engine(
         self,
-        url: Optional[str] = None,
-        readonly: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        execution_options: Optional[Dict[str, Any]] = None,
-        adapter: Optional[str] = None,
+        url: t.Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        execution_options: t.Optional[t.Dict[str, t.Any]] = None,
+        adapter: t.Optional[str] = None,
         **kwargs,
     ) -> 'Engine':
         """
@@ -425,11 +425,11 @@ class BasePostgresBackend(abc.ABC):
     
     def get_aengine(
         self,
-        url: Optional[str] = None,
-        readonly: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        execution_options: Optional[Dict[str, Any]] = None,
-        adapter: Optional[str] = None,
+        url: t.Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        execution_options: t.Optional[t.Dict[str, t.Any]] = None,
+        adapter: t.Optional[str] = None,
         **kwargs,
     ) -> 'AsyncEngine':
         """
@@ -453,9 +453,9 @@ class BasePostgresBackend(abc.ABC):
 
     def _get_engine_type(
         self,
-        readonly: Optional[bool] = None,
-        mode: Optional[Literal['sync', 'async']] = 'sync',
-    ) -> Union['Engine', 'AsyncEngine']:
+        readonly: t.Optional[bool] = None,
+        mode: t.Optional[t.Literal['sync', 'async']] = 'sync',
+    ) -> t.Union['Engine', 'AsyncEngine']:
         """
         Returns the session type
         """
@@ -466,15 +466,15 @@ class BasePostgresBackend(abc.ABC):
     @contextlib.contextmanager
     def connection(
         self,
-        readonly: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        execution_options: Optional[Dict[str, Any]] = None,
-        url: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        execution_options: t.Optional[t.Dict[str, t.Any]] = None,
+        url: t.Optional[str] = None,
         **kwargs,
-    ) -> Generator['Connection', None, None]:
+    ) -> t.Generator['Connection', None, None]:
         """
         Context Manager for the connection
         """
@@ -515,15 +515,15 @@ class BasePostgresBackend(abc.ABC):
     @contextlib.asynccontextmanager
     async def aconnection(
         self,
-        readonly: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        execution_options: Optional[Dict[str, Any]] = None,
-        url: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        execution_options: t.Optional[t.Dict[str, t.Any]] = None,
+        url: t.Optional[str] = None,
         **kwargs,
-    ) -> AsyncGenerator['AsyncConnection', None]:
+    ) -> t.AsyncGenerator['AsyncConnection', None]:
         """
         Context Manager for the connection
         """
@@ -567,8 +567,8 @@ class BasePostgresBackend(abc.ABC):
 
     def get_pgpool(
         self,
-        readonly: Optional[bool] = None,
-        superuser: Optional[bool] = None,
+        readonly: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
         **kwargs,
     ) -> 'ConnectionPool':
         """
@@ -621,11 +621,11 @@ class BasePostgresBackend(abc.ABC):
     def pgexec(
         self, 
         sql: str,
-        superuser: Optional[bool] = None,
-        readonly: Optional[bool] = None,
-        database: Optional[str] = None,
-        debug_enabled: Optional[bool] = None,
-        verbose: Optional[bool] = True,
+        superuser: t.Optional[bool] = None,
+        readonly: t.Optional[bool] = None,
+        database: t.Optional[str] = None,
+        debug_enabled: t.Optional[bool] = None,
+        verbose: t.Optional[bool] = True,
         **kwargs,
     ) -> str:
         """
@@ -648,11 +648,11 @@ class BasePostgresBackend(abc.ABC):
     async def apgexec(
         self, 
         sql: str,
-        superuser: Optional[bool] = None,
-        readonly: Optional[bool] = None,
-        database: Optional[str] = None,
-        debug_enabled: Optional[bool] = None,
-        verbose: Optional[bool] = True,
+        superuser: t.Optional[bool] = None,
+        readonly: t.Optional[bool] = None,
+        database: t.Optional[str] = None,
+        debug_enabled: t.Optional[bool] = None,
+        verbose: t.Optional[bool] = True,
         **kwargs,
     ) -> str:
         """
@@ -674,8 +674,8 @@ class BasePostgresBackend(abc.ABC):
 
     def wait_for_ready(
         self,
-        max_attempts: Optional[int] = 10,
-        interval: Optional[float] = 5.0,
+        max_attempts: t.Optional[int] = 10,
+        interval: t.Optional[float] = 5.0,
     ):
         """
         Waits for the database to be ready
@@ -698,8 +698,8 @@ class BasePostgresBackend(abc.ABC):
 
     async def await_for_ready(
         self,
-        max_attempts: Optional[int] = 10,
-        interval: Optional[float] = 5.0,
+        max_attempts: t.Optional[int] = 10,
+        interval: t.Optional[float] = 5.0,
     ):
         """
         Waits for the database to be ready
@@ -723,9 +723,9 @@ class BasePostgresBackend(abc.ABC):
     def _execute_scalar(
         self,
         query: 'TextClause',
-        params: Optional[Dict[str, Any]] = None,
+        params: t.Optional[t.Dict[str, t.Any]] = None,
         **kwargs,
-    ) -> Any:
+    ) -> t.Any:
         """
         Executes a scalar query
         """
@@ -736,9 +736,9 @@ class BasePostgresBackend(abc.ABC):
     async def _aexecute_scalar(
         self,
         query: 'TextClause',
-        params: Optional[Dict[str, Any]] = None,
+        params: t.Optional[t.Dict[str, t.Any]] = None,
         **kwargs,
-    ) -> Any:
+    ) -> t.Any:
         """
         Executes a scalar query
         """
@@ -785,7 +785,7 @@ class BasePostgresBackend(abc.ABC):
     def database_exists(
         self,
         db_name: str,
-        verbose: Optional[bool] = True,
+        verbose: t.Optional[bool] = True,
     ) -> bool:
         """
         Checks if the database exists
@@ -801,7 +801,7 @@ class BasePostgresBackend(abc.ABC):
     async def adatabase_exists(
         self,
         db_name: str,
-        verbose: Optional[bool] = True,
+        verbose: t.Optional[bool] = True,
     ) -> bool:
         """
         Checks if the database exists
@@ -816,8 +816,8 @@ class BasePostgresBackend(abc.ABC):
 
     def get_table_names(
         self,
-        schema: Optional[str] = None,
-    ) -> List[str]:
+        schema: t.Optional[str] = None,
+    ) -> t.List[str]:
         """
         Returns the table names
         """
@@ -829,9 +829,9 @@ class BasePostgresBackend(abc.ABC):
         self,
         table: str,
         column: str,
-        schema: Optional[str] = None,
-        verbose: Optional[bool] = False,
-    ) -> Dict[str, Union[str, float]]:
+        schema: t.Optional[str] = None,
+        verbose: t.Optional[bool] = False,
+    ) -> t.Dict[str, t.Union[str, float]]:
         """
         Displays the table column size
         """
@@ -858,8 +858,8 @@ class BasePostgresBackend(abc.ABC):
     def get_table_column_names(
         self,
         table: str,
-        schema: Optional[str] = None,
-    ) -> List[str]:
+        schema: t.Optional[str] = None,
+    ) -> t.List[str]:
         """
         Returns the table column names
         """
@@ -877,10 +877,10 @@ class BasePostgresBackend(abc.ABC):
 
     def upgrade_extensions(
         self,
-        extensions: Optional[List[str]] = None,
-        verbose: Optional[bool] = True,
+        extensions: t.Optional[t.List[str]] = None,
+        verbose: t.Optional[bool] = True,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> t.Dict[str, t.Any]:
         """
         Upgrade the extensions
         """
@@ -904,10 +904,10 @@ class BasePostgresBackend(abc.ABC):
 
     async def aupgrade_extensions(
         self,
-        extensions: Optional[List[str]] = None,
-        verbose: Optional[bool] = True,
+        extensions: t.Optional[t.List[str]] = None,
+        verbose: t.Optional[bool] = True,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> t.Dict[str, t.Any]:
         """
         Upgrade the extensions
         """
@@ -933,41 +933,41 @@ class SQLAlchemyBackend(BasePostgresBackend):
     """
     SQLAlchemy Backend
     """
-    backend: Optional[BackendType] = 'sqlalchemy'
+    backend: t.Optional[BackendType] = 'sqlalchemy'
 
 
 class SQLModelBackend(BasePostgresBackend):
     """
     SqlModel Backend
     """
-    backend: Optional[BackendType] = 'sqlmodel'
+    backend: t.Optional[BackendType] = 'sqlmodel'
 
 
-BackendClassT = Union[SQLAlchemyBackend, SQLModelBackend]
+BackendClassT = t.Union[SQLAlchemyBackend, SQLModelBackend]
 
-_BackendMapping: Dict[BackendType, Type[BackendClassT]] = {
+_BackendMapping: t.Dict[BackendType, t.Type[BackendClassT]] = {
     'sqlalchemy': SQLAlchemyBackend,
     'sqlmodel': SQLModelBackend,
 }
 
-_PGBMT = TypeVar('_PGBMT', bound = 'PGBackendManager')
+_PGBMT = t.TypeVar('_PGBMT', bound = 'PGBackendManager')
 
 class PGBackendManager(abc.ABC):
     """
     Postgres Backend Manager
     """    
-    _extra: Dict[str, Any] = {}
-    default_backend: Optional[BackendType] = 'sqlalchemy'
+    _extra: t.Dict[str, t.Any] = {}
+    default_backend: t.Optional[BackendType] = 'sqlalchemy'
 
     def __init__(
         self,
-        default_backend: Optional[BackendType] = None,
-        debug_enabled: Optional[bool] = None,
-        settings: Optional['PostgresSettings'] = None,
-        config: Optional['PostgresConfig'] = None,
-        error_callbacks: Optional[List[Callable]] = None,
+        default_backend: t.Optional[BackendType] = None,
+        debug_enabled: t.Optional[bool] = None,
+        settings: t.Optional['PostgresSettings'] = None,
+        config: t.Optional['PostgresConfig'] = None,
+        error_callbacks: t.Optional[t.List[t.Callable]] = None,
         # These exceptions will be handled by the error callbacks
-        handled_exceptions: Optional[List[Type[Exception]]] = None,
+        handled_exceptions: t.Optional[t.List[t.Type[Exception]]] = None,
         **kwargs,
     ):
         """
@@ -975,10 +975,10 @@ class PGBackendManager(abc.ABC):
         """
         if default_backend: self.default_backend = default_backend
         self.debug_enabled = debug_enabled
-        self.current: Optional[str] = None
-        self.backends: Dict[str, BackendClassT] = {}
-        self._on_failure_callbacks: List[Callable] = error_callbacks or []
-        self._handled_exceptions: List[Type[Exception]] = handled_exceptions or []
+        self.current: t.Optional[str] = None
+        self.backends: t.Dict[str, BackendClassT] = {}
+        self._on_failure_callbacks: t.List[t.Callable] = error_callbacks or []
+        self._handled_exceptions: t.List[t.Type[Exception]] = handled_exceptions or []
         self.post_init(**kwargs)
         if not self.current and (settings or config):
             self.configure_backend(
@@ -987,7 +987,7 @@ class PGBackendManager(abc.ABC):
                 **kwargs,
             )
     
-    def add_error_callback(self, callback: Callable):
+    def add_error_callback(self, callback: t.Callable):
         """
         Adds an error callback
         """
@@ -1001,20 +1001,20 @@ class PGBackendManager(abc.ABC):
 
     def initialize_backend(
         self,
-        name: Optional[str] = None,
-        backend: Optional[BackendType] = None,
+        name: t.Optional[str] = None,
+        backend: t.Optional[BackendType] = None,
 
-        settings: Optional['PostgresSettings'] = None,
-        config: Optional['PostgresConfig'] = None,
+        settings: t.Optional['PostgresSettings'] = None,
+        config: t.Optional['PostgresConfig'] = None,
         
-        filepath: Optional[Union[str, pathlib.Path]] = None, 
-        env_var: Optional[str] = None,
+        filepath: t.Optional[t.Union[str, pathlib.Path]] = None, 
+        env_var: t.Optional[str] = None,
 
-        settings_app_name: Optional[str] = None,
-        settings_filepath: Optional[Union[str, pathlib.Path]] = None,
-        settings_env_var: Optional[str] = None,
+        settings_app_name: t.Optional[str] = None,
+        settings_filepath: t.Optional[t.Union[str, pathlib.Path]] = None,
+        settings_env_var: t.Optional[str] = None,
 
-        overrides: Optional[Dict[str, Any]] = None,
+        overrides: t.Optional[t.Dict[str, t.Any]] = None,
         **kwargs,
     ) -> BackendClassT:
         """
@@ -1045,20 +1045,20 @@ class PGBackendManager(abc.ABC):
 
     def configure_backend(
         self,
-        name: Optional[str] = None,
-        backend: Optional[BackendType] = None,
-        settings: Optional['PostgresSettings'] = None,
-        config: Optional['PostgresConfig'] = None,
+        name: t.Optional[str] = None,
+        backend: t.Optional[BackendType] = None,
+        settings: t.Optional['PostgresSettings'] = None,
+        config: t.Optional['PostgresConfig'] = None,
         
-        filepath: Optional[Union[str, pathlib.Path]] = None, 
-        env_var: Optional[str] = None,
+        filepath: t.Optional[t.Union[str, pathlib.Path]] = None, 
+        env_var: t.Optional[str] = None,
 
-        settings_app_name: Optional[str] = None,
-        settings_filepath: Optional[Union[str, pathlib.Path]] = None,
-        settings_env_var: Optional[str] = None,
+        settings_app_name: t.Optional[str] = None,
+        settings_filepath: t.Optional[t.Union[str, pathlib.Path]] = None,
+        settings_env_var: t.Optional[str] = None,
 
-        overrides: Optional[Dict[str, Any]] = None,
-        set_as_current: Optional[bool] = None,
+        overrides: t.Optional[t.Dict[str, t.Any]] = None,
+        set_as_current: t.Optional[bool] = None,
         **kwargs,
     ) -> BackendClassT:
         """
@@ -1125,8 +1125,8 @@ class PGBackendManager(abc.ABC):
         self, 
         e: Exception,
         backend: 'BackendClassT',
-        scoped: Optional[bool] = None,
-        readonly: Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        readonly: t.Optional[bool] = None,
     ):
         """
         Runs the error callbacks
@@ -1153,18 +1153,18 @@ class PGBackendManager(abc.ABC):
             if isinstance(e, cls): return True
         return False
     
-    @overload
+    @t.overload
     @contextlib.contextmanager
     def session(
         self, 
-        readonly: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        scoped: Optional[bool] = None,
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> Generator['SMSession', None, None]:
+    ) -> t.Generator['SMSession', None, None]:
         """
         Context Manager for the current session
         """
@@ -1173,15 +1173,15 @@ class PGBackendManager(abc.ABC):
     @contextlib.contextmanager
     def session(
         self, 
-        readonly: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        scoped: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> Generator['SessionT', None, None]:
+    ) -> t.Generator['SessionT', None, None]:
         """
         Context Manager for the current session
         """
@@ -1223,32 +1223,32 @@ class PGBackendManager(abc.ABC):
             else:
                 sess.close()
 
-    @overload
+    @t.overload
     @contextlib.asynccontextmanager
     async def asession(
         self, 
-        readonly: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        scoped: Optional[bool] = None,
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> AsyncGenerator['SMAsyncSession', None]:
+    ) -> t.AsyncGenerator['SMAsyncSession', None]:
         ...
 
     @contextlib.asynccontextmanager
     async def asession(
         self, 
-        readonly: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        scoped: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> AsyncGenerator['AsyncSessionGetT', None]:
+    ) -> t.AsyncGenerator['AsyncSessionGetT', None]:
         """
         Async Context Manager for the current session
         """
@@ -1293,27 +1293,27 @@ class PGBackendManager(abc.ABC):
 
     def database(
         self, 
-        readonly: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        mode: Optional[Literal['sync', 'async']] = 'sync',
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        mode: t.Optional[t.Literal['sync', 'async']] = 'sync',
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> Callable[..., 'SessionGetT']:
+    ) -> t.Callable[..., 'SessionGetT']:
         """
         Creates an inner dependency wrapper for the database session [FastAPI]
         """
         if mode == 'sync':
-            def inner() -> Generator['SessionGetterT', None, None]:
+            def inner() -> t.Generator['SessionGetterT', None, None]:
                 """
                 Returns the database session
                 """
                 with self.session(readonly = readonly, auto_commit = auto_commit, raise_errors = raise_errors, auto_rollback = auto_rollback, superuser = superuser, ctx = ctx, **kwargs) as sess:
                     yield sess
         else:
-            async def inner() -> AsyncGenerator['AsyncSessionGetT', None]:
+            async def inner() -> t.AsyncGenerator['AsyncSessionGetT', None]:
                 """
                 Returns the database session
                 """
@@ -1323,16 +1323,16 @@ class PGBackendManager(abc.ABC):
 
     def connection(
         self,
-        readonly: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        execution_options: Optional[Dict[str, Any]] = None,
-        url: Optional[str] = None,
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        execution_options: t.Optional[t.Dict[str, t.Any]] = None,
+        url: t.Optional[str] = None,
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> Generator['Connection', None, None]:
+    ) -> t.Generator['Connection', None, None]:
         """
         Context Manager for the connection
         """
@@ -1353,16 +1353,16 @@ class PGBackendManager(abc.ABC):
     
     def aconnection(
         self,
-        readonly: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        execution_options: Optional[Dict[str, Any]] = None,
-        url: Optional[str] = None,
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        execution_options: t.Optional[t.Dict[str, t.Any]] = None,
+        url: t.Optional[str] = None,
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> AsyncGenerator['AsyncConnection', None]:
+    ) -> t.AsyncGenerator['AsyncConnection', None]:
         """
         Context Manager for the connection
         """
@@ -1381,63 +1381,63 @@ class PGBackendManager(abc.ABC):
             **kwargs,
         )
     
-    @overload
+    @t.overload
     @classmethod
     def default(
-        cls: Type['_PGBMT'],
-        name: Optional[str] = None,
-        default_backend: Optional[BackendType] = None,
-        debug_enabled: Optional[bool] = None,
+        cls: t.Type['_PGBMT'],
+        name: t.Optional[str] = None,
+        default_backend: t.Optional[BackendType] = None,
+        debug_enabled: t.Optional[bool] = None,
         
-        settings: Optional['PostgresSettings'] = None,
-        config: Optional['PostgresConfig'] = None,
+        settings: t.Optional['PostgresSettings'] = None,
+        config: t.Optional['PostgresConfig'] = None,
         
-        filepath: Optional[Union[str, pathlib.Path]] = None, 
-        env_var: Optional[str] = None,
+        filepath: t.Optional[t.Union[str, pathlib.Path]] = None, 
+        env_var: t.Optional[str] = None,
 
-        settings_app_name: Optional[str] = None,
-        settings_filepath: Optional[Union[str, pathlib.Path]] = None,
-        settings_env_var: Optional[str] = None,
+        settings_app_name: t.Optional[str] = None,
+        settings_filepath: t.Optional[t.Union[str, pathlib.Path]] = None,
+        settings_env_var: t.Optional[str] = None,
 
-        overrides: Optional[Dict[str, Any]] = None,
+        overrides: t.Optional[t.Dict[str, t.Any]] = None,
         **kwargs,
     ) -> '_PGBMT':
         """
         Returns the default backend manager
         
         Args:
-            name (Optional[str], optional): 
+            name (t.Optional[str], optional): 
                 The name of the backend. Defaults to None.
                 This should be a unique name for the backend.
 
-            default_backend (Optional[BackendType], optional): 
+            default_backend (t.Optional[BackendType], optional): 
                 The default backend type. Defaults to None.
 
-            debug_enabled (Optional[bool], optional): 
+            debug_enabled (t.Optional[bool], optional): 
                 Whether to enable debug mode. Defaults to None.
             
-            settings (Optional['PostgresSettings'], optional): 
+            settings (t.Optional['PostgresSettings'], optional): 
                 The settings object. Defaults to None.
             
-            config (Optional['PostgresConfig'], optional): 
+            config (t.Optional['PostgresConfig'], optional): 
                 The config object. Defaults to None.
             
-            filepath (Optional[Union[str, pathlib.Path]], optional): 
+            filepath (t.Optional[t.Union[str, pathlib.Path]], optional): 
                 The config file path. Defaults to None.
             
-            env_var (Optional[str], optional): 
+            env_var (t.Optional[str], optional): 
                 The config env var. Defaults to None.
             
-            settings_app_name (Optional[str], optional):
+            settings_app_name (t.Optional[str], optional):
                 The settings app name. Defaults to None.
 
-            settings_filepath (Optional[Union[str, pathlib.Path]], optional):
+            settings_filepath (t.Optional[t.Union[str, pathlib.Path]], optional):
                 The settings config file path. Defaults to None.
 
-            settings_env_var (Optional[str], optional):
+            settings_env_var (t.Optional[str], optional):
                 The settings config env var. Defaults to None.
 
-            overrides (Optional[Dict[str, Any]], optional): 
+            overrides (t.Optional[t.Dict[str, t.Any]], optional): 
                 The config overrides. Defaults to None.
                 This is used to override the config values.
         """
@@ -1446,13 +1446,13 @@ class PGBackendManager(abc.ABC):
 
     @classmethod
     def default(
-        cls: Type['_PGBMT'],
-        name: Optional[str] = None,
-        default_backend: Optional[BackendType] = None,
-        debug_enabled: Optional[bool] = None,
-        settings: Optional['PostgresSettings'] = None,
-        config: Optional['PostgresConfig'] = None,
-        overrides: Optional[Dict[str, Any]] = None,
+        cls: t.Type['_PGBMT'],
+        name: t.Optional[str] = None,
+        default_backend: t.Optional[BackendType] = None,
+        debug_enabled: t.Optional[bool] = None,
+        settings: t.Optional['PostgresSettings'] = None,
+        config: t.Optional['PostgresConfig'] = None,
+        overrides: t.Optional[t.Dict[str, t.Any]] = None,
         **kwargs,
     ) -> '_PGBMT':
         """
@@ -1471,19 +1471,19 @@ class PGBackendManager(abc.ABC):
             **kwargs,
         )
     
-    def add_error_callback(self, *callbacks: Callable):
+    def add_error_callback(self, *callbacks: t.Callable):
         """
         Adds an error callback
         """
         self._on_failure_callbacks.extend(callbacks)
 
-    def add_handled_exception(self, *exceptions: Type[Exception]):
+    def add_handled_exception(self, *exceptions: t.Type[Exception]):
         """
         Adds an exception to the handled exceptions
         """
         self._handled_exceptions.extend(exceptions)
     
-    def add_exception_callback(self, callback: Callable, *exceptions: Type[Exception]):
+    def add_exception_callback(self, callback: t.Callable, *exceptions: t.Type[Exception]):
         """
         Adds an exception callback
         """
@@ -1491,7 +1491,7 @@ class PGBackendManager(abc.ABC):
         self._handled_exceptions.extend(exceptions)
 
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name: str) -> t.Any:
         """
         Forward all unknown attributes to the backend
         """
@@ -1500,7 +1500,7 @@ class PGBackendManager(abc.ABC):
             return self.backends[name]
         return getattr(self.bkend, name)
     
-    if TYPE_CHECKING:
+    if t.TYPE_CHECKING:
         @property
         def engine(self) -> 'Engine':
             """

@@ -1,28 +1,32 @@
 from __future__ import annotations
 
-"""
-Aggregate of all the DB Backends and Managers
-"""
+"""Convenience registries that map adapters to backend implementations."""
 
-from typing import Optional, Dict, Any, Union, Type, TYPE_CHECKING
+import typing as t
+
 from .base.backend import BaseDatabaseBackend, BackendClassT
 from .base.manager import DBBackendManager, DBManagerT
-from .sqlite import SqliteBackendManager, SqliteBackendMap, SqliteBackendClasses
 from .postgres import PostgresBackendManager, PostgresBackendMap, PostgresBackendClasses
+from .sqlite import SqliteBackendManager, SqliteBackendMap, SqliteBackendClasses
 
-ADAPTER_TO_BACKENDS: Dict[str, Dict[str, Type[BackendClassT]]] = {
+ADAPTER_TO_BACKENDS: t.Dict[str, t.Dict[str, t.Type[BackendClassT]]] = {
     'postgres': PostgresBackendMap,
     'postgresql': PostgresBackendMap,
-    'sqlite': SqliteBackendMap
+    'sqlite': SqliteBackendMap,
 }
 
-ADAPTER_TO_MANAGER: Dict[str, Type[DBManagerT]] = {
+ADAPTER_TO_MANAGER: t.Dict[str, t.Type[DBManagerT]] = {
     'postgres': PostgresBackendManager,
     'postgresql': PostgresBackendManager,
-
     'sqlite': SqliteBackendManager,
 }
 
+DATABASE_MANAGER_CLASSES = t.Union[DBBackendManager, SqliteBackendManager, PostgresBackendManager]
+DATABASE_BACKEND_CLASSES = t.Union[BaseDatabaseBackend, SqliteBackendClasses, PostgresBackendClasses]
 
-DATABASE_MANAGER_CLASSES = Union[DBBackendManager, SqliteBackendManager, PostgresBackendManager]
-DATABASE_BACKEND_CLASSES = Union[BaseDatabaseBackend, SqliteBackendClasses, PostgresBackendClasses]
+__all__ = [
+    "ADAPTER_TO_BACKENDS",
+    "ADAPTER_TO_MANAGER",
+    "DATABASE_MANAGER_CLASSES",
+    "DATABASE_BACKEND_CLASSES",
+]

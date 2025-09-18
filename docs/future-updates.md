@@ -12,3 +12,10 @@ remain intentional.
   reduce reliance on the mutable `PresetMap` dictionary.
 - Explore replacing the global monkey patch of `httpx.Response.raise_for_status`
   with a scoped wrapper to avoid affecting consumers outside `lzl`.
+
+## lzl.db
+- Several backend helper methods (for example sqlite `get_table_column_size`)
+  remain unimplemented placeholders; document desired semantics before adding
+  behaviour in a future sprint.
+- Evaluate whether importing heavy SQLAlchemy dependencies at module import time
+  can be deferred to improve startup performance for non-database use cases.

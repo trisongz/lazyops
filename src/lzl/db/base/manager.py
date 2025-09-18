@@ -8,12 +8,12 @@ import abc
 import pathlib
 import contextlib
 from lzl.logging import logger, null_logger, Logger
-from lzl.types import eproperty, Literal
+from lzl.types import eproperty
 from .config import DatabaseConfig, BaseDBSettings, BackendType, DBConfigT, DBSettingsT
 from .utils import SQLAlchemyUtilities
-from typing import List, Optional, Dict, Any, Union, Type, TypeVar, Callable, Tuple, AsyncGenerator, Generator, overload, TYPE_CHECKING
+import typing as t
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from .backend import (
         BackendClassT,
         ThreadPool,
@@ -38,25 +38,25 @@ if TYPE_CHECKING:
     from lzl.db.backends import DATABASE_BACKEND_CLASSES
 
 
-DBManagerT = TypeVar('DBManagerT', bound = 'DBBackendManager')
+DBManagerT = t.TypeVar('DBManagerT', bound = 'DBBackendManager')
 
 class DBBackendManager(abc.ABC):
     """
     DB Backend Manager
     """    
-    _extra: Dict[str, Any] = {}
-    default_backend: Optional[BackendType] = 'sqlalchemy'
-    db_type: Optional[str] = None
+    _extra: t.Dict[str, t.Any] = {}
+    default_backend: t.Optional[BackendType] = 'sqlalchemy'
+    db_type: t.Optional[str] = None
 
     def __init__(
         self,
-        default_backend: Optional[BackendType] = None,
-        debug_enabled: Optional[bool] = None,
-        settings: Optional[DBSettingsT] = None,
-        config: Optional[DBConfigT] = None,
-        error_callbacks: Optional[List[Callable]] = None,
+        default_backend: t.Optional[BackendType] = None,
+        debug_enabled: t.Optional[bool] = None,
+        settings: t.Optional[DBSettingsT] = None,
+        config: t.Optional[DBConfigT] = None,
+        error_callbacks: t.Optional[t.List[t.Callable]] = None,
         # These exceptions will be handled by the error callbacks
-        handled_exceptions: Optional[List[Type[Exception]]] = None,
+        handled_exceptions: t.Optional[t.List[t.Type[Exception]]] = None,
         **kwargs,
     ):
         """
@@ -64,10 +64,10 @@ class DBBackendManager(abc.ABC):
         """
         if default_backend: self.default_backend = default_backend
         self.debug_enabled = debug_enabled
-        self.current: Optional[str] = None
-        self.backends: Dict[str, 'DATABASE_BACKEND_CLASSES'] = {}
-        self._on_failure_callbacks: List[Callable] = error_callbacks or []
-        self._handled_exceptions: List[Type[Exception]] = handled_exceptions or []
+        self.current: t.Optional[str] = None
+        self.backends: t.Dict[str, 'DATABASE_BACKEND_CLASSES'] = {}
+        self._on_failure_callbacks: t.List[t.Callable] = error_callbacks or []
+        self._handled_exceptions: t.List[t.Type[Exception]] = handled_exceptions or []
         self.db_type_name = self.db_type.capitalize() if self.db_type else 'DB'
         self.post_init(**kwargs)
         if not self.current and (settings or config):
@@ -77,7 +77,7 @@ class DBBackendManager(abc.ABC):
                 **kwargs,
             )
     
-    def add_error_callback(self, callback: Callable):
+    def add_error_callback(self, callback: t.Callable):
         """
         Adds an error callback
         """
@@ -91,20 +91,20 @@ class DBBackendManager(abc.ABC):
 
     def initialize_backend(
         self,
-        name: Optional[str] = None,
-        backend: Optional[BackendType] = None,
+        name: t.Optional[str] = None,
+        backend: t.Optional[BackendType] = None,
 
-        settings: Optional[DBSettingsT] = None,
-        config: Optional[DBConfigT] = None,
+        settings: t.Optional[DBSettingsT] = None,
+        config: t.Optional[DBConfigT] = None,
         
-        filepath: Optional[Union[str, pathlib.Path]] = None, 
-        env_var: Optional[str] = None,
+        filepath: t.Optional[t.Union[str, pathlib.Path]] = None, 
+        env_var: t.Optional[str] = None,
 
-        settings_app_name: Optional[str] = None,
-        settings_filepath: Optional[Union[str, pathlib.Path]] = None,
-        settings_env_var: Optional[str] = None,
+        settings_app_name: t.Optional[str] = None,
+        settings_filepath: t.Optional[t.Union[str, pathlib.Path]] = None,
+        settings_env_var: t.Optional[str] = None,
 
-        overrides: Optional[Dict[str, Any]] = None,
+        overrides: t.Optional[t.Dict[str, t.Any]] = None,
         **kwargs,
     ) -> 'DATABASE_BACKEND_CLASSES':
         """
@@ -138,20 +138,20 @@ class DBBackendManager(abc.ABC):
 
     def configure_backend(
         self,
-        name: Optional[str] = None,
-        backend: Optional[BackendType] = None,
-        settings: Optional[DBSettingsT] = None,
-        config: Optional[DBConfigT] = None,
+        name: t.Optional[str] = None,
+        backend: t.Optional[BackendType] = None,
+        settings: t.Optional[DBSettingsT] = None,
+        config: t.Optional[DBConfigT] = None,
         
-        filepath: Optional[Union[str, pathlib.Path]] = None, 
-        env_var: Optional[str] = None,
+        filepath: t.Optional[t.Union[str, pathlib.Path]] = None, 
+        env_var: t.Optional[str] = None,
 
-        settings_app_name: Optional[str] = None,
-        settings_filepath: Optional[Union[str, pathlib.Path]] = None,
-        settings_env_var: Optional[str] = None,
+        settings_app_name: t.Optional[str] = None,
+        settings_filepath: t.Optional[t.Union[str, pathlib.Path]] = None,
+        settings_env_var: t.Optional[str] = None,
 
-        overrides: Optional[Dict[str, Any]] = None,
-        set_as_current: Optional[bool] = None,
+        overrides: t.Optional[t.Dict[str, t.Any]] = None,
+        set_as_current: t.Optional[bool] = None,
         **kwargs,
     ) -> 'DATABASE_BACKEND_CLASSES':
         """
@@ -218,8 +218,8 @@ class DBBackendManager(abc.ABC):
         self, 
         e: Exception,
         backend: 'BackendClassT',
-        scoped: Optional[bool] = None,
-        readonly: Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        readonly: t.Optional[bool] = None,
     ):
         """
         Runs the error callbacks
@@ -247,18 +247,18 @@ class DBBackendManager(abc.ABC):
             if isinstance(e, cls): return True
         return False
     
-    @overload
+    @t.overload
     @contextlib.contextmanager
     def session(
         self, 
-        readonly: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        scoped: Optional[bool] = None,
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> Generator['SMSession', None, None]:
+    ) -> t.Generator['SMSession', None, None]:
         """
         Context Manager for the current session
         """
@@ -267,15 +267,15 @@ class DBBackendManager(abc.ABC):
     @contextlib.contextmanager
     def session(
         self, 
-        readonly: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        scoped: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> Generator['SessionT', None, None]:
+    ) -> t.Generator['SessionT', None, None]:
         """
         Context Manager for the current session
         """
@@ -317,32 +317,32 @@ class DBBackendManager(abc.ABC):
             else:
                 sess.close()
 
-    @overload
+    @t.overload
     @contextlib.asynccontextmanager
     async def asession(
         self, 
-        readonly: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        scoped: Optional[bool] = None,
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> AsyncGenerator['SMAsyncSession', None]:
+    ) -> t.AsyncGenerator['SMAsyncSession', None]:
         ...
 
     @contextlib.asynccontextmanager
     async def asession(
         self, 
-        readonly: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        scoped: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        scoped: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> AsyncGenerator['AsyncSessionGetT', None]:
+    ) -> t.AsyncGenerator['AsyncSessionGetT', None]:
         """
         Async Context Manager for the current session
         """
@@ -387,27 +387,27 @@ class DBBackendManager(abc.ABC):
 
     def database(
         self, 
-        readonly: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        mode: Optional[Literal['sync', 'async']] = 'sync',
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        mode: t.Optional[t.Literal['sync', 'async']] = 'sync',
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> Callable[..., 'SessionGetT']:
+    ) -> t.Callable[..., 'SessionGetT']:
         """
         Creates an inner dependency wrapper for the database session [FastAPI]
         """
         if mode == 'sync':
-            def inner() -> Generator['SessionGetterT', None, None]:
+            def inner() -> t.Generator['SessionGetterT', None, None]:
                 """
                 Returns the database session
                 """
                 with self.session(readonly = readonly, auto_commit = auto_commit, raise_errors = raise_errors, auto_rollback = auto_rollback, superuser = superuser, ctx = ctx, **kwargs) as sess:
                     yield sess
         else:
-            async def inner() -> AsyncGenerator['AsyncSessionGetT', None]:
+            async def inner() -> t.AsyncGenerator['AsyncSessionGetT', None]:
                 """
                 Returns the database session
                 """
@@ -417,16 +417,16 @@ class DBBackendManager(abc.ABC):
 
     def connection(
         self,
-        readonly: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        execution_options: Optional[Dict[str, Any]] = None,
-        url: Optional[str] = None,
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        execution_options: t.Optional[t.Dict[str, t.Any]] = None,
+        url: t.Optional[str] = None,
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> Generator['Connection', None, None]:
+    ) -> t.Generator['Connection', None, None]:
         """
         Context Manager for the connection
         """
@@ -447,16 +447,16 @@ class DBBackendManager(abc.ABC):
     
     def aconnection(
         self,
-        readonly: Optional[bool] = None,
-        raise_errors: Optional[bool] = None,
-        auto_rollback: Optional[bool] = None,
-        auto_commit: Optional[bool] = None,
-        superuser: Optional[bool] = None,
-        execution_options: Optional[Dict[str, Any]] = None,
-        url: Optional[str] = None,
-        ctx: Optional[str] = None,
+        readonly: t.Optional[bool] = None,
+        raise_errors: t.Optional[bool] = None,
+        auto_rollback: t.Optional[bool] = None,
+        auto_commit: t.Optional[bool] = None,
+        superuser: t.Optional[bool] = None,
+        execution_options: t.Optional[t.Dict[str, t.Any]] = None,
+        url: t.Optional[str] = None,
+        ctx: t.Optional[str] = None,
         **kwargs,
-    ) -> AsyncGenerator['AsyncConnection', None]:
+    ) -> t.AsyncGenerator['AsyncConnection', None]:
         """
         Context Manager for the connection
         """
@@ -475,63 +475,63 @@ class DBBackendManager(abc.ABC):
             **kwargs,
         )
     
-    @overload
+    @t.overload
     @classmethod
     def default(
-        cls: Type['DBManagerT'],
-        name: Optional[str] = None,
-        default_backend: Optional[BackendType] = None,
-        debug_enabled: Optional[bool] = None,
+        cls: t.Type['DBManagerT'],
+        name: t.Optional[str] = None,
+        default_backend: t.Optional[BackendType] = None,
+        debug_enabled: t.Optional[bool] = None,
         
-        settings: Optional[DBSettingsT] = None,
-        config: Optional[DBConfigT] = None,
+        settings: t.Optional[DBSettingsT] = None,
+        config: t.Optional[DBConfigT] = None,
         
-        filepath: Optional[Union[str, pathlib.Path]] = None, 
-        env_var: Optional[str] = None,
+        filepath: t.Optional[t.Union[str, pathlib.Path]] = None, 
+        env_var: t.Optional[str] = None,
 
-        settings_app_name: Optional[str] = None,
-        settings_filepath: Optional[Union[str, pathlib.Path]] = None,
-        settings_env_var: Optional[str] = None,
+        settings_app_name: t.Optional[str] = None,
+        settings_filepath: t.Optional[t.Union[str, pathlib.Path]] = None,
+        settings_env_var: t.Optional[str] = None,
 
-        overrides: Optional[Dict[str, Any]] = None,
+        overrides: t.Optional[t.Dict[str, t.Any]] = None,
         **kwargs,
     ) -> 'DBManagerT':
         """
         Returns the default backend manager
         
         Args:
-            name (Optional[str], optional): 
+            name (t.Optional[str], optional): 
                 The name of the backend. Defaults to None.
                 This should be a unique name for the backend.
 
-            default_backend (Optional[BackendType], optional): 
+            default_backend (t.Optional[BackendType], optional): 
                 The default backend type. Defaults to None.
 
-            debug_enabled (Optional[bool], optional): 
+            debug_enabled (t.Optional[bool], optional): 
                 Whether to enable debug mode. Defaults to None.
             
-            settings (Optional['DBSettingsT'], optional): 
+            settings (t.Optional['DBSettingsT'], optional): 
                 The settings object. Defaults to None.
             
-            config (Optional['DBConfigT'], optional): 
+            config (t.Optional['DBConfigT'], optional): 
                 The config object. Defaults to None.
             
-            filepath (Optional[Union[str, pathlib.Path]], optional): 
+            filepath (t.Optional[t.Union[str, pathlib.Path]], optional): 
                 The config file path. Defaults to None.
             
-            env_var (Optional[str], optional): 
+            env_var (t.Optional[str], optional): 
                 The config env var. Defaults to None.
             
-            settings_app_name (Optional[str], optional):
+            settings_app_name (t.Optional[str], optional):
                 The settings app name. Defaults to None.
 
-            settings_filepath (Optional[Union[str, pathlib.Path]], optional):
+            settings_filepath (t.Optional[t.Union[str, pathlib.Path]], optional):
                 The settings config file path. Defaults to None.
 
-            settings_env_var (Optional[str], optional):
+            settings_env_var (t.Optional[str], optional):
                 The settings config env var. Defaults to None.
 
-            overrides (Optional[Dict[str, Any]], optional): 
+            overrides (t.Optional[t.Dict[str, t.Any]], optional): 
                 The config overrides. Defaults to None.
                 This is used to override the config values.
         """
@@ -540,13 +540,13 @@ class DBBackendManager(abc.ABC):
 
     @classmethod
     def default(
-        cls: Type['DBManagerT'],
-        name: Optional[str] = None,
-        default_backend: Optional[BackendType] = None,
-        debug_enabled: Optional[bool] = None,
-        settings: Optional[DBSettingsT] = None,
-        config: Optional[DBConfigT] = None,
-        overrides: Optional[Dict[str, Any]] = None,
+        cls: t.Type['DBManagerT'],
+        name: t.Optional[str] = None,
+        default_backend: t.Optional[BackendType] = None,
+        debug_enabled: t.Optional[bool] = None,
+        settings: t.Optional[DBSettingsT] = None,
+        config: t.Optional[DBConfigT] = None,
+        overrides: t.Optional[t.Dict[str, t.Any]] = None,
         **kwargs,
     ) -> 'DBManagerT':
         """
@@ -565,19 +565,19 @@ class DBBackendManager(abc.ABC):
             **kwargs,
         )
     
-    def add_error_callback(self, *callbacks: Callable):
+    def add_error_callback(self, *callbacks: t.Callable):
         """
         Adds an error callback
         """
         self._on_failure_callbacks.extend(callbacks)
 
-    def add_handled_exception(self, *exceptions: Type[Exception]):
+    def add_handled_exception(self, *exceptions: t.Type[Exception]):
         """
         Adds an exception to the handled exceptions
         """
         self._handled_exceptions.extend(exceptions)
     
-    def add_exception_callback(self, callback: Callable, *exceptions: Type[Exception]):
+    def add_exception_callback(self, callback: t.Callable, *exceptions: t.Type[Exception]):
         """
         Adds an exception callback
         """
@@ -585,7 +585,7 @@ class DBBackendManager(abc.ABC):
         self._handled_exceptions.extend(exceptions)
 
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name: str) -> t.Any:
         """
         Forward all unknown attributes to the backend
         """
@@ -594,7 +594,7 @@ class DBBackendManager(abc.ABC):
             return self.backends[name]
         return getattr(self.bkend, name)
     
-    if TYPE_CHECKING:
+    if t.TYPE_CHECKING:
         @property
         def engine(self) -> 'Engine':
             """

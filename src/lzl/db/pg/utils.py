@@ -3,17 +3,17 @@ from __future__ import annotations
 
 import abc
 import datetime
-from typing import List, Optional, Dict, Any, Union, TYPE_CHECKING
+import typing as t
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from lzl.types import AppEnv
 
 def parse_pg_config(
-    config: Dict[str, Dict[str, Union[str, Dict[str, str]]]],
-    env_name: Optional[Union[str, 'AppEnv']] = 'local',
-    in_cluster: Optional[bool] = None,
+    config: t.Dict[str, t.Dict[str, t.Union[str, t.Dict[str, str]]]],
+    env_name: t.Optional[t.Union[str, 'AppEnv']] = 'local',
+    in_cluster: t.Optional[bool] = None,
     **kwargs,
-) -> Dict[str, str]:
+) -> t.Dict[str, str]:
     """
     Constructs the Postgres URLs from a YAML Configuration
     
@@ -110,10 +110,10 @@ def parse_pg_config(
 
 def build_sql_metadata_filter(
     table: str,
-    conditional: Optional[str] = 'AND',
-    metadata_key: Optional[str] = '_metadata',
-    include_table_name: Optional[bool] = False,
-    **filters: Dict[str, Union[int, float, datetime.datetime, Dict, List, Any]]
+    conditional: t.Optional[str] = 'AND',
+    metadata_key: t.Optional[str] = '_metadata',
+    include_table_name: t.Optional[bool] = False,
+    **filters: t.Dict[str, t.Union[int, float, datetime.datetime, t.Dict, t.List, t.Any]]
 ) -> str:
     """
     Constructs the WHERE clause for the `_metadata` property because it's a `jsonb` field
@@ -174,7 +174,7 @@ class SQLAlchemyUtilities(abc.ABC):
         from sqlalchemy.sql.expression import (
             text, select, update, delete, 
             funcfilter, lambda_stmt, func, modifier, bindparam,
-            exists, desc, asc, case, cast, literal, 
+            exists, desc, asc, case, t.cast, literal, 
             collate, distinct, extract, false, null, nulls_first, nulls_last, true,
             over, between, lateral, try_cast, alias, type_coerce, within_group, 
             intersect, intersect_all, outerjoin, union, union_all, table, values,
@@ -197,7 +197,7 @@ class SQLAlchemyUtilities(abc.ABC):
         self.desc = desc
         self.asc = asc
         self.case = case
-        self.cast = cast
+        self.t.cast = t.cast
         self.literal = literal
 
         self.collate = collate
