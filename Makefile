@@ -4,7 +4,7 @@ PYTHON ?= python
 PYTEST ?= pytest
 PYTEST_OPTS ?=
 
-.PHONY: test test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool test-lzl-proxied test-lzl-require test-lzl
+.PHONY: test test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool test-lzl-proxied test-lzl-require test-lzl-sysmon test-lzl
 
 ## test: Run the entire pytest suite
 test:
@@ -37,5 +37,9 @@ test-lzl-proxied:
 test-lzl-require:
 	$(PYTEST) $(PYTEST_OPTS) tests/lzl/test_require.py
 
+## test-lzl-sysmon: Run system monitoring context tests
+test-lzl-sysmon:
+	$(PYTEST) $(PYTEST_OPTS) tests/lzl/test_sysmon.py
+
 ## test-lzl: Run documentation-focused submodule tests
-test-lzl: test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool test-lzl-proxied test-lzl-require
+test-lzl: test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool test-lzl-proxied test-lzl-require test-lzl-sysmon

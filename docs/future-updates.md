@@ -47,3 +47,9 @@ remain intentional.
   context manager or helper to reset state when used in long-lived processes.
 - Explore exposing thread-safety controls for `ProxyObject` beyond a simple
   boolean to support custom lock strategies when profiling indicates issues.
+
+## lzl.sysmon
+- GPU/CPU sampling currently depends on `lzo.utils.system`; consider adding
+  graceful degradation when those utilities are unavailable.
+- Evaluate emitting structured data (JSON) alongside formatted strings so the
+  metrics can be ingested by observability tooling without parsing log text.

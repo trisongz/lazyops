@@ -40,5 +40,7 @@ it updated so new contributors have a single reference for style expectations.
   event loop does not emit "task was destroyed" warnings during teardown.
 - Reset class-level caches (for example `ProxyDict._dict`) in tests that
   mutate proxied registries to avoid leaking state between cases.
+- When exercising `WorkerContext`/`MLContext`, stub `logger.info` and resource
+  fetchers so tests do not rely on real hardware metrics.
 
 _Last updated: September 18, 2025_
