@@ -3,11 +3,14 @@
 PYTHON ?= python
 PYTEST ?= pytest
 PYTEST_OPTS ?=
+MINT ?= npx --yes mint
+DOCS_REMOTE ?= origin
+DOCS_BRANCH ?= main
 
 PYTHONPATH := src$(if $(PYTHONPATH),:$(PYTHONPATH),)
 export PYTHONPATH
 
-.PHONY: test test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool test-lzl-proxied test-lzl-require test-lzl-sysmon test-lzl test-lzo-registry test-lzo-types test-lzo-utils test-lzo
+.PHONY: test test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool test-lzl-proxied test-lzl-require test-lzl-sysmon test-lzl test-lzo-registry test-lzo-types test-lzo-utils test-lzo docs-preview docs-generate docs-publish
 
 ## test: Run the entire pytest suite
 test:
@@ -61,3 +64,18 @@ test-lzo-utils:
 
 ## test-lzo: Run the `lzo` suite generated alongside documentation updates
 test-lzo: test-lzo-registry test-lzo-types test-lzo-utils
+
+## docs-preview: Preview documentation locally via Mintlify
+docs-preview:
+	$(MINT) dev
+
+## docs-generate: Run Mintlify validation checks before publishing
+docs-generate:
+	$(MINT) broken-links
+	@if [ -n "$(DOCS_OPENAPI)" ]; then \
+		$(MINT) openapi-check $(DOCS_OPENAPI); \
+	fi
+
+## docs-publish: Push documentation updates to trigger Mintlify deployment
+docs-publish:
+	git push $(DOCS_REMOTE) $(DOCS_BRANCH)

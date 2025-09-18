@@ -1,0 +1,45 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "LazyOps Documentation",
+  "description": "Guides, coding standards, and roadmap notes for the LazyOps lzl and lzo modules.",
+  "colors": {
+    "primary": "#2563EB",
+    "light": "#60A5FA",
+    "dark": "#1D4ED8"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "index",
+              "mintlify"
+            ]
+          },
+          {
+            "group": "Engineering Standards",
+            "pages": [
+              "code-style"
+            ]
+          },
+          {
+            "group": "Planning",
+            "pages": [
+              "future-updates",
+              "todo"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/trisongz/lazyops"
+    }
+  }
+}

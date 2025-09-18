@@ -1,0 +1,6 @@
+- [ ] Add Documentation (mintlify)
+- [ ] Add Documentation (readme)
+- [ ] Remove v1
+- [ ] Add proper tests
+- [ ] Rework / refactor code
+- [ ] Rework fileio module
