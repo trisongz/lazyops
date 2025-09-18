@@ -4,6 +4,9 @@ PYTHON ?= python
 PYTEST ?= pytest
 PYTEST_OPTS ?=
 
+PYTHONPATH := src$(if $(PYTHONPATH),:$(PYTHONPATH),)
+export PYTHONPATH
+
 .PHONY: test test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool test-lzl-proxied test-lzl-require test-lzl-sysmon test-lzl test-lzo-registry test-lzo-types test-lzo-utils test-lzo
 
 ## test: Run the entire pytest suite

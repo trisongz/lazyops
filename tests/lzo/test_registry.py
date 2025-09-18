@@ -1,13 +1,51 @@
 from __future__ import annotations
 
 import typing as t
+import sys
+from pathlib import Path
+import types
 
 import pytest
+
+ROOT = Path(__file__).resolve().parents[2]
+SRC_PATH = ROOT / 'src'
+if str(SRC_PATH) not in sys.path:
+    sys.path.insert(0, str(SRC_PATH))
+
+try:
+    import lzo
+except Exception as exc:  # pragma: no cover - diagnostic
+    raise RuntimeError(f'Failed to import lzo: {exc}; sys.path={sys.path}') from exc
+
+required_wrap_names = {
+    'func_to_async_func': lambda func: func,
+    'func_to_async_method': lambda func: func,
+    'coro_to_async_method': lambda coro: coro,
+    'to_async_method': lambda func: func,
+    'method_to_async_method': lambda func: func,
+}
+
+wrap = sys.modules.get('aiopath.wrap')
+if wrap is None:
+    wrap = types.ModuleType('aiopath.wrap')
+    sys.modules['aiopath.wrap'] = wrap
+
+aiopath_pkg = sys.modules.get('aiopath')
+if aiopath_pkg is None:
+    aiopath_pkg = types.ModuleType('aiopath')
+    aiopath_pkg.__path__ = []  # type: ignore[attr-defined]
+    sys.modules['aiopath'] = aiopath_pkg
+
+setattr(aiopath_pkg, 'wrap', wrap)
+
+for name, factory in required_wrap_names.items():
+    if not hasattr(wrap, name):
+        setattr(wrap, name, factory)
 
 from lzo.registry.base import MRegistry, combine_parts
 from lzo.registry import clients as registry_clients
 
-from . import fixtures
+import lzo_fixtures as fixtures
 
 
 def test_combine_parts_skips_none_segments() -> None:

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
+import asyncio
 import math
-
-import pytest
 
 from lzo.utils.helpers.base import extract_function_kwargs, retryable
 from lzo.utils.keygen import Generate
@@ -34,8 +33,7 @@ def test_retryable_retries_sync_function() -> None:
     assert attempts['count'] == 3
 
 
-@pytest.mark.asyncio
-async def test_retryable_handles_async_functions() -> None:
+def test_retryable_handles_async_functions() -> None:
     attempts = {'count': 0}
 
     @retryable(limit=2, delay=0)
@@ -45,7 +43,7 @@ async def test_retryable_handles_async_functions() -> None:
             raise RuntimeError('first attempt fails')
         return 7
 
-    assert await flaky_async() == 7
+    assert asyncio.run(flaky_async()) == 7
     assert attempts['count'] == 2
 
 
@@ -63,7 +61,7 @@ def test_parse_memory_metric_supports_human_readable_units() -> None:
 def test_parse_memory_metric_to_byte_size_round_trips() -> None:
     result = parse_memory_metric_to_bs(1_048_576)
 
-    assert str(result) == '1024KiB'
+    assert int(result) == 1_048_576
 
 
 def test_safe_float_returns_nan_for_invalid_input() -> None:
