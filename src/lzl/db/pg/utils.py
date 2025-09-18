@@ -172,13 +172,13 @@ class SQLAlchemyUtilities(abc.ABC):
         """
         from sqlalchemy.orm import defer
         from sqlalchemy.sql.expression import (
-            text, select, update, delete, 
+            text, select, update, delete,
             funcfilter, lambda_stmt, func, modifier, bindparam,
-            exists, desc, asc, case, t.cast, literal, 
+            exists, desc, asc, case, cast, literal,
             collate, distinct, extract, false, null, nulls_first, nulls_last, true,
-            over, between, lateral, try_cast, alias, type_coerce, within_group, 
+            over, between, lateral, try_cast, alias, type_coerce, within_group,
             intersect, intersect_all, outerjoin, union, union_all, table, values,
-            all_, and_, any_, not_, or_, tuple_, except_, except_all, 
+            all_, and_, any_, not_, or_, tuple_, except_, except_all,
         )
         from sqlalchemy.dialects.postgresql import insert, array_agg
         from sqlalchemy.orm import selectinload
@@ -197,7 +197,7 @@ class SQLAlchemyUtilities(abc.ABC):
         self.desc = desc
         self.asc = asc
         self.case = case
-        self.t.cast = t.cast
+        self.cast = cast
         self.literal = literal
 
         self.collate = collate
