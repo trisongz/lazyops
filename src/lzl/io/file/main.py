@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-"""
-The FileIO Module
+"""Primary entry-point for LazyOps file abstractions.
+
+The implementations stay untouched; only documentation and typing surface areas
+are clarified to make downstream usage explicit for auto-generated docs.
 """
 
 import os
@@ -19,9 +21,7 @@ if t.TYPE_CHECKING:
 if t.TYPE_CHECKING:
     
     class File(t.Generic[FileLikeT], CloudFileSystemPath):
-        """
-        The File Class
-        """
+        """Lightweight wrapper over provider-specific path implementations."""
         
         settings: 'FileIOConfig'
 
@@ -72,22 +72,25 @@ else:
     )
 
     class File(t.Generic[FileLikeT]):
+        """Factory that instantiates concrete path objects for various backends."""
 
         settings: 'FileIOConfig' = fileio_settings
 
         @classmethod
-        def _get_filelike(cls, *args, **kwargs) -> 'FileLike':
-            """
-            Returns the FileLike
+        def _get_filelike(cls, *args: t.Any, **kwargs: t.Any) -> 'FileLike':
+            """Resolve the correct :class:`FileLike` instance for given input.
+
+            Args:
+                *args: Positional arguments forwarded to
+                    :func:`lzl.io.file.spec.main.get_filelike`.
+                **kwargs: Keyword arguments forwarded to the same helper.
             """
             from .spec.main import get_filelike
             return get_filelike(*args, **kwargs)
         
         @classmethod
         def get_object_size(cls, obj: t.Any) -> 'ObjectSize':
-            """
-            Returns the size of the object
-            """
+            """Return a convenience wrapper reporting object size in bytes."""
             from .types.misc import ObjectSize
             return ObjectSize(obj)
 
@@ -96,25 +99,29 @@ else:
             *args, 
             **kwargs
         ) -> 'FileLike':
-            """
-            Initializes the File
-            """
+            """Instantiate a file path object for the configured backend."""
             return cls._get_filelike(*args, **kwargs)
 
 
         @classmethod
         def get_dir(cls, path: 'PathLike') -> 'FileLike':
-            """
-            Returns the directory of the file
-            """
+            """Return the parent directory for the provided path-like value."""
             new = cls._get_filelike(path)
             return new if new.is_dir() else new.parent
         
             
         @classmethod
         def register_loader(cls, ext: str, loader: t.Union[t.Callable[['FileLike'], None], t.Awaitable['FileLike', None]], overwrite: t.Optional[bool] = None) -> None:
-            """
-            Registers a file loader for a specific file extension.
+            """Register a loader callback for the given file extension.
+
+            Args:
+                ext: Extension (``.json``, ``.csv``…) to register the loader
+                    against.  A leading dot is optional.
+                loader: Callable that receives the resolved :class:`FileLike`
+                    instance and should return either a processed value or
+                    coroutine.
+                overwrite: When ``True`` the loader replaces any existing
+                    registration for ``ext``.
             """
             from lzl.io.file.registry import register_loader
             register_loader(ext, loader, overwrite)
@@ -140,9 +147,7 @@ else:
                 source: type[t.Any], 
                 handler: GetCoreSchemaHandler
             ) -> core_schema.CoreSchema:
-                """
-                Get the Pydantic CoreSchema for the given source
-                """
+                """Return the Pydantic v2 CoreSchema for :class:`File` fields."""
                 from pydantic_core import core_schema, SchemaSerializer
                 schema = core_schema.with_info_plain_validator_function(
                     cls._validate,
@@ -154,9 +159,7 @@ else:
 
             @classmethod
             def _validate(cls, __input_value: t.Any, _: core_schema.ValidationInfo) -> FileLike:
-                """
-                Validator for Pydantic v2
-                """
+                """Pydantic validator that coerces inputs into :class:`File` objects."""
                 return cls._get_filelike(__input_value) if __input_value is not None else None
             
 

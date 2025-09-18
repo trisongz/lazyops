@@ -133,28 +133,11 @@ async def acreate_stream(
     cert: t.Optional[CertTypes] = None,
     trust_env: bool = True,
 ) -> Response:
-    """
-    Creates an asynchronous streaming response.
+    """Create an asynchronous streaming response.
 
-    Builds an asynchronous HTTP request, sends it, and returns a streaming response.
-
-    Args:
-        method: The HTTP method to use.
-        url: The URL to send the request to.
-        content: The body content.
-        data: The body data.
-        files: The files to include.
-        json: JSON data to include. 
-        params: URL parameters to include.
-        headers: Headers to include.
-        cookies: Cookies to include.
-        auth: Authentication settings.
-        follow_redirects: Whether to follow redirects.
-        timeout: Timeout settings.
-        extensions: Extensions to use.
-
-    Returns:
-        httpx.Response: The streaming response.
+    Parameters are identical to :func:`arequest`; the key difference is that
+    this helper returns the streaming response immediately instead of loading
+    the body in memory.
     """
     async with AsyncClient(
         cookies=cookies,

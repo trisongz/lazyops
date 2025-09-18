@@ -1,38 +1,63 @@
 from __future__ import annotations
 
+"""Factory helpers for configuring LazyOps logging.
+
+The underlying implementation remains untouched – the adjustments here make the
+intent of each entry-point explicit for generated documentation and downstream
+integrations.
+"""
+
+import atexit as _atexit
 import os
 import sys
 import threading
-import atexit as _atexit
+import typing as t
+
 from loguru import _defaults
 from loguru._logger import Core as _Core
-from .base import Logger, InterceptHandler
+
+from .base import InterceptHandler, Logger
 from .formatters import LoggerFormatter
 from .null_logger import NullLogger
-from .utils import extract_module_name
-from .state import run_record_patching_hook, register_logger_module
+from .state import register_logger_module, run_record_patching_hook
 from .static import REVERSE_LOGLEVEL_MAPPING
-from typing import Dict, Union, Any, TYPE_CHECKING, Optional, List, Callable
+from .utils import extract_module_name
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from pydantic_settings import BaseSettings
     from logging import Handler as LoggingHandler
     from logging import LogRecord
 
 _lock = threading.Lock()
-_logger_contexts: Dict[str, Logger] = {}
+_logger_contexts: t.Dict[str, Logger] = {}
+
+__all__ = ["create_global_logger", "create_default_logger"]
 
 def create_global_logger(
-    name: Optional[str] = 'lzl',
-    level: Union[str, int] = "INFO",
-    format: Optional[Callable] = None,
-    filter: Optional[Callable] = None,
-    handlers: Optional[List['LoggingHandler']] = None,
-    settings: Optional['BaseSettings'] = None,
+    name: t.Optional[str] = 'lzl',
+    level: t.Union[str, int] = "INFO",
+    format: t.Optional[t.Callable] = None,
+    filter: t.Optional[t.Callable] = None,
+    handlers: t.Optional[t.List['LoggingHandler']] = None,
+    settings: t.Optional['BaseSettings'] = None,
     **kwargs,
 ) -> Logger:
-    """
-    Creates the global logger
+    """Instantiate the shared global Loguru logger used across LazyOps.
+
+    Args:
+        name: Registry key for the logger instance.  Defaults to ``"lzl"``.
+        level: Log level for newly attached handlers.  Accepts both string and
+            numeric values recognised by Loguru.
+        format: Optional callable used to format log records.
+        filter: Optional predicate used to filter records.
+        handlers: Additional :mod:`logging` handlers to bridge into Loguru.
+        settings: Optional settings object attached to the logger for runtime
+            reference.
+        **kwargs: Additional keyword arguments forwarded to
+            :meth:`loguru.Logger.add`.
+
+    Returns:
+        Logger: The configured Loguru logger instance.
     """
     global _logger_contexts
 
@@ -95,16 +120,29 @@ def create_global_logger(
 
 
 def create_default_logger(
-    name: Optional[str] = None,
-    level: Union[str, int] = "INFO",
-    format: Optional[Callable] = None,
-    filter: Optional[Callable] = None,
-    handlers: Optional[List['LoggingHandler']] = None,
-    settings: Optional['BaseSettings'] = None,
+    name: t.Optional[str] = None,
+    level: t.Union[str, int] = "INFO",
+    format: t.Optional[t.Callable] = None,
+    filter: t.Optional[t.Callable] = None,
+    handlers: t.Optional[t.List['LoggingHandler']] = None,
+    settings: t.Optional['BaseSettings'] = None,
     **kwargs,
 ) -> Logger:
-    """
-    Creates a default logger
+    """Return a named logger that proxies calls to the global instance.
+
+    Args:
+        name: Optional logger namespace.  If omitted the global logger is
+            returned.
+        level: Minimum log level once the logger is registered.
+        format: Formatter applied when a dedicated handler is configured.
+        filter: Optional filtering callable.
+        handlers: Additional logging handlers to attach.
+        settings: Optional settings object attached to the logger for runtime
+            reference.
+        **kwargs: Extra keyword arguments forwarded to the Loguru ``add`` call.
+
+    Returns:
+        Logger: Either the global logger or a namespaced proxy.
     """
     global _logger_contexts
     if name:

@@ -1,12 +1,14 @@
-import copy
-import threading
+"""Lightweight proxy object that defers object creation until first use."""
+
 import contextlib
-import operator
+import copy
 import copyreg
-from typing import Any, Type, Tuple, Dict, List, Union, Optional, Callable, TypeVar, Iterable, Generic, TYPE_CHECKING
+import operator
+import threading
+import typing as t
 
 
-ProxyObjT = TypeVar('ProxyObjT')
+ProxyObjT = t.TypeVar('ProxyObjT')
 
 class Constant(tuple):
     "Pretty display of immutable constant."
@@ -21,8 +23,10 @@ EMPTY = Constant('EMPTY')
 empty = object()
 
 
-def new_method_proxy(func):
-    def inner(self: 'ProxyObject', *args):
+def new_method_proxy(func: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
+    """Wrap ``func`` so calls are forwarded to the underlying object."""
+
+    def inner(self: 'ProxyObject', *args: t.Any):
         if self._wrapped is empty:
             self._setup()
         return func(self._wrapped, *args)
@@ -34,29 +38,39 @@ https://github.com/seperman/dotobject/blob/master/dot/borrowed_lazy.py
 """
 
 
-class ProxyObject(Generic[ProxyObjT]):
+class ProxyObject(t.Generic[ProxyObjT]):
     
     _wrapped = None
 
-    if TYPE_CHECKING:
-        def __new__(cls: Type[ProxyObjT], *args, **kwargs) -> ProxyObjT:
+    if t.TYPE_CHECKING:
+        def __new__(cls: t.Type[ProxyObjT], *args, **kwargs) -> ProxyObjT:
             ...
 
     def __init__(
         self,
-        obj_cls: Optional[Union[Type[ProxyObjT], str]] = None,
-        obj_getter: Optional[Union[Callable[..., ProxyObjT], str]] = None,
-        obj_args: Optional[Union[str, Callable[..., Iterable[Any]], Iterable[Any]]] = None,
-        obj_kwargs: Optional[Union[str, Callable[..., Dict[str, Any]], Dict[str, Any]]] = None,
-        obj_initialize: Optional[bool] = True,
-        threadsafe: Optional[bool] = True,
-        # debug_enabled: Optional[bool] = False,
+        obj_cls: t.Optional[t.Union[t.Type[ProxyObjT], str]] = None,
+        obj_getter: t.Optional[t.Union[t.Callable[..., ProxyObjT], str]] = None,
+        obj_args: t.Optional[t.Union[str, t.Callable[..., t.Iterable[t.Any]], t.Iterable[t.Any]]] = None,
+        obj_kwargs: t.Optional[t.Union[str, t.Callable[..., t.Dict[str, t.Any]], t.Dict[str, t.Any]]] = None,
+        obj_initialize: t.Optional[bool] = True,
+        threadsafe: t.Optional[bool] = True,
     ) -> ProxyObjT:
-        """
-        args:
-            obj_cls: the class of the object
-            obj_getter: the function to get the object
-            debug_enabled: if True, will raise an error if the object is not found
+        """Create a lazily-evaluated proxy.
+
+        Args:
+            obj_cls: Class or import string for the wrapped object.  Used when
+                no ``obj_getter`` is provided.
+            obj_getter: Callable or import string that constructs the wrapped
+                object on demand.
+            obj_args: Positional arguments (or callable returning positional
+                arguments) forwarded to the constructor.
+            obj_kwargs: Keyword arguments (or callable returning keyword
+                arguments) forwarded to the constructor.
+            obj_initialize: When ``True`` the proxy will immediately instantiate
+                ``obj_cls`` on first access; otherwise the class itself is
+                returned.
+            threadsafe: When ``True`` access to the underlying object is
+                protected by a re-entrant lock.
         """
         
         assert obj_cls or obj_getter, "Either `obj_cls` or `obj_getter` must be provided"
@@ -74,9 +88,7 @@ class ProxyObject(Generic[ProxyObjT]):
     
     @contextlib.contextmanager
     def _objlock_(self):
-        """
-        Returns the object lock
-        """
+        """Context manager guarding the underlying object lock."""
         if self.__dict__['__threadlock_'] is not None:
             try:
                 with self.__dict__['__threadlock_']:
@@ -104,18 +116,14 @@ class ProxyObject(Generic[ProxyObjT]):
             self._setup()
         delattr(self._wrapped, name)
 
-    def __call__(self, *args, **kwargs) -> Any:
-        """
-        Call the proxy object
-        """
+    def __call__(self, *args: t.Any, **kwargs: t.Any) -> t.Any:
+        """Proxy call invocations to the wrapped object."""
         if self._wrapped is empty:
             self._setup()
         return self._wrapped(*args, **kwargs)
 
-    def _setup_init(self):
-        """
-        Setup and initialize the proxy object arguments
-        """
+    def _setup_init(self) -> None:
+        """Load callables/import strings used to build the underlying object."""
         from lzl.load import lazy_import
         # from lazyops.utils.helpers import lazy_import
         if self.__dict__['__obj_args_'] is not None and not isinstance(self.__dict__['__obj_args_'], (list, tuple)):
@@ -137,10 +145,8 @@ class ProxyObject(Generic[ProxyObjT]):
             self.__dict__['__obj_cls_'] = lazy_import(self.__dict__['__obj_cls_'])
 
 
-    def _setup(self):
-        """
-        Initializes the Proxy Object
-        """
+    def _setup(self) -> None:
+        """Instantiate (or fetch) the wrapped object if it isn't available."""
         # if self.__dict__['__obj_'] is not None: return
         
         with self._objlock_():
@@ -230,4 +236,3 @@ class ProxyObject(Generic[ProxyObjT]):
     __and__ = new_method_proxy(operator.and_)
     __or__ = new_method_proxy(operator.or_)
     __xor__ = new_method_proxy(operator.xor)
-

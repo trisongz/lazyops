@@ -94,28 +94,33 @@ class MLContext(abc.ABC):
         if not colored: return f"{gpu_name}: {curr_mem_used.human_readable()} / {curr_mem_total.human_readable()} ({curr_mem_percent}%)"
         return f"{gpu_name}: |y|{curr_mem_used.human_readable()}|e| / |g|{curr_mem_total.human_readable()}|e| ({curr_mem_percent}%)"
 
-    def get_gpu_memory(self, compare: t.Optional[bool] = None, previous_usage: t.Optional[GPUData] = None, colored: bool = False) -> t.Optional[str]:
-        """
-        Returns the GPU memory usage information.
+    def get_gpu_memory(
+        self,
+        compare: t.Optional[bool] = None,
+        previous_usage: t.Optional[GPUData] = None,
+        colored: bool = False,
+    ) -> t.Optional[str]:
+        """Return the current GPU memory usage as a formatted string.
 
         Args:
-            compare (bool, optional): Whether to compare with previous usage.
-            short (bool, optional): Whether to return a short summary.
-            colored (bool, optional): Whether to return colored output.
+            compare: When ``True`` the output highlights the delta from the
+                previous measurement (if available).
+            previous_usage: Optional gpu usage snapshot to compare against.  If
+                omitted the internally cached value from the last call is used.
+            colored: When ``True`` the string includes LazyOps color markers for
+                rich terminal formatting.
         """
         current_usage = self.get_gpu_data()
         if not current_usage: return None
         return self.build_gpu_data_string(current_usage, compare = compare, previous_usage = previous_usage, colored = colored)
 
-    async def aget_gpu_memory(self, compare: t.Optional[bool] = None, previous_usage: t.Optional[GPUData] = None, colored: bool = False) -> t.Optional[str]:
-        """
-        Returns the GPU memory usage information.
-
-        Args:
-            compare (bool, optional): Whether to compare with previous usage.
-            short (bool, optional): Whether to return a short summary.
-            colored (bool, optional): Whether to return colored output.
-        """
+    async def aget_gpu_memory(
+        self,
+        compare: t.Optional[bool] = None,
+        previous_usage: t.Optional[GPUData] = None,
+        colored: bool = False,
+    ) -> t.Optional[str]:
+        """Asynchronous variant of :meth:`get_gpu_memory`."""
         current_usage = await self.aget_gpu_data()
         if not current_usage: return None
         return self.build_gpu_data_string(current_usage, compare = compare, previous_usage = previous_usage, colored = colored)
@@ -131,13 +136,15 @@ class MLContext(abc.ABC):
         hook: t.Optional[t.Callable[[t.Dict[str, t.Any]], None]] = None,
         **kwargs,
     ):
-        """
-        Context manager for inference mode.
+        """Context manager that tracks inference duration and GPU usage.
 
         Args:
-            batch_size (int, optional): The batch size for inference.
-            obj_name (str, optional): The name of the object being processed.
-            enable_gc (bool, optional): Whether to enable garbage collection.
+            batch_size: Logical batch size for the inference run.
+            obj_name: Optional identifier used purely for logging context.
+            enable_gc: When ``True`` triggers a :func:`gc.collect` call on exit.
+            enable_summary: If provided, toggles summarised logging on exit.
+            hook: Optional callback invoked for each log message.
+            **kwargs: Additional metadata stored alongside the inference metrics.
         """
         ts = self.timer(format_ms = True, format_short = 1)
         start_text = "Starting Inference"
