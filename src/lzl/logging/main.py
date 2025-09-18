@@ -31,16 +31,24 @@ if t.TYPE_CHECKING:
 _lock = threading.Lock()
 _logger_contexts: t.Dict[str, Logger] = {}
 
-__all__ = ["create_global_logger", "create_default_logger"]
+__all__ = [
+    "create_global_logger",
+    "create_default_logger",
+    "change_logger_level",
+    "get_logger",
+    "logger",
+    "default_logger",
+    "null_logger",
+]
 
 def create_global_logger(
-    name: t.Optional[str] = 'lzl',
-    level: t.Union[str, int] = "INFO",
-    format: t.Optional[t.Callable] = None,
-    filter: t.Optional[t.Callable] = None,
-    handlers: t.Optional[t.List['LoggingHandler']] = None,
-    settings: t.Optional['BaseSettings'] = None,
-    **kwargs,
+    name: str | None = "lzl",
+    level: str | int = "INFO",
+    format: t.Callable[["LogRecord"], str] | None = None,
+    filter: t.Callable[["LogRecord"], bool] | None = None,
+    handlers: t.Sequence["LoggingHandler"] | None = None,
+    settings: "BaseSettings" | None = None,
+    **kwargs: t.Any,
 ) -> Logger:
     """Instantiate the shared global Loguru logger used across LazyOps.
 
@@ -120,13 +128,13 @@ def create_global_logger(
 
 
 def create_default_logger(
-    name: t.Optional[str] = None,
-    level: t.Union[str, int] = "INFO",
-    format: t.Optional[t.Callable] = None,
-    filter: t.Optional[t.Callable] = None,
-    handlers: t.Optional[t.List['LoggingHandler']] = None,
-    settings: t.Optional['BaseSettings'] = None,
-    **kwargs,
+    name: str | None = None,
+    level: str | int = "INFO",
+    format: t.Callable[["LogRecord"], str] | None = None,
+    filter: t.Callable[["LogRecord"], bool] | None = None,
+    handlers: t.Sequence['LoggingHandler'] | None = None,
+    settings: 'BaseSettings' | None = None,
+    **kwargs: t.Any,
 ) -> Logger:
     """Return a named logger that proxies calls to the global instance.
 
@@ -204,20 +212,12 @@ def create_default_logger(
 
 
 def change_logger_level(
-    name: Optional[str] = None,
-    level: Union[str, int] = 'INFO',
+    name: str | None = None,
+    level: str | int = "INFO",
     verbose: bool = False,
-    **kwargs,
-):
-    """
-    Change the logger level for a specific logger
-
-    args:
-        level: str = 'INFO'
-            The level to change the logger to
-        verbose: bool = False
-            Whether to print the change to the logger
-    """
+    **kwargs: t.Any,
+) -> None:
+    """Update the minimum level for the global or named logger."""
     global logger, logger_level
     if isinstance(level, str): level = level.upper()
     # Skip if the level is the same
