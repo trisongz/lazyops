@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+"""Pydantic model capturing :class:`Client` configuration state."""
+
+import typing as t
 
 import httpx
-import typing as t
+
 from lzl.types import BaseModel, ConfigDict
+
 from . import typed as ht
 
+
 class ClientParams(BaseModel):
-    """
-    Used to store the params for the Client class
-    """
+    """Lightweight serialisable copy of the arguments passed to :class:`Client`."""
     auth: t.Optional[ht.AuthTypes] = None
     params: t.Optional[ht.QueryParamTypes] = None
     headers: t.Optional[ht.HeaderTypes] = None
@@ -47,10 +50,8 @@ class ClientParams(BaseModel):
     model_config = ConfigDict(extra = 'allow', arbitrary_types_allowed = True)
 
     @property
-    def sync_kwargs(self) -> t.Dict:
-        """
-        Returns the sync kwargs
-        """
+    def sync_kwargs(self) -> t.Dict[str, t.Any]:
+        """Return keyword arguments safe for :class:`httpx.Client`."""
         data = self.model_dump(
             exclude_none = True, 
             exclude = {'async_transport', 'async_mounts', 'async_event_hooks', 'soup_enabled', 'debug', 'retries', 'proxies'}
@@ -61,10 +62,8 @@ class ClientParams(BaseModel):
         return data
     
     @property
-    def async_kwargs(self) -> t.Dict:
-        """
-        Returns the async kwargs
-        """
+    def async_kwargs(self) -> t.Dict[str, t.Any]:
+        """Return keyword arguments safe for :class:`httpx.AsyncClient`."""
         data = self.model_dump(
             exclude_none = True, 
             exclude = {'soup_enabled', 'debug', 'retries', 'proxies'}

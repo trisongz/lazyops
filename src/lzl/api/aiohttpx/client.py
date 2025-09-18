@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-import httpx
+"""Hybrid sync/async HTTP client facade built on top of :mod:`httpx`."""
+
 import contextlib
-import typing as t 
-from .utils.logs import logger
-from .utils.helpers import is_coro_func, http_retry_wrapper, raise_for_status, wrap_soup_response
+import typing as t
+
+import httpx
+
+from .presets import PresetConfig, get_preset
 from .types import typed as ht
 from .types.params import ClientParams
-from .presets import PresetConfig, get_preset
+from .utils.helpers import http_retry_wrapper, is_coro_func, raise_for_status, wrap_soup_response
+from .utils.logs import logger
+
+__all__ = ["Client", "Response"]
 
 if t.TYPE_CHECKING:
     from bs4 import BeautifulSoup
@@ -128,7 +134,7 @@ class Client:
         init_hooks: t.Optional[t.List[t.Union[t.Tuple[t.Callable, t.Dict], t.Callable]]] = None,
         preset_config: t.Optional[PresetConfig] = 'default',
         disable_httpx_logger: t.Optional[bool] = None,
-        **kwargs
+        **kwargs: t.Any,
     ):
         preset = get_preset(preset_config)
         if preset:
@@ -191,9 +197,7 @@ class Client:
         self._incomplete_hooks: t.Optional[t.List[t.Union[t.Tuple[t.Callable, t.Dict], t.Callable]]] = []
 
     def _wrap_retry(self, client: httpx.Client | httpx.AsyncClient) -> httpx.Client | httpx.AsyncClient:
-        """
-        Wraps the client with retry logic
-        """
+        """Attach retry-aware wrappers to the primary HTTP verbs."""
         if self._config.retries is None:
             return client
         for method in {
@@ -203,12 +207,13 @@ class Client:
         return client
     
     def _wrap_retry_method(self, method: t.Callable[..., RT], max_retries: t.Optional[int] = None) -> t.Callable[..., RT]:
-        """
-        Wraps the client with retry logic
-        """
-        if max_retries is None: max_retries = self._config.retries
-        if max_retries is None: return method
-        return http_retry_wrapper(max_tries  = max_retries + 1)(method)
+        """Return *method* wrapped with the configured retry strategy."""
+
+        if max_retries is None:
+            max_retries = self._config.retries
+        if max_retries is None:
+            return method
+        return http_retry_wrapper(max_tries=max_retries + 1)(method)
 
 
     @property

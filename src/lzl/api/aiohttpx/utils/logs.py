@@ -1,21 +1,31 @@
-import os
+"""Logging helpers specific to the :mod:`lzl.api.aiohttpx` package."""
+
 import logging
-from typing import Optional
-from lzl.logging import get_logger, change_logger_level, null_logger, Logger, NullLogger
+import os
+import typing as t
 
-# to prevent recursive imports, we'll just use os environ here
-logger_level: str = os.getenv('LOGGER_LEVEL', 'INFO').upper()
-logger = get_logger(logger_level)
+from lzl.logging import Logger, NullLogger, change_logger_level, get_logger, null_logger
 
-logger.set_module_name('lzl.api.aiohttpx', 'aiohttpx', is_relative = True)
+__all__ = [
+    "logger",
+    "mute_httpx_logger",
+    "change_logger_level",
+    "null_logger",
+    "Logger",
+    "NullLogger",
+]
 
-_muted_httpx: Optional[bool] = None
+# Keep module-level logger creation simple to avoid recursive import issues.
+logger_level = os.getenv('LOGGER_LEVEL', 'INFO').upper()
+logger: Logger = get_logger(logger_level)
+logger.set_module_name('lzl.api.aiohttpx', 'aiohttpx', is_relative=True)
+
+_muted_httpx: t.Optional[bool] = None
 
 
 def mute_httpx_logger() -> None:
-    """
-    Mute the httpx logger.
-    """
+    """Ensure the upstream ``httpx`` logger only logs warnings or higher once."""
+
     global _muted_httpx
     if _muted_httpx is not None:
         return

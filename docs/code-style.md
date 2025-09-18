@@ -29,4 +29,8 @@ it updated so new contributors have a single reference for style expectations.
 - Maintain ASCII encoding in source files unless there is a clear reason to do
   otherwise and the file already uses non-ASCII characters.
 
+## Testing
+- Prefer deterministic transports (for example `httpx.MockTransport`) when
+  exercising HTTP clients to keep tests network-free and CI friendly.
+
 _Last updated: September 18, 2025_

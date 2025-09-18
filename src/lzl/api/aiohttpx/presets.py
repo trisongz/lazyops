@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+"""Connection presets that provide ergonomic defaults for :class:`Client`."""
+
 import os
-import httpx
 import typing as t
+
+import httpx
+
 from .types import typed as ht
+
+__all__ = ["PresetConfig", "Preset", "PresetMap", "get_preset"]
 
 PresetConfig = t.Literal[
     'default', 
@@ -20,9 +26,7 @@ _ncpu_cores = os.cpu_count()
 _conn_unit = max(2, _ncpu_cores // 10)
 
 class Preset(t.TypedDict):
-    """
-    A Preset Option for the Client
-    """
+    """Configuration blob describing httpx limits, timeouts, and retries."""
     name: str
     limits: ht.Limits
     timeout: ht.TimeoutTypes
@@ -121,7 +125,7 @@ DownloadsPreset = Preset(
     kwargs = {'follow_redirects': True, 'disable_httpx_logger': True},
 )
 
-PresetMap = {
+PresetMap: t.Dict[str, Preset] = {
     'default': DefaultPreset,
     'low': LowPreset,
     'mid': MidPreset,
@@ -133,7 +137,6 @@ PresetMap = {
 }
 
 def get_preset(name: PresetConfig) -> t.Optional[Preset]:
-    """
-    Returns the preset
-    """
+    """Return the preset definition for *name* if one is registered."""
+
     return PresetMap.get(name)

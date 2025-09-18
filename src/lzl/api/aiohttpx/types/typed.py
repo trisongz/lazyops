@@ -1,20 +1,10 @@
+"""Shared typing primitives for :mod:`lzl.api.aiohttpx`."""
 
 import ssl
-import httpx
 from http.cookiejar import CookieJar
-from typing import (
-    IO,
-    AsyncIterable,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    Union,
-)
+import typing as t
+
+import httpx
 
 __all__ = [
     "PrimitiveData",
@@ -43,67 +33,67 @@ __all__ = [
     "Limits",
 ]
 
-PrimitiveData = Optional[Union[str, int, float, bool]]
-RawURL = Tuple[bytes, bytes, Optional[int], bytes]
-URLTypes = Union[httpx.URL, str]
+PrimitiveData = t.Optional[t.Union[str, int, float, bool]]
+RawURL = t.Tuple[bytes, bytes, t.Optional[int], bytes]
+URLTypes = t.Union[httpx.URL, str]
 
-QueryParamTypes = Union[
+QueryParamTypes = t.Union[
     httpx.QueryParams,
-    Mapping[str, Union[PrimitiveData, Sequence[PrimitiveData]]],
-    List[Tuple[str, PrimitiveData]],
-    Tuple[Tuple[str, PrimitiveData], ...],
+    t.Mapping[str, t.Union[PrimitiveData, t.Sequence[PrimitiveData]]],
+    t.List[t.Tuple[str, PrimitiveData]],
+    t.Tuple[t.Tuple[str, PrimitiveData], ...],
     str,
     bytes,
 ]
 
-HeaderTypes = Union[
+HeaderTypes = t.Union[
     httpx.Headers,
-    Dict[str, str],
-    Dict[bytes, bytes],
-    Sequence[Tuple[str, str]],
-    Sequence[Tuple[bytes, bytes]],
+    t.Dict[str, str],
+    t.Dict[bytes, bytes],
+    t.Sequence[t.Tuple[str, str]],
+    t.Sequence[t.Tuple[bytes, bytes]],
 ]
 
-CookieTypes = Union[httpx.Cookies, CookieJar, Dict[str, str], List[Tuple[str, str]]]
-CertTypes = Union[
+CookieTypes = t.Union[httpx.Cookies, CookieJar, t.Dict[str, str], t.List[t.Tuple[str, str]]]
+CertTypes = t.Union[
     # certfile
     str,
     # (certfile, keyfile)
-    Tuple[str, Optional[str]],
+    t.Tuple[str, t.Optional[str]],
     # (certfile, keyfile, password)
-    Tuple[str, Optional[str], Optional[str]],
+    t.Tuple[str, t.Optional[str], t.Optional[str]],
 ]
-VerifyTypes = Union[str, bool, ssl.SSLContext]
-TimeoutTypes = Union[
-    Optional[float],
-    Tuple[Optional[float], Optional[float], Optional[float], Optional[float]],
+VerifyTypes = t.Union[str, bool, ssl.SSLContext]
+TimeoutTypes = t.Union[
+    t.Optional[float],
+    t.Tuple[t.Optional[float], t.Optional[float], t.Optional[float], t.Optional[float]],
     httpx.Timeout,
 ]
-ProxiesTypes = Union[URLTypes, httpx.Proxy, Dict[URLTypes, Union[None, URLTypes, httpx.Proxy]]]
+ProxiesTypes = t.Union[URLTypes, httpx.Proxy, t.Dict[URLTypes, t.Union[None, URLTypes, httpx.Proxy]]]
 
-AuthTypes = Union[
-    Tuple[Union[str, bytes], Union[str, bytes]],
-    Callable[[httpx.Request], httpx.Request],
+AuthTypes = t.Union[
+    t.Tuple[t.Union[str, bytes], t.Union[str, bytes]],
+    t.Callable[[httpx.Request], httpx.Request],
     httpx.Auth,
 ]
 
-RequestContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
-ResponseContent = Union[str, bytes, Iterable[bytes], AsyncIterable[bytes]]
+RequestContent = t.Union[str, bytes, t.Iterable[bytes], t.AsyncIterable[bytes]]
+ResponseContent = t.Union[str, bytes, t.Iterable[bytes], t.AsyncIterable[bytes]]
 
-RequestData = dict
+RequestData = t.Dict[str, t.Any]
 
-FileContent = Union[IO[bytes], bytes]
-FileTypes = Union[
+FileContent = t.Union[t.IO[bytes], bytes]
+FileTypes = t.Union[
     # file (or bytes)
     FileContent,
     # (filename, file (or bytes))
-    Tuple[Optional[str], FileContent],
+    t.Tuple[t.Optional[str], FileContent],
     # (filename, file (or bytes), content_type)
-    Tuple[Optional[str], FileContent, Optional[str]],
+    t.Tuple[t.Optional[str], FileContent, t.Optional[str]],
     # (filename, file (or bytes), content_type, headers)
-    Tuple[Optional[str], FileContent, Optional[str], Mapping[str, str]],
+    t.Tuple[t.Optional[str], FileContent, t.Optional[str], t.Mapping[str, str]],
 ]
-RequestFiles = Union[Mapping[str, FileTypes], Sequence[Tuple[str, FileTypes]]]
+RequestFiles = t.Union[t.Mapping[str, FileTypes], t.Sequence[t.Tuple[str, FileTypes]]]
 
 # Aliasing 
 
@@ -119,5 +109,3 @@ Limits = httpx.Limits
 DEFAULT_TIMEOUT_CONFIG = httpx._client.DEFAULT_TIMEOUT_CONFIG
 DEFAULT_LIMITS = httpx._client.DEFAULT_LIMITS
 DEFAULT_MAX_REDIRECTS = httpx._client.DEFAULT_MAX_REDIRECTS
-
-

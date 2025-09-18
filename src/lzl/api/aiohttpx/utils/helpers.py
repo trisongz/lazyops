@@ -1,14 +1,19 @@
 from __future__ import annotations
 
-import httpx
-import functools
-import contextlib
+"""Utility helpers that extend :mod:`httpx` with LazyOps ergonomics."""
+
 import asyncio
+import contextlib
+import functools
 import inspect
 import typing as t
+
+import httpx
+
+from httpx._exceptions import HTTPError, HTTPStatusError
+
 from lzl import load
 from lzl.types import lazyproperty
-from httpx._exceptions import HTTPError, HTTPStatusError
 
 if load.TYPE_CHECKING:
     import bs4
@@ -19,32 +24,26 @@ else:
 
 
 def fatal_http_exception(exc: Exception | HTTPError) -> bool:
-    """
-    Checks if the exception is fatal
-    """
+    """Return ``True`` when the exception should *not* be retried."""
+
     if isinstance(exc, HTTPStatusError):
-        # retry on server errors and client errors
-        # with 429 status code (rate limited),
-        # don't retry on other client errors
+        # Retry on 5xxs and rate limits; other client errors are considered fatal
         return (400 <= exc.response.status_code < 500) and exc.response.status_code != 429
-    else:
-        # retry on all other errors (eg. network)
-        return False
+    # Network errors are treated as transient
+    return False
 
 
 http_retry_wrapper = functools.partial(
     backoff.on_exception,
-    backoff.expo, 
-    exception = Exception, 
-    giveup = fatal_http_exception,
-    factor = 5,
+    backoff.expo,
+    exception=Exception,
+    giveup=fatal_http_exception,
+    factor=5,
 )
 
 
-def raise_for_status(self: 'httpx.Response') -> None:
-    """
-    Raise the `HTTPStatusError` if one occurred.
-    """
+def raise_for_status(self: httpx.Response) -> None:
+    """Mirror :meth:`httpx.Response.raise_for_status` with richer messages."""
     request = self._request
     if request is None:
         raise RuntimeError(
@@ -78,15 +77,13 @@ def raise_for_status(self: 'httpx.Response') -> None:
     message = message.format(self, error_type=error_type)
     with contextlib.suppress(Exception):
         resp_text = self.text
-        if resp_text: message += f'\nResponse Payload: {resp_text}'
+        if resp_text:
+            message += f'\nResponse Payload: {resp_text}'
     raise httpx.HTTPStatusError(message, request=request, response=self)
 
 
-def is_coro_func(obj, func_name: str = None):
-    """
-    This is probably in the library elsewhere but returns bool
-    based on if the function is a coro
-    """
+def is_coro_func(obj: t.Any, func_name: str | None = None) -> bool:
+    """Return ``True`` if *obj* or its named attribute is awaitable."""
     try:
         if inspect.iscoroutinefunction(obj): return True
         if inspect.isawaitable(obj): return True
@@ -97,12 +94,11 @@ def is_coro_func(obj, func_name: str = None):
     except Exception:
         return False
 
-background_tasks = set()
+background_tasks: t.Set[asyncio.Task[t.Any]] = set()
 
-def run_in_background(coro: t.Coroutine):
-    """
-    Runs a coroutine in the background
-    """
+
+def run_in_background(coro: t.Coroutine[t.Any, t.Any, t.Any]) -> None:
+    """Schedule *coro* for execution without awaiting it immediately."""
     task = asyncio.create_task(coro)
     background_tasks.add(task)
     task.add_done_callback(background_tasks.discard)
@@ -113,10 +109,16 @@ def run_in_background(coro: t.Coroutine):
 # rather than on every request
 
 @lazyproperty
-def soup_property(self: 'httpx.Response'):
+def soup_property(self: httpx.Response) -> t.Any:
+    """Create a lazily-evaluated ``BeautifulSoup`` view of the response body."""
+
     with contextlib.suppress(Exception):
         return bs4.BeautifulSoup(self.text, 'html.parser')
+    return None
 
-def wrap_soup_response(response: httpx.Response) -> 'httpx.Response':
+
+def wrap_soup_response(response: httpx.Response) -> httpx.Response:
+    """Attach the :func:`soup_property` accessor to *response*'s class."""
+
     setattr(response.__class__, 'soup', soup_property)
     return response
