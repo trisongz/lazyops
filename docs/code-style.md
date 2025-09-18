@@ -10,6 +10,9 @@ it updated so new contributors have a single reference for style expectations.
   minimise runtime import overhead.
 - Add `__all__` lists when modules act as façades or re-export symbols to make
   the public surface explicit for documentation generators.
+- Aggregator modules (for example `lzo.registry` and `lzo.utils`) should
+  populate `__all__` with the curated public API so Mintlify exports remain
+  predictable.
 
 ## Documentation
 - Every module modified during this effort should include a narrative
@@ -40,6 +43,8 @@ it updated so new contributors have a single reference for style expectations.
   event loop does not emit "task was destroyed" warnings during teardown.
 - Reset class-level caches (for example `ProxyDict._dict`) in tests that
   mutate proxied registries to avoid leaking state between cases.
+- Mark coroutine tests with `@pytest.mark.asyncio` rather than managing event
+  loops manually when exercising async utilities such as `retryable`.
 - When exercising `WorkerContext`/`MLContext`, stub `logger.info` and resource
   fetchers so tests do not rely on real hardware metrics.
 

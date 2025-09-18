@@ -4,7 +4,7 @@ PYTHON ?= python
 PYTEST ?= pytest
 PYTEST_OPTS ?=
 
-.PHONY: test test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool test-lzl-proxied test-lzl-require test-lzl-sysmon test-lzl
+.PHONY: test test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool test-lzl-proxied test-lzl-require test-lzl-sysmon test-lzl test-lzo-registry test-lzo-types test-lzo-utils test-lzo
 
 ## test: Run the entire pytest suite
 test:
@@ -43,3 +43,18 @@ test-lzl-sysmon:
 
 ## test-lzl: Run documentation-focused submodule tests
 test-lzl: test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool test-lzl-proxied test-lzl-require test-lzl-sysmon
+
+## test-lzo-registry: Run registry tests created during `lzo` documentation sweep
+test-lzo-registry:
+	$(PYTEST) $(PYTEST_OPTS) tests/lzo/test_registry.py
+
+## test-lzo-types: Run type helper tests added for `lzo.types`
+test-lzo-types:
+	$(PYTEST) $(PYTEST_OPTS) tests/lzo/test_types.py
+
+## test-lzo-utils: Exercise utility helpers refreshed during documentation work
+test-lzo-utils:
+	$(PYTEST) $(PYTEST_OPTS) tests/lzo/test_utils.py
+
+## test-lzo: Run the `lzo` suite generated alongside documentation updates
+test-lzo: test-lzo-registry test-lzo-types test-lzo-utils

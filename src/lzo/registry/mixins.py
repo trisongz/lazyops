@@ -1,231 +1,200 @@
 from __future__ import annotations
 
-"""
-Registry Mixins
-"""
+"""Shared mixins for auto-registering LazyOps components."""
 
 import abc
 import copy
-from typing import Dict, Any, Optional, Type, TYPE_CHECKING
+import typing as t
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from pathlib import Path
-    from lzl.logging import Logger, NullLogger
     from pydantic import ConfigDict
 
+__all__ = [
+    'ExtraMeta',
+    'RegisteredClient',
+    'RegisteredObject',
+    'RegisteredSettings',
+    'add_extra_meta',
+]
 
-def add_extra_meta(
-    obj: Type['ExtraMeta'],
-) -> None:
+
+def add_extra_meta(obj: t.Type['ExtraMeta']) -> None:
+    """Populate bookkeeping metadata on registration-aware classes.
+
+    Args:
+        obj: Class that derives from :class:`ExtraMeta`.
     """
-    Adds extra metadata to the class
-    """
+
     import inspect
     from pathlib import Path
-    from lzl.logging import logger
+
     from lzl.io.ser import get_object_classname
-    cls_name = get_object_classname(obj, is_type = True)
+    from lzl.logging import logger
+
+    cls_name = get_object_classname(obj, is_type=True)
     cls_module = obj.__module__.split('.')[0]
     module_lib_path = Path(inspect.getfile(obj)).parent
     obj._rxtra['module'] = cls_module
     obj._rxtra['cls_name'] = cls_name
     obj._rxtra['module_lib_path'] = module_lib_path
-    if '__main__' not in cls_module:
-        # try to determine the module path
-        # while preventing infinite loops
-        p = module_lib_path
-        m_path, iters = None, 0
-        while p.name != cls_module and iters < 4:
-            p = p.parent
-            iters += 1
-            if p.name == cls_module:
-                m_path = p
-                break
-        if m_path is not None: obj._rxtra['module_path'] = m_path
-    
+    logger.debug('Registered meta for %s.%s', cls_module, cls_name)
+    if '__main__' in cls_module:
+        return
+
+    p = module_lib_path
+    m_path, iters = None, 0
+    while p.name != cls_module and iters < 4:
+        p = p.parent
+        iters += 1
+        if p.name == cls_module:
+            m_path = p
+            break
+    if m_path is not None:
+        obj._rxtra['module_path'] = m_path
 
 
 class ExtraMeta(abc.ABC):
-    """
-    Adds extra metadata to the class
-    """
-    _rxtra: Dict[str, Any] = {}
+    """Base class that captures module and path metadata for registries."""
 
-    def __init_subclass__(cls, **kwargs: Dict[str, Any]):
+    _rxtra: t.Dict[str, t.Any] = {}
+
+    def __init_subclass__(cls, **kwargs: t.Any) -> None:  # pragma: no cover - instrumentation
         add_extra_meta(cls)
-        return super().__init_subclass__(**kwargs)
+        super().__init_subclass__(**kwargs)
 
     @property
-    def module_path(self) -> Path:
-        """
-        Gets the module root path
-        """
+    def module_path(self) -> 'Path':
+        """Absolute path to the package containing the class."""
+
         return self._rxtra.get('module_path')
 
     @property
-    def module_lib_path(self) -> Path:
-        """
-        Returns the module lib path
-        """
+    def module_lib_path(self) -> 'Path':
+        """Filesystem path of the module where the class is defined."""
+
         return self._rxtra.get('module_lib_path')
 
     @property
     def module_name(self) -> str:
-        """
-        Returns the module name
-        """
+        """Dotted module name derived from the class namespace."""
+
         return self._rxtra.get('module')
-    
+
     @property
     def cls_name(self) -> str:
-        """
-        Returns the class name
-        """
+        """Original class name captured during registration."""
+
         return self._rxtra.get('cls_name')
 
 
 class RegisteredClient(abc.ABC):
-    """
-    Registers this client with the registry
-    """
-    name: Optional[str] = None
+    """Mixin that auto-registers client classes with :mod:`lzo.registry`."""
 
-    if TYPE_CHECKING:
-        enable_registration: bool = None
+    name: t.Optional[str] = None
+    _rxtra: t.Dict[str, t.Any] = {}
+    _rmodule: t.Optional[str] = None
+    _rsubmodule: t.Optional[str] = None
 
-    _rxtra: Dict[str, Any] = {}
-    _rmodule: Optional[str] = None
-    _rsubmodule: Optional[str] = None
+    if t.TYPE_CHECKING:
+        enable_registration: bool
 
-    def __init_subclass__(cls, **kwargs: Dict[str, Any]):
+    def __init_subclass__(cls, **kwargs: t.Any) -> None:  # pragma: no cover - registration glue
         if not hasattr(cls, 'enable_registration') or cls.enable_registration is True:
             from lzo.registry.clients import register_client
+
             register_client(cls)
-        return super().__init_subclass__(**kwargs)
-    
+        super().__init_subclass__(**kwargs)
 
     @classmethod
-    def configure_registered(cls, **kwargs):
-        """
-        Configures the registered client
-        """
-        new = copy.deepcopy(cls)
-        if kwargs.get('module'): new._rmodule = kwargs.pop('module')
-        if kwargs.get('submodule'): new._rsubmodule = kwargs.pop('submodule')
-        if kwargs.get('name'): new.name = kwargs.pop('name')
-        if kwargs: new._rxtra.update(kwargs)
-        return new
+    def configure_registered(cls, **kwargs: t.Any) -> 'RegisteredClient':
+        """Return a copy of ``cls`` with overridden registration metadata."""
+
+        new_cls = copy.deepcopy(cls)
+        if kwargs.get('module'):
+            new_cls._rmodule = kwargs.pop('module')
+        if kwargs.get('submodule'):
+            new_cls._rsubmodule = kwargs.pop('submodule')
+        if kwargs.get('name'):
+            new_cls.name = kwargs.pop('name')
+        if kwargs:
+            new_cls._rxtra.update(kwargs)
+        return new_cls
+
 
 class RegisteredObject(abc.ABC):
-    """
-    Registers this object with the registry
-    """
-    name: Optional[str] = None
-    kind: Optional[str] = None
+    """Mixin that registers singleton-like objects for lazy access."""
 
-    _rxtra: Dict[str, Any] = {}
-    _rmodule: Optional[str] = None
+    name: t.Optional[str] = None
+    kind: t.Optional[str] = None
 
-    def __init_subclass__(cls, **kwargs: Dict[str, Any]):
+    _rxtra: t.Dict[str, t.Any] = {}
+    _rmodule: t.Optional[str] = None
+
+    def __init_subclass__(cls, **kwargs: t.Any) -> None:  # pragma: no cover - registration glue
         from lzo.registry.clients import register_client
+
         register_client(cls)
-        return super().__init_subclass__(**kwargs)
-    
+        super().__init_subclass__(**kwargs)
+
     @classmethod
-    def configure_registered(cls, **kwargs):
-        """
-        Configures the registered object
-        """
-        new = copy.deepcopy(cls)
-        if kwargs.get('module'): new._rmodule = kwargs.pop('module')
-        if kwargs.get('kind'): new.kind = kwargs.pop('kind')
-        if kwargs.get('name'): new.name = kwargs.pop('name')
-        if kwargs: new._rxtra.update(kwargs)
-        return new
-    
+    def configure_registered(cls, **kwargs: t.Any) -> 'RegisteredObject':
+        """Return a copy of ``cls`` with custom registration metadata."""
+
+        new_cls = copy.deepcopy(cls)
+        if kwargs.get('module'):
+            new_cls._rmodule = kwargs.pop('module')
+        if kwargs.get('kind'):
+            new_cls.kind = kwargs.pop('kind')
+        if kwargs.get('name'):
+            new_cls.name = kwargs.pop('name')
+        if kwargs:
+            new_cls._rxtra.update(kwargs)
+        return new_cls
 
 
 class RegisteredSettings(abc.ABC):
-    """
-    Registers this as the module settings
-    """
-    _rmodule: Optional[str] = None
-    _rsubmodule: Optional[str] = None
-    _rxtra: Dict[str, Any] = {}
+    """Mixin that registers pydantic settings classes with the registry."""
 
-    def __init_subclass__(cls, **kwargs: 'ConfigDict'):
+    _rmodule: t.Optional[str] = None
+    _rsubmodule: t.Optional[str] = None
+    _rxtra: t.Dict[str, t.Any] = {}
+
+    def __init_subclass__(cls, **kwargs: 'ConfigDict') -> None:  # pragma: no cover - registration glue
         from lzo.registry.settings import register_settings
+
         register_settings(cls)
-        return super().__init_subclass__(**kwargs)
-    
+        super().__init_subclass__(**kwargs)
+
     @classmethod
-    def configure_registered(cls, **kwargs):
-        """
-        Configures the registered settings
-        """
-        new = copy.deepcopy(cls)
-        if kwargs.get('module'): new._rmodule = kwargs.pop('module')
-        if kwargs.get('submodule'): new._rsubmodule = kwargs.pop('submodule')
-        if kwargs: new._rxtra.update(kwargs)
-        return new
+    def configure_registered(cls, **kwargs: t.Any) -> 'RegisteredSettings':
+        """Return a copy of ``cls`` with overridden registry metadata."""
+
+        new_cls = copy.deepcopy(cls)
+        if kwargs.get('module'):
+            new_cls._rmodule = kwargs.pop('module')
+        if kwargs.get('submodule'):
+            new_cls._rsubmodule = kwargs.pop('submodule')
+        if kwargs:
+            new_cls._rxtra.update(kwargs)
+        return new_cls
 
     @property
     def _rverbose(self) -> bool:
-        """
-        Returns whether the object should be verbose
-        """
+        """Flag controlling whether verbose logging is enabled for this class."""
+
         return self._rxtra.get('verbose', False)
-    
-    if TYPE_CHECKING:
+
+    if t.TYPE_CHECKING:
 
         @property
-        def module_path(self) -> Path:
-            """
-            Gets the module root path
-            """
+        def module_path(self) -> Path:  # pragma: no cover - typing helper
             ...
 
         @property
-        def module_config_path(self) -> Path:
-            """
-            Returns the config module path
-            """
+        def module_config_path(self) -> Path:  # pragma: no cover - typing helper
             ...
 
         @property
-        def module_name(self) -> str:
-            """
-            Returns the module name
-            """
+        def module_name(self) -> str:  # pragma: no cover - typing helper
             ...
-
-
-# class RegisteredWorkflow(abc.ABC):
-#     """
-#     Registers this workflow with the registry
-#     """
-#     name: Optional[str] = None
-
-#     if TYPE_CHECKING:
-#         enable_registration: bool = None
-
-#     _rxtra: Dict[str, Any] = {}
-#     _rmodule: Optional[str] = None
-
-#     def __init_subclass__(cls, **kwargs: Dict[str, Any]):
-#         if not hasattr(cls, 'enable_registration') or cls.enable_registration is True:
-#             from lzo.registry.clients import register_client
-#             register_client(cls)
-#         return super().__init_subclass__(**kwargs)
-    
-
-#     @classmethod
-#     def configure_registered(cls, **kwargs):
-#         """
-#         Configures the registered client
-#         """
-#         new = copy.deepcopy(cls)
-#         if kwargs.get('module'): new._rmodule = kwargs.pop('module')
-#         if kwargs.get('name'): new.name = kwargs.pop('name')
-#         if kwargs: new._rxtra.update(kwargs)
-#         return new

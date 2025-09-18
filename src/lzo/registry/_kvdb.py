@@ -1,138 +1,164 @@
 from __future__ import annotations
 
-"""
-Maintains a Stateful Registry of KVDB Clients
-"""
+"""Helpers for maintaining stateful KVDB client registries."""
 
 import abc
 import copy
-from typing import Optional, Dict, Any, List, TypeVar, TYPE_CHECKING
+import typing as t
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from kvdb import KVDBSession, PersistentDict
 
+__all__ = ['KVDBRegistry']
+
+
 class KVDBRegistry(abc.ABC):
-    """
-    The KVDB Registry
-    """
-    module: Optional[str] = None
+    """Manage shared KVDB sessions and persistent dictionaries for a module."""
 
-    default_serializer: Optional[str] = 'json'
-    default_kwargs: Optional[Dict[str, Any]] = {}
+    module: t.Optional[str] = None
 
-    default_pdict_expiration: Optional[int] = None
-    default_pdict_kwargs: Optional[Dict[str, Any]] = {}
+    default_serializer: t.Optional[str] = 'json'
+    default_kwargs: t.Dict[str, t.Any] = {}
 
-    default_fdict_serializer: Optional[str] = None # If None, will use the default serializer, or if explicitly 'none' will not use any serializer
-    default_fdict_expiration: Optional[int] = -1
-    default_fdict_kwargs: Optional[Dict[str, Any]] = {}
+    default_pdict_expiration: t.Optional[int] = None
+    default_pdict_kwargs: t.Dict[str, t.Any] = {}
 
-    sessions: Dict[str, 'KVDBSession'] = {}
-    pdicts: Dict[str, 'PersistentDict'] = {}
-    pdict_aliases: Dict[str, str] = {}
-    pdict_prefix_module: Optional[bool] = True
-    
-    _extra: Dict[str, Any] = {}
+    # If ``None`` we fall back to ``default_serializer``; if ``'none'`` we skip serialisation
+    default_fdict_serializer: t.Optional[str] = None
+    default_fdict_expiration: t.Optional[int] = -1
+    default_fdict_kwargs: t.Dict[str, t.Any] = {}
+
+    sessions: t.Dict[str, 'KVDBSession'] = {}
+    pdicts: t.Dict[str, 'PersistentDict'] = {}
+    pdict_aliases: t.Dict[str, str] = {}
+    pdict_prefix_module: t.Optional[bool] = True
+
+    _extra: t.Dict[str, t.Any] = {}
 
     def __init__(
-        self, 
-        module: Optional[str] = None,
-        default_serializer: Optional[str] = None,
-        default_kwargs: Optional[Dict[str, Any]] = None,
-        default_pdict_expiration: Optional[int] = None,
-        default_pdict_kwargs: Optional[Dict[str, Any]] = None,
-        default_fdict_serializer: Optional[str] = None,
-        default_fdict_expiration: Optional[int] = None,
-        default_fdict_kwargs: Optional[Dict[str, Any]] = None,
-        pdict_prefix_module: Optional[bool] = None,
-        **kwargs,
-    ):
-        """
-        The KVDB Registry
-        """
-        self._extra: Dict[str, Any] = {}
-        if module: self.module = module
-        if default_serializer: self.default_serializer = default_serializer
-        if default_kwargs: self.default_kwargs = default_kwargs
-        if default_pdict_expiration: self.default_pdict_expiration = default_pdict_expiration
-        if default_pdict_kwargs: self.default_pdict_kwargs = default_pdict_kwargs
-        if pdict_prefix_module is not None: self.pdict_prefix_module = pdict_prefix_module
-        if default_fdict_serializer: self.default_fdict_serializer = default_fdict_serializer
-        elif self.default_serializer is None: self.default_fdict_serializer = self.default_serializer
-        if default_fdict_expiration: self.default_fdict_expiration = default_fdict_expiration
-        if default_fdict_kwargs: self.default_fdict_kwargs = default_fdict_kwargs
+        self,
+        module: t.Optional[str] = None,
+        default_serializer: t.Optional[str] = None,
+        default_kwargs: t.Optional[t.Mapping[str, t.Any]] = None,
+        default_pdict_expiration: t.Optional[int] = None,
+        default_pdict_kwargs: t.Optional[t.Mapping[str, t.Any]] = None,
+        default_fdict_serializer: t.Optional[str] = None,
+        default_fdict_expiration: t.Optional[int] = None,
+        default_fdict_kwargs: t.Optional[t.Mapping[str, t.Any]] = None,
+        pdict_prefix_module: t.Optional[bool] = None,
+        **kwargs: t.Any,
+    ) -> None:
+        """Configure default serialisation options for KVDB resources."""
 
-        if not self.module: self.pdict_prefix_module = False
+        self._extra = {}
+        if module:
+            self.module = module
+        if default_serializer:
+            self.default_serializer = default_serializer
+        if default_kwargs:
+            self.default_kwargs = dict(default_kwargs)
+        if default_pdict_expiration:
+            self.default_pdict_expiration = default_pdict_expiration
+        if default_pdict_kwargs:
+            self.default_pdict_kwargs = dict(default_pdict_kwargs)
+        if pdict_prefix_module is not None:
+            self.pdict_prefix_module = pdict_prefix_module
+        if default_fdict_serializer:
+            self.default_fdict_serializer = default_fdict_serializer
+        elif self.default_serializer is None:
+            self.default_fdict_serializer = self.default_serializer
+        if default_fdict_expiration:
+            self.default_fdict_expiration = default_fdict_expiration
+        if default_fdict_kwargs:
+            self.default_fdict_kwargs = dict(default_fdict_kwargs)
+
+        if not self.module:
+            self.pdict_prefix_module = False
         self.post_init(**kwargs)
 
-    def post_init(self, **kwargs):
-        """
-        Post Initialization
-        """
-        pass
+    def post_init(self, **kwargs: t.Any) -> None:  # pragma: no cover - hook for subclasses
+        """Finalise subclass configuration after initial settings are applied."""
 
     @property
-    def module_prefix(self) -> str:
-        """
-        Returns the module prefix
-        """
+    def module_prefix(self) -> t.Optional[str]:
+        """Return the prefix applied to session and persistence names."""
+
         return self.module
-    
-    def _build_kwargs(self, src_kwargs: Dict[str, Any], **kwargs) -> Dict[str, Any]:
-        """
-        Builds the kwargs
-        """
-        _kwargs = copy.deepcopy(src_kwargs)
-        if kwargs: _kwargs.update(kwargs)
-        return _kwargs
+
+    def _build_kwargs(self, src_kwargs: t.Mapping[str, t.Any], **kwargs: t.Any) -> t.Dict[str, t.Any]:
+        """Clone ``src_kwargs`` and merge ``kwargs`` without mutating inputs."""
+
+        merged = copy.deepcopy(src_kwargs)
+        if kwargs:
+            merged.update(kwargs)
+        return merged
 
     def get(
-        self, 
-        name: Optional[str] = None,
-        serializer: Optional[str] = None,
-        **kwargs,
+        self,
+        name: t.Optional[str] = None,
+        serializer: t.Optional[str] = None,
+        **kwargs: t.Any,
     ) -> 'KVDBSession':
-        """
-        Gets the KVDB Session
-        """
-        if name is None: name = self.module or 'global'
-        if name not in self.sessions:
+        """Fetch or create a named KVDB session."""
+
+        session_name = name or self.module_prefix or 'global'
+        if session_name not in self.sessions:
             from kvdb import KVDBClient
-            serializer = serializer or self.default_serializer
-            if serializer == 'none': serializer = None
-            if self.default_kwargs: kwargs = self._build_kwargs(self.default_kwargs, **kwargs)
-            self.sessions[name] = KVDBClient.get_session(
-                name = name,
-                serializer = serializer,
+
+            effective_serializer = serializer or self.default_serializer
+            if effective_serializer == 'none':
+                effective_serializer = None
+            if self.default_kwargs:
+                kwargs = self._build_kwargs(self.default_kwargs, **kwargs)
+            self.sessions[session_name] = KVDBClient.get_session(
+                name=session_name,
+                serializer=effective_serializer,
                 **kwargs,
             )
-        return self.sessions[name]
+        return self.sessions[session_name]
 
     def pdict(
-        self, 
+        self,
         base_key: str,
-        expiration: Optional[int] = None,
-        aliases: Optional[List[str]] = None,
-        **kwargs,
+        expiration: t.Optional[int] = None,
+        aliases: t.Optional[t.Iterable[str]] = None,
+        **kwargs: t.Any,
     ) -> 'PersistentDict':
+        """Return a persistent dictionary scoped to ``base_key``.
+
+        Args:
+            base_key: Identifier for the persistence bucket.
+            expiration: Optional TTL applied during creation. ``<=0`` disables.
+            aliases: Alternate keys that reference the same dictionary.
+            **kwargs: Additional arguments forwarded to ``create_persistence``.
         """
-        Returns the Persistent Dict for data
-        """
-        if self.pdict_prefix_module:
-            if self.module_prefix not in base_key: base_key = f'{self.module_prefix}.{base_key}'
-        if base_key not in self.pdicts and base_key not in self.pdict_aliases:
-            session = self.get(f'{self.module_prefix}.persistence' if self.module else 'persistence', serializer = 'none', url = kwargs.pop('url', None))
-            if expiration is None and self.default_pdict_expiration: expiration = self.default_pdict_expiration
-            if expiration is not None and expiration <= 0: expiration = None
-            if self.default_pdict_kwargs: kwargs = self._build_kwargs(self.default_pdict_kwargs, **kwargs)
-            self.pdicts[base_key] = session.create_persistence(
-                base_key = base_key,
-                expiration = expiration,
+
+        effective_key = base_key
+        if self.pdict_prefix_module and self.module_prefix and self.module_prefix not in effective_key:
+            effective_key = f'{self.module_prefix}.{effective_key}'
+
+        if effective_key not in self.pdicts and effective_key not in self.pdict_aliases:
+            persistence_session = self.get(
+                f'{self.module_prefix}.persistence' if self.module_prefix else 'persistence',
+                serializer='none',
+                url=kwargs.pop('url', None),
+            )
+            ttl = expiration
+            if ttl is None and self.default_pdict_expiration:
+                ttl = self.default_pdict_expiration
+            if ttl is not None and ttl <= 0:
+                ttl = None
+            if self.default_pdict_kwargs:
+                kwargs = self._build_kwargs(self.default_pdict_kwargs, **kwargs)
+            self.pdicts[effective_key] = persistence_session.create_persistence(
+                base_key=effective_key,
+                expiration=ttl,
                 **kwargs,
             )
             if aliases:
                 for alias in aliases:
-                    self.pdict_aliases[alias] = base_key
-        elif base_key in self.pdict_aliases:
-            base_key = self.pdict_aliases[base_key]
-        return self.pdicts[base_key]
+                    self.pdict_aliases[alias] = effective_key
+        elif effective_key in self.pdict_aliases:
+            effective_key = self.pdict_aliases[effective_key]
+
+        return self.pdicts[effective_key]

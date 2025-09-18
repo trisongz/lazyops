@@ -1,23 +1,33 @@
 from __future__ import annotations
 
-"""
-This submodule only contains common types often used in the library
-"""
+"""Public typing façade for LazyOps' higher-level APIs."""
 
+from .base import (
+    BaseModel,
+    BaseSettings,
+    RBaseModel,
+    field_validator,
+    get_schema_extra,
+    model_validator,
+    pre_root_validator,
+    root_validator,
+    validator,
+)
 from .common.appenv import AppEnv, get_app_env
 from .common.extra import Final, Literal
-from .base import (
-    BaseModel, 
-    RBaseModel,
-    Field, 
-    root_validator, 
-    pre_root_validator, 
-    validator, 
-    eproperty, 
-    PYDANTIC_VERSION,
-    PrivateAttr,
-    BaseSettings,
-    get_schema_extra,
-    field_validator,
-    model_validator,
-)
+
+__all__ = [
+    'AppEnv',
+    'BaseModel',
+    'BaseSettings',
+    'Final',
+    'Literal',
+    'RBaseModel',
+    'field_validator',
+    'get_app_env',
+    'get_schema_extra',
+    'model_validator',
+    'pre_root_validator',
+    'root_validator',
+    'validator',
+]

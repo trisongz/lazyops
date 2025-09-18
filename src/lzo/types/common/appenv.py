@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-"""
-Configuration Types
-"""
+"""Re-export application environment helpers from ``lzl``."""
 
-# Deprecate this later
+# This module is kept for backwards compatibility.
 
 from lzl.types.common import AppEnv, get_app_env
+
+__all__ = ['AppEnv', 'get_app_env']

@@ -4,38 +4,33 @@ from __future__ import annotations
 Base Helpers
 """
 
-import time
+import asyncio
+import collections.abc
+import contextlib
+import functools
+import importlib.util
+import inspect
+import pathlib
 import random
 import string
-import contextlib
-import asyncio
-import inspect
-import functools
-import pathlib
-import importlib.util
-import collections.abc
-from typing import Callable, Dict, Any, Tuple, Optional, Union, Tuple, TYPE_CHECKING
+import time
+import typing as t
 
-def extract_function_kwargs(func: Callable[..., Any], **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """
-    Returns the unused kwargs
-    """
-    func_kwargs = {
-        k: v for k, v in kwargs.items() if k in func.__code__.co_varnames
-    }
-    extra_kwargs = {
-        k: v for k, v in kwargs.items() if k not in func_kwargs
-    }
+def extract_function_kwargs(
+    func: t.Callable[..., t.Any],
+    **kwargs: t.Any,
+) -> t.Tuple[t.Dict[str, t.Any], t.Dict[str, t.Any]]:
+    """Split ``kwargs`` into arguments accepted by ``func`` and leftovers."""
+
+    func_kwargs = {k: v for k, v in kwargs.items() if k in func.__code__.co_varnames}
+    extra_kwargs = {k: v for k, v in kwargs.items() if k not in func_kwargs}
     return func_kwargs, extra_kwargs
 
     # return {k: v for k, v in kwargs.items() if k not in func.__code__.co_varnames}
 
 
-def is_coro_func(obj, func_name: str = None):
-    """
-    This is probably in the library elsewhere but returns bool
-    based on if the function is a coro
-    """
+def is_coro_func(obj: t.Any, func_name: t.Optional[str] = None) -> bool:
+    """Return ``True`` when ``obj`` or ``obj.func_name`` is awaitable."""
     try:
         if inspect.iscoroutinefunction(obj): return True
         if inspect.isawaitable(obj): return True
@@ -50,17 +45,10 @@ def is_coro_func(obj, func_name: str = None):
 def exponential_backoff(
     attempts: int,
     base_delay: int = 1,
-    max_delay: int = None,
+    max_delay: t.Optional[int] = None,
     jitter: bool = True,
-):
-    """
-    Get the next delay for retries in exponential backoff.
-
-    attempts: Number of attempts so far
-    base_delay: Base delay, in seconds
-    max_delay: Max delay, in seconds. If None (default), there is no max.
-    jitter: If True, add a random jitter to the delay
-    """
+) -> float:
+    """Compute an exponentially increasing delay for retry loops."""
     if max_delay is None:
         max_delay = float("inf")
     backoff = min(max_delay, base_delay * 2 ** max(attempts - 1, 0))
@@ -68,127 +56,128 @@ def exponential_backoff(
         backoff = backoff * random.random()
     return backoff
 
-def retryable(limit: int = 3, delay: int = 3):
-    """
-    Creates a retryable decorator
-    """
-    def decorator(func: Callable):
+def retryable(limit: int = 3, delay: int = 3) -> t.Callable[[t.Callable[..., t.Any]], t.Callable[..., t.Any]]:
+    """Wrap a callable to retry transient failures with exponential backoff."""
+
+    def decorator(func: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
         if not inspect.iscoroutinefunction(func):
-            def sync_wrapper(*args, **kwargs):
+
+            def sync_wrapper(*args: t.Any, **kwargs: t.Any) -> t.Any:
                 for n in range(limit - 1):
                     with contextlib.suppress(Exception):
                         return func(*args, **kwargs)
                     time.sleep(exponential_backoff(n, base_delay=delay))
                 return func(*args, **kwargs)
+
             return sync_wrapper
-        else:
-            async def async_wrapper(*args, **kwargs):
-                for n in range(limit-1):
-                    with contextlib.suppress(Exception):
-                        return await func(*args, **kwargs)
-                    await asyncio.sleep(exponential_backoff(n, base_delay=delay))
-                return await func(*args, **kwargs)
-            return async_wrapper
+
+        async def async_wrapper(*args: t.Any, **kwargs: t.Any) -> t.Any:
+            for n in range(limit - 1):
+                with contextlib.suppress(Exception):
+                    return await func(*args, **kwargs)
+                await asyncio.sleep(exponential_backoff(n, base_delay=delay))
+            return await func(*args, **kwargs)
+
+        return async_wrapper
+
     return decorator
 
 
-def suppress(
-    *exceptions: Optional[Union[Tuple[Exception], Exception]],
-):
-    """
-    Wrapper for suppressing exceptions
-    args:
-        exceptions: exceptions to suppress
-    """
-    if not exceptions: exceptions = (Exception,)
-    def wrapper(func):
+def suppress(*exceptions: t.Optional[t.Union[t.Tuple[Exception, ...], Exception]]) -> t.Callable[[t.Callable[..., t.Any]], t.Callable[..., t.Any]]:
+    """Decorator factory mirroring :func:`contextlib.suppress` for callables."""
+
+    if not exceptions:
+        exceptions = (Exception,)
+
+    def wrapper(func: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
         if is_coro_func(func):
+
             @functools.wraps(func)
-            async def wrapped_func(*args, **kwargs):
+            async def wrapped_func(*args: t.Any, **kwargs: t.Any) -> t.Any:
                 with contextlib.suppress(*exceptions):
                     return await func(*args, **kwargs)
+
             return wrapped_func
-        else:
-            @functools.wraps(func)
-            def wrapped_func(*args, **kwargs):
-                with contextlib.suppress(*exceptions):
-                    return func(*args, **kwargs)
+
+        @functools.wraps(func)
+        def wrapped_func(*args: t.Any, **kwargs: t.Any) -> t.Any:
+            with contextlib.suppress(*exceptions):
+                return func(*args, **kwargs)
+
         return wrapped_func
+
     return wrapper
 
-def create_secret(
-    nbytes: Optional[int] = 16,    
-):
-    """
-    Generates a secret key
-    """
+def create_secret(nbytes: t.Optional[int] = 16) -> str:
+    """Generate a hexadecimal token using ``secrets.token_hex``."""
+
     import secrets
+
     return secrets.token_hex(nbytes)
 
 
 def create_unique_id(
-    method: Optional[str] = 'uuid4',
-    alph_only: Optional[bool] = False,
-    length: Optional[int] = None,
-):
-    """
-    Creates a unique id
-    args:
-        method: uuid4, uuid1, uuid5, timestamp, secret
-        alph_only: if True, returns a string of only alphabets
-        length: if specified, returns a string of the specified length
-    """
+    method: t.Optional[str] = 'uuid4',
+    alph_only: bool = False,
+    length: t.Optional[int] = None,
+) -> str:
+    """Generate a UUID-based identifier with optional filtering/truncation."""
+
     import uuid
+
     meth = getattr(uuid, method, None)
-    if not meth:  raise ValueError(f'Invalid UUID method: {method}')
+    if not meth:
+        raise ValueError(f'Invalid UUID method: {method}')
     val = str(meth())
-    if alph_only: val = ''.join([c for c in val if c.isalpha()])
+    if alph_only:
+        val = ''.join(c for c in val if c.isalpha())
     if length:
         while len(val) < length:
             val += str(meth())
-            if alph_only: val = ''.join([c for c in val if c.isalpha()])
-            # remove trailing hyphen
-            if val.endswith('-'): val = val[:-1]
+            if alph_only:
+                val = ''.join(c for c in val if c.isalpha())
+            if val.endswith('-'):
+                val = val[:-1]
         val = val[:length]
     return val
 
 ALPHA = string.ascii_letters
 
 def create_unique_secret_key(length: int = 44) -> str:
-    """
-    Creates a unique secret key
-    """
+    """Return an uppercase alphanumeric key suitable for shared secrets."""
+
     return ''.join(random.choice(ALPHA) for _ in range(length)).upper()
 
 
-def fail_after(
-    delay: Union[int, float] = 5.0,
-):
-    """
-    Creates a fail after context
-    """
+def fail_after(delay: t.Union[int, float] = 5.0) -> t.Callable[[t.Callable[..., t.Any]], t.Callable[..., t.Any]]:
+    """Raise a timeout if ``func`` does not finish within ``delay`` seconds."""
+
     import concurrent.futures
-    def decorator(func: Callable):
+
+    def decorator(func: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
         @functools.wraps(func)
-        def wrapper(*args, **kwargs):
-            p = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        def wrapper(*args: t.Any, **kwargs: t.Any) -> t.Any:
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
             try:
-                f = p.submit(func, *args, **kwargs)
-                return f.result(timeout = delay)
-            except Exception as e:
-                raise e
+                future = executor.submit(func, *args, **kwargs)
+                return future.result(timeout=delay)
             finally:
-                p.shutdown(wait = False, cancel_futures = True)
+                executor.shutdown(wait=False, cancel_futures=True)
+
         return wrapper
+
     return decorator
 
     
 
 
-def update_dict(d: Dict, u: Dict, exclude_none: Optional[bool] = False, unset_value: Optional[str] = 'UNSET') -> Dict:
-    """
-    Recursively update a dictionary
-    """
+def update_dict(
+    d: t.Dict[t.Hashable, t.Any],
+    u: t.Mapping[t.Hashable, t.Any],
+    exclude_none: bool = False,
+    unset_value: t.Optional[str] = 'UNSET',
+) -> t.Dict[t.Hashable, t.Any]:
+    """Recursively update a dictionary, respecting unset sentinels."""
     unset_keys = []
     for k, v in u.items():
         if exclude_none and v is None:
@@ -208,12 +197,10 @@ def update_dict(d: Dict, u: Dict, exclude_none: Optional[bool] = False, unset_va
 
 
 def merge_recursive_dict(
-    d: Dict,
+    d: t.Mapping[str, t.Any],
     current_key: str,
-) -> Dict:
-    """
-    Merge a recursive dictionary
-    """
+) -> t.Dict[str, t.Any]:
+    """Flatten nested dictionaries into dotted-key mappings."""
     if not isinstance(d, collections.abc.Mapping):
         return d
     mapping = {}
@@ -227,13 +214,12 @@ def merge_recursive_dict(
 
 
 def flatten_dict_value(
-    d: Dict,
+    d: t.Mapping[str, t.Any],
     parent_key: str = '',
-) -> str:
-    """
-    Flatten a dictionary
-    """
-    items = []
+) -> t.Dict[str, t.Any]:
+    """Return a flattened dictionary where keys are joined by ``.``."""
+
+    items: t.List[t.Tuple[str, t.Any]] = []
     for k, v in d.items():
         new_key = f'{parent_key}.{k}' if parent_key else k
         if isinstance(v, dict):
@@ -248,11 +234,10 @@ def flatten_dict_value(
 
 
 
-def parse_deltas(deltas: dict) -> dict: # type: ignore
-    """
-    Parses the deltas
-    """
-    res = {}
+def parse_deltas(deltas: t.Mapping[str, t.Tuple[t.Any, t.Any]]) -> t.Dict[str, t.Any]:
+    """Normalise nested diff output into a flat mapping."""
+
+    res: t.Dict[str, t.Any] = {}
     for k, v in deltas.items():
         if isinstance(v[0], dict):
             tmp = diff_dict(v[0], v[1])
@@ -262,7 +247,7 @@ def parse_deltas(deltas: dict) -> dict: # type: ignore
             res[k] = v[1]
     return res
 
-def diff_dict(d1: Dict[str, Any], d2: Dict[str, Any]) -> Dict[str, Any]:
+def diff_dict(d1: t.Mapping[str, t.Any], d2: t.Mapping[str, t.Any]) -> t.Dict[str, t.Any]:
     """
     Returns the difference between two dictionaries
 
@@ -287,23 +272,14 @@ def get_module_path(
     module_name: str, 
     **kwargs
 ) -> pathlib.Path:
-    """
-    Get the path to the module.
+    """Locate the filesystem path for ``module_name`` using import metadata."""
 
-    args:
-        module_name: name of the module to import from (e.g. 'lazyops')
-    
-    Use it like this:
-
-    >>> get_module_path('lazyops')
-    """
     module_spec = importlib.util.find_spec(module_name)
     if not module_spec:
         raise ValueError(f"Module {module_name} not found")
-    
+
     for path in module_spec.submodule_search_locations:
         module_path = pathlib.Path(path)
         if module_path.exists(): return module_path
     
     raise ValueError(f"Module {module_name} cant be found in the path")
-

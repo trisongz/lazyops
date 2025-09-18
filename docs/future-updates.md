@@ -53,3 +53,25 @@ remain intentional.
   graceful degradation when those utilities are unavailable.
 - Evaluate emitting structured data (JSON) alongside formatted strings so the
   metrics can be ingested by observability tooling without parsing log text.
+
+## lzo.registry
+- `lzo.registry.objects` is still a partial stub that references undefined
+  client registries; determine whether it should mirror the client registry or
+  be removed before publishing the API.
+- `MRegistry` currently stores all class-level state on the class itself; consider
+  migrating to instance-level storage to support multiple independent registries.
+
+## lzo.types
+- Explore simplifying the `BaseSettings` inheritance chain so it no longer needs
+  to import logging utilities at runtime, reducing the risk of circular
+  dependencies when documentation generators import the module.
+- Investigate whether `set_app_env` should call `AppEnv.from_env` directly
+  instead of delegating via the potentially `None` ``self.app_env`` attribute.
+
+## lzo.utils
+- Several helper modules still use legacy ``from typing import`` patterns; sweep
+  the remaining files (`helpers.dates`, `helpers.caching`, etc.) so typing
+  imports are consistent across the package.
+- The optional bcrypt dependency in `keygen.generate_htpasswd_key` is lazily
+  imported; consider surfacing a clearer error message when the dependency is
+  missing to aid downstream users.

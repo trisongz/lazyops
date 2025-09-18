@@ -69,6 +69,24 @@ from lzo.registry import settings
 
 ---
 
+### Module Highlights
+
+- **`lzo.registry`** – Provides the `MRegistry` core with hook support for
+  pre/post instantiation along with helpers for registering clients and
+  settings.  See `src/lzo/registry/README.md` for an overview and run
+  `make test-lzo-registry` to exercise the accompanying tests.
+- **`lzo.types`** – Re-exports the LazyOps pydantic wrappers such as
+  `BaseSettings` and `BaseModel`, streamlining environment-aware
+  configuration.  Quick-start examples live in `src/lzo/types/README.md` and
+  can be validated with `make test-lzo-types`.
+- **`lzo.utils`** – Collects lightweight helper modules (retry decorators,
+  key generators, formatting utilities) that avoid heavy dependencies.  The
+  façade README at `src/lzo/utils/README.md` highlights the most common entry
+  points; run `make test-lzo-utils` to confirm everything behaves as
+  documented.
+
+---
+
 ### Core Dependencies
 
 *   Python 3.7+

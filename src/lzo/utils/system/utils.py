@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-import os
-from typing import Union, Dict, Any, List, TYPE_CHECKING
+import typing as t
 from functools import lru_cache
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from pydantic.types import ByteSize
 
-def parse_memory_metric(data: Union[int, float, str]):
-    """
-    Parses memory to full memory
-    """
+__all__ = ['parse_memory_metric', 'parse_memory_metric_to_bs', 'safe_float']
+
+
+def parse_memory_metric(data: t.Union[int, float, str]) -> float:
+    """Convert Kubernetes-style memory strings (``Mi``, ``Gi``) into bytes."""
+
     if isinstance(data, (int, float)): return data
     if data.endswith('B'): 
         data = data[:-1]
@@ -29,17 +30,22 @@ def parse_memory_metric(data: Union[int, float, str]):
         return cast_type(data.split('Ei')[0].strip()) * (1024 * 1024 * 1024 * 1024 * 1024 * 1024)
     return cast_type(data.strip())
 
-def parse_memory_metric_to_bs(data: Union[int, float, str]) -> 'ByteSize':
-    """
-    Parses memory to ByteSize
-    """
+
+def parse_memory_metric_to_bs(data: t.Union[int, float, str]) -> 'ByteSize':
+    """Return a :class:`ByteSize` instance from byte or string input."""
+
     from pydantic.types import ByteSize
     if isinstance(data, (int, float)): 
         return ByteSize(data)
     data = parse_memory_metric(f'{data} MiB')
     return ByteSize(data)
 
+
 def safe_float(item: str) -> float:
-    try: number = float(item)
-    except ValueError: number = float('nan')
+    """Return ``float(item)`` or ``nan`` when conversion fails."""
+
+    try:
+        number = float(item)
+    except ValueError:
+        number = float('nan')
     return number
