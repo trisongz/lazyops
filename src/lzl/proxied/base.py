@@ -11,7 +11,7 @@ import typing as t
 ProxyObjT = t.TypeVar('ProxyObjT')
 
 class Constant(tuple):
-    "Pretty display of immutable constant."
+    """Pretty display helper for immutable sentinel values."""
 
     def __new__(cls, name):
         return tuple.__new__(cls, (name,))
@@ -23,8 +23,11 @@ EMPTY = Constant('EMPTY')
 empty = object()
 
 
+__all__ = ["ProxyObject", "ProxyObjT", "new_method_proxy", "Constant", "EMPTY", "empty"]
+
+
 def new_method_proxy(func: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
-    """Wrap ``func`` so calls are forwarded to the underlying object."""
+    """Return a wrapper that forwards calls to the proxied object."""
 
     def inner(self: 'ProxyObject', *args: t.Any):
         if self._wrapped is empty:

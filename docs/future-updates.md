@@ -41,3 +41,9 @@ remain intentional.
   fallback or clearer error message when the optional dependency is missing.
 - Consider pooling executors across interpreter restarts to avoid spinning up
   multiple thread pools in short-lived CLI contexts.
+
+## lzl.proxied
+- `ProxyDict` shares class-level caches across subclasses; evaluate providing a
+  context manager or helper to reset state when used in long-lived processes.
+- Explore exposing thread-safety controls for `ProxyObject` beyond a simple
+  boolean to support custom lock strategies when profiling indicates issues.
