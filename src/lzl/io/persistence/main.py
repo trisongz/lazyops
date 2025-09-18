@@ -85,9 +85,7 @@ VT = TypeVar('VT')
 # https://stackoverflow.com/questions/61112684/how-to-subclass-a-dictionary-so-it-supports-generic-type-hints
 
 class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
-    """
-    Persistent Dictionary Interface
-    """
+    """Dictionary-like façade around the configured persistence backend."""
 
     backend_type: Optional[str] = 'auto'
     base_class: Optional[Type['BackendT']] = None
@@ -105,9 +103,7 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         metric_types: Optional[Dict[str, Union[str, Type['MetricT']]]] = None,
         **kwargs,
     ):
-        """
-        Initializes the Persistent Dictionary
-        """
+        """Initialise a new persistent dictionary instance."""
         if 'new_base' in kwargs:
             self._child_init(**kwargs)
         else:
@@ -138,9 +134,7 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         metric_types: Optional[Dict[str, Union[str, Type['MetricT']]]] = None,
         **kwargs,
     ):
-        """
-        Initializes the Persistent Dictionary
-        """
+        """Perform the default initialisation path for the dictionary."""
         if backend_type is not None: self.backend_type = backend_type
         if backend is not None:
             self.base_class = lazy_import(backend) if isinstance(backend, str) else backend
@@ -175,9 +169,7 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         new_base: 'BackendT',
         **kwargs,
     ):
-        """
-        Initializes the Persistent Dictionary from a Parent Instance
-        """
+        """Create a child dictionary linked to the provided ``parent``."""
         self.name = kwargs.get('name') or parent.name
         self.base_key = kwargs.get('base_key') or parent.base_key
         self.settings = kwargs.get('settings') or parent.settings
@@ -298,9 +290,7 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         return base_kwargs
 
     def get_child(self, key: KT, **kwargs) -> 'PersistentDict':
-        """
-        Gets a Child Persistent Dictionary
-        """
+        """Return a scoped child :class:`PersistentDict` rooted under ``key``."""
         if hasattr(self.base, 'get_child'):
             new_base = self.base.get_child(key, **kwargs)
             return self.__class__(
@@ -320,85 +310,63 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         return self.base.get_key(key)
 
     def get(self, key: KT, default: Optional[VT] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[VT]:
-        """
-        Gets a Value from the DB
-        """
+        """Return the value stored for ``key`` or ``default`` when missing."""
         self._save_mutation_objects(key)
         return self.base.get(key, default = default, _raw = _raw, **kwargs)
     
     def get_values(self, keys: Iterable[str], **kwargs) -> List[VT]:
-        """
-        Gets a Value from the DB
-        """
+        """Bulk fetch helpers mirroring :meth:`get` for multiple keys."""
         self._save_mutation_objects(*keys)
         return self.base.get_values(keys, **kwargs)
     
     def fetch(self, key: KT, _raw: Optional[bool] = None, **kwargs) -> Optional[VT]:
-        """
-        Gets a Value from the DB
-        """
+        """Return ``None`` for missing keys instead of raising errors."""
         return self.get(key, _raw = _raw, **kwargs) if self.contains(key) else None
     
     def set(self, key: KT, value: Any, ex: Optional[Union[float, int]] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[KT]:
-        """
-        Saves a Value to the DB
-        """
+        """Persist ``value`` under ``key`` optionally expiring after ``ex`` seconds."""
         if self.base.async_enabled and is_in_async_loop():
             ThreadPool.create_background_task(self.base.aset(key, value, ex = ex, _raw = _raw, **kwargs))
         else:
             return self.base.set(key, value, ex = ex, _raw = _raw, **kwargs)
     
     def set_batch(self, data: Dict[str, Any], **kwargs) -> None:
-        """
-        Saves a Value to the DB
-        """
+        """Store a mapping of key/value pairs in a single backend call."""
         if self.base.async_enabled:
             ThreadPool.create_background_task(self.base.aset_batch(data, **kwargs))
         else:
             self.base.set_batch(data, **kwargs)
 
     def delete(self, key: KT, **kwargs) -> None:
-        """
-        Deletes a Value from the DB
-        """
+        """Remove ``key`` from the persistence backend."""
         if self.base.async_enabled and is_in_async_loop():
             ThreadPool.create_background_task(self.base.adelete(key, **kwargs))
         else:
             self.base.delete(key, **kwargs)
 
     def contains(self, key: KT, **kwargs) -> bool:
-        """
-        Returns True if the Cache contains the Key
-        """
+        """Return ``True`` when the backend currently stores ``key``."""
         return self.base.contains(key, **kwargs)
     
     def clear(self, *keys, **kwargs) -> None:
-        """
-        Clears the Cache
-        """
+        """Clear all stored items or only the provided ``keys`` when supplied."""
         if self.base.async_enabled and is_in_async_loop():
             ThreadPool.create_background_task(self.base.clear(*keys, **kwargs))
         else:
             self.base.clear(*keys, **kwargs)
     
     async def aget(self, key: KT, default: Optional[VT] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[VT]:
-        """
-        Gets a Value from the DB
-        """
+        """Async equivalent of :meth:`get` for coroutine contexts."""
         await self._asave_mutation_objects(key)
         return await self.base.aget(key, default = default, _raw = _raw, **kwargs)
     
     async def aget_values(self, keys: Iterable[KT], **kwargs) -> List[VT]:
-        """
-        Gets a Value from the DB
-        """
+        """Async variant of :meth:`get_values`."""
         await self._asave_mutation_objects(*keys)
         return await self.base.aget_values(keys,  **kwargs)
     
     async def afetch(self, key: KT, _raw: Optional[bool] = None, **kwargs) -> Optional[VT]:
-        """
-        Gets a Value from the DB
-        """
+        """Async variant of :meth:`fetch`."""
         return await self.aget(key, _raw = _raw, **kwargs) if await self.acontains(key) else None
 
     async def aset(self, key: KT, value: VT, ex: Optional[Union[float, int]] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[KT]:

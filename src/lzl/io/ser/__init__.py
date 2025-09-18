@@ -1,159 +1,178 @@
 from __future__ import annotations
 
-"""
-Serialization I/O Modules
+"""Serialization façade for LazyOps IO helpers.
+
+This module centralises serializer registrations and exposes convenience
+functions used across the codebase.  The implementation remains unchanged; we
+focus on providing richer typing information and descriptive docstrings so that
+Mintlify and other documentation tools can surface the available serializers
+and helpers accurately.
 """
 
-from .base import BaseSerializer, BinaryBaseSerializer, ObjectValue, SchemaType, create_object_hash, create_hash_from_args_and_kwargs
-from .defaults import default_json, default_pickle, default_msgpack
-from .utils import serialize_object, deserialize_object, register_schema_mapping, get_object_class, get_object_classname
-from ._json import JsonSerializer
-from ._pickle import PickleSerializer
-from ._msgpack import MsgPackSerializer
+import typing as t
 from types import ModuleType
-from typing import Any, Dict, Optional, Union, Type, List, Literal, overload
 
-SerT = Union[JsonSerializer, PickleSerializer, MsgPackSerializer, BaseSerializer, BinaryBaseSerializer]
+from .base import (
+    BaseSerializer,
+    BinaryBaseSerializer,
+    ObjectValue,
+    SchemaType,
+    create_object_hash,
+    create_hash_from_args_and_kwargs,
+)
+from .defaults import default_json, default_msgpack, default_pickle
+from .utils import (
+    SerMode,
+    deserialize_object,
+    get_object_class,
+    get_object_classname,
+    register_schema_mapping,
+    serialize_object,
+)
+from ._json import JsonSerializer
+from ._msgpack import MsgPackSerializer
+from ._pickle import PickleSerializer
 
-RegisteredSerializers: Dict[str, Type[SerT]] = {
+SerT = t.Union[JsonSerializer, PickleSerializer, MsgPackSerializer, BaseSerializer, BinaryBaseSerializer]
+SerializerFactory = t.Type[BaseSerializer]
+
+RegisteredSerializers: dict[str, SerializerFactory] = {
     "json": JsonSerializer,
     "pickle": PickleSerializer,
     "msgpack": MsgPackSerializer,
 }
 
-RegisteredSerializerLibs: Dict[str, List[str]] = {
+RegisteredSerializerLibs: dict[str, list[str]] = {
     "json": ["orjson", "ujson", "simdjson", "cysimdjson"],
     "pickle": ["dill", "cloudpickle"],
 }
 
-
 DEFAULT_SERIALIZER = "json"
 
+
 def get_default_serializer() -> str:
-    """
-    Returns the default serializer
-    """
+    """Return the globally configured default serializer name."""
+
     return DEFAULT_SERIALIZER
 
-def set_default_serializer(
-    serializer: str,
-) -> None:
-    """
-    Sets the default serializer
 
-    :param serializer: The serializer to use
+def set_default_serializer(serializer: str) -> None:
+    """Update the global default serializer.
+
+    Args:
+        serializer: Name used when resolving serializers via :func:`get_serializer`.
     """
+
     global DEFAULT_SERIALIZER
     DEFAULT_SERIALIZER = serializer
 
 
 def register_serializer(
     name: str,
-    serializer: Type[SerT],
-    override: Optional[bool] = False,
-    set_as_default: Optional[bool] = False,
+    serializer: SerializerFactory,
+    override: bool | None = False,
+    set_as_default: bool | None = False,
 ) -> None:
+    """Register a :class:`BaseSerializer` factory for use throughout LazyOps.
+
+    Args:
+        name: Identifier that callers pass into :func:`get_serializer`.
+        serializer: Concrete serializer class implementing the
+            :class:`BaseSerializer` contract.
+        override: When ``True`` replace an existing registration with the same
+            ``name``; otherwise a :class:`ValueError` is raised.
+        set_as_default: When ``True`` call :func:`set_default_serializer` with
+            ``name`` to make the serializer the global default.
     """
-    Registers a Serializer
-    """
+
     global RegisteredSerializers
     if name in RegisteredSerializers and not override:
-        raise ValueError(f"Serializer `{name}` already registered with {RegisteredSerializers[name]} and override is False")
+        existing = RegisteredSerializers[name]
+        raise ValueError(
+            f"Serializer `{name}` already registered with {existing} and override is False"
+        )
     RegisteredSerializers[name] = serializer
-    if set_as_default: set_default_serializer(name)
+    if set_as_default:
+        set_default_serializer(name)
 
 
-def set_default_serializer_lib(
-    serializer: str,
-    lib: Union[ModuleType, str],
-):
-    """
-    Sets the default library for a serializer
-    """
+def set_default_serializer_lib(serializer: str, lib: ModuleType | str) -> None:
+    """Set the preferred underlying library for a known serializer."""
+
     if serializer not in RegisteredSerializers:
-        raise ValueError(f"Serializer `{serializer}` is not registered. Please register the serializer first")
+        raise ValueError(
+            f"Serializer `{serializer}` is not registered. Please register the serializer first"
+        )
     RegisteredSerializers[serializer].set_default_lib(lib)
+
 
 def register_serializer_lib(
     serializer: str,
-    lib: Union[ModuleType, str],
-    set_as_default_lib: Optional[bool] = False,
-):
+    lib: ModuleType | str,
+    set_as_default_lib: bool | None = False,
+) -> None:
+    """Register a library backend that a serializer implementation understands.
+
+    Args:
+        serializer: Name of the serializer to attach the backend to.
+        lib: Either the module object or its dotted import path.
+        set_as_default_lib: When ``True`` update the serializer so that ``lib``
+            is used as the default backend for subsequent serializer instances.
     """
-    Registers a serializer library such as
-    - Json: orjson, ujson, simdjson
-    - Pickle: dill, cloudpickle
-    """
+
     global RegisteredSerializerLibs
     if serializer not in RegisteredSerializers:
-        raise ValueError(f"Serializer `{serializer}` is not registered. Please register the serializer first")
+        raise ValueError(
+            f"Serializer `{serializer}` is not registered. Please register the serializer first"
+        )
     if serializer not in RegisteredSerializerLibs:
         RegisteredSerializerLibs[serializer] = []
     if isinstance(lib, ModuleType):
         lib = lib.__name__
     if lib not in RegisteredSerializerLibs[serializer]:
         RegisteredSerializerLibs[serializer].append(lib)
-    if set_as_default_lib: RegisteredSerializers[serializer].set_default_lib(lib)
-
-# We use this to create a singleton instance of the serializer
-# so that get_serializer can be called repeatedly without risk of initializing multiple times
-# if the same kwargs are passed in
-_initialized_sers: Dict[str, SerT] = {}
+    if set_as_default_lib:
+        RegisteredSerializers[serializer].set_default_lib(lib)
 
 
-@overload
+_initialized_sers: dict[str, SerT] = {}
+
+
+@t.overload
 def get_serializer(
-    serializer: Literal['json'] = ...,
-    jsonlib: Optional[Union[str, Any]] = ...,
-    compression: Optional[str] = ...,
-    compression_level: int | None = ..., 
-    encoding: str | None = ..., 
-    serialization_obj: Optional[Type] = ...,
-    serialization_obj_kwargs: Optional[Dict[str, Any]] = ...,
-    disable_object_serialization: Optional[bool] = ...,
-    disable_nested_values: Optional[bool] = ...,
-    verbosity: Optional[int] = ...,
+    serializer: t.Literal["json"] = ...,
+    jsonlib: str | ModuleType | None = ...,
+    compression: str | None = ...,
+    compression_level: int | None = ...,
+    encoding: str | None = ...,
+    serialization_obj: t.Type[object] | None = ...,
+    serialization_obj_kwargs: dict[str, t.Any] | None = ...,
+    disable_object_serialization: bool | None = ...,
+    disable_nested_values: bool | None = ...,
+    verbosity: int | None = ...,
     raise_errors: bool = ...,
-    enforce_string_value: Optional[bool] = ...,
-    enforce_byte_value: Optional[bool] = ...,
-    ser_mode: Optional[SerMode] = ...,
-    deprecated_compression: Optional[str] = ...,
-    schema_map: Optional[Dict[str, str]] = ...,
-    **kwargs
+    enforce_string_value: bool | None = ...,
+    enforce_byte_value: bool | None = ...,
+    ser_mode: SerMode | None = ...,
+    deprecated_compression: str | None = ...,
+    schema_map: dict[str, str] | None = ...,
+    **kwargs: t.Any,
 ) -> JsonSerializer:
-    """
-    Returns a JSON Serializer
+    ...
 
-    Args:
-        serializer: The serializer to use. Options are ``json``, ``pickle``, ``msgpack``, or ``auto``.
-        jsonlib: The JSON library to use. This is ignored if ``serializer`` is set.
-        compression: The compression to use. Options are ``gzip``, ``lz4``, ``zlib``, or ``auto``.
-        compression_level: The compression level to use.
-        encoding: The encoding to use. Defaults to ``utf-8``.
-        serialization_obj: The serialization object to use. Defaults to ``lzl.io.serialization.DefaultSerializationObject``.
-        serialization_obj_kwargs: The serialization object kwargs to use.
-        disable_object_serialization: Whether to disable object serialization. Defaults to ``False``.
-        disable_nested_values: Whether to disable nested values. Defaults to ``False``.
-        verbosity: The verbosity level to use. Defaults to ``None``.
-        raise_errors: Whether to raise errors. Defaults to ``True``.
-        enforce_string_value: Whether to enforce string values. Defaults to ``False``.
-        enforce_byte_value: Whether to enforce byte values. Defaults to ``False``.
-        ser_mode: The serialization mode to use. Defaults to ``auto``.
-        deprecated_compression: The deprecated compression to use. This is ignored if ``compression`` is set.
-        schema_map: The schema map to use. Defaults to ``None``.
+
+def get_serializer(serializer: str | None = None, **kwargs: t.Any) -> SerT:
+    """Return a serializer instance matching ``serializer`` and ``kwargs``.
+
+    The helper caches instances keyed by their configuration so the same
+    serializer can be reused across the process without repeatedly
+    instantiating identical objects.
     """
 
-        
-def get_serializer(
-    serializer: Optional[str] = None,
-    **kwargs
-) -> SerT:
-    """
-    Returns a Serializer
-    """
     global _initialized_sers
 
-    if serializer == 'auto':  serializer = None
+    if serializer == "auto":
+        serializer = None
     serializer = serializer or get_default_serializer()
     ser_hash = create_hash_from_args_and_kwargs(serializer, **kwargs)
     if ser_hash in _initialized_sers:
@@ -163,11 +182,39 @@ def get_serializer(
         new = RegisteredSerializers[serializer](**kwargs)
         _initialized_sers[ser_hash] = new
         return new
-    
+
     for kind, libs in RegisteredSerializerLibs.items():
         if serializer in libs:
-            if f'{kind}lib' not in kwargs: kwargs[f'{kind}lib'] = serializer
+            if f"{kind}lib" not in kwargs:
+                kwargs[f"{kind}lib"] = serializer
             new = RegisteredSerializers[kind](**kwargs)
             _initialized_sers[ser_hash] = new
             return new
     raise ValueError(f"Invalid Serializer Type: {serializer}")
+
+
+__all__ = [
+    "BaseSerializer",
+    "BinaryBaseSerializer",
+    "JsonSerializer",
+    "MsgPackSerializer",
+    "PickleSerializer",
+    "SerT",
+    "SerializerFactory",
+    "DEFAULT_SERIALIZER",
+    "get_serializer",
+    "register_serializer",
+    "set_default_serializer",
+    "set_default_serializer_lib",
+    "register_serializer_lib",
+    "default_json",
+    "default_pickle",
+    "default_msgpack",
+    "serialize_object",
+    "deserialize_object",
+    "register_schema_mapping",
+    "get_object_class",
+    "get_object_classname",
+    "create_object_hash",
+    "create_hash_from_args_and_kwargs",
+]

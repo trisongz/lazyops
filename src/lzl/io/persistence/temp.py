@@ -1,210 +1,194 @@
 from __future__ import annotations
 
-"""
-Temporary Data that deletes itself on exit
-"""
+"""Helpers for temporary, self-cleaning persistence files."""
 
-import os
 import abc
 import atexit
-import tempfile
-import pathlib
 import contextlib
+import os
+import pathlib
+import tempfile
+import typing as t
+
 from lzl import load
 from lzl.logging import logger
-from typing import Optional, Dict, Any, Set, List, Union, Generator, TYPE_CHECKING
 
 if load.TYPE_CHECKING:
     import filelock
 else:
     filelock = load.LazyLoad("filelock", install_missing=True)
 
-if TYPE_CHECKING:
+if t.TYPE_CHECKING:
     from filelock import SoftFileLock
 
+MutableMappingT = dict[str, t.Any]
+
+
 class TemporaryData(abc.ABC):
-    """
-    Temporary Data that deletes itself on exit
-    """
+    """Dictionary-like interface backed by an auto-cleaned JSON file."""
+
     def __init__(
-        self, 
-        filepath: Optional[Union[str, pathlib.Path]] = None,
-        filedir: Optional[pathlib.Path] = None,
-        is_multithreaded: Optional[bool] = False,
-        timeout: Optional[int] = 10,
-    ):
-        
+        self,
+        filepath: str | pathlib.Path | None = None,
+        filedir: pathlib.Path | None = None,
+        is_multithreaded: bool | None = False,
+        timeout: int | None = 10,
+    ) -> None:
+        """Prepare the on-disk file and optional file lock used by the store."""
+
         if filedir is not None:
-            if filepath: filepath = filedir.joinpath(filepath)
-            else: filepath = filedir.joinpath(f'{os.getpid()}.tmp.json')
-        if not filepath: filepath = pathlib.Path(tempfile.mktemp())
+            if filepath is not None:
+                filepath = filedir.joinpath(filepath)
+            else:
+                filepath = filedir.joinpath(f"{os.getpid()}.tmp.json")
+        if not filepath:
+            filepath = pathlib.Path(tempfile.mktemp())
         self.filepath = pathlib.Path(filepath)
         self._created_dir = not self.filepath.parent.exists()
-        
-        self.filepath.parent.mkdir(parents = True, exist_ok = True)
-        self.filelock_path = filepath.with_suffix('.lock')
+
+        self.filepath.parent.mkdir(parents=True, exist_ok=True)
+        self.filelock_path = self.filepath.with_suffix(".lock")
         self.timeout = timeout
-        self.is_multithreaded = is_multithreaded
-        self._filelock: Optional['SoftFileLock'] = None
+        self.is_multithreaded = bool(is_multithreaded)
+        self._filelock: "SoftFileLock | None" = None
         from lzl.io.ser import get_serializer
-        self.serializer = get_serializer('json')
+
+        self.serializer = get_serializer("json")
 
     @property
-    def filelock(self) -> 'SoftFileLock':
-        """
-        Returns the filelock
-        """
+    def filelock(self) -> "SoftFileLock":
+        """Return (and lazily create) the file lock guarding the JSON file."""
+
         if self._filelock is None:
             try:
                 self._filelock = filelock.SoftFileLock(
-                    self.filelock_path.as_posix(), 
-                    timeout = self.timeout,
-                    thread_local = False
+                    self.filelock_path.as_posix(),
+                    timeout=self.timeout,
+                    thread_local=False,
                 )
                 with self._filelock.acquire():
                     if not self.filepath.exists():
-                        self.filepath.write_text('{}')
+                        self.filepath.write_text("{}")
                     data = self.serializer.loads(self.filepath.read_text())
-                    if self.is_multithreaded and not data.get('process_id'):
-                        data['process_id'] = os.getpid()
-                        self.filepath.write_text(self.serializer.dumps(data, indent = 2))
+                    if self.is_multithreaded and not data.get("process_id"):
+                        data["process_id"] = os.getpid()
+                        self.filepath.write_text(self.serializer.dumps(data, indent=2))
                 atexit.register(self.cleanup_on_exit)
-            except Exception as e:
-                from lazyops.libs.logging import logger
-                logger.trace(f'Error creating filelock for {self.filepath}', e)
-                raise e
+            except Exception as exc:  # pragma: no cover - logging path
+                from lazyops.libs.logging import logger as lazy_logger
+
+                lazy_logger.trace(f"Error creating filelock for {self.filepath}", exc)
+                raise exc
         return self._filelock
-    
-    def _load_data(self) -> Dict[str, Any]:
-        """
-        Loads the data
-        """
+
+    def _load_data(self) -> MutableMappingT:
+        """Load the backing JSON document into memory."""
+
         if not self.filepath.exists():
-            self.filepath.write_text('{}')
+            self.filepath.write_text("{}")
         return self.serializer.loads(self.filepath.read_text())
 
     @property
-    def data(self) -> Dict[str, Any]:
-        """
-        Returns the data
-        """
+    def data(self) -> MutableMappingT:
+        """Return the current JSON payload guarded by the file lock."""
+
         try:
             with self.filelock.acquire():
                 return self._load_data()
-        except filelock.Timeout as e:
-            from lazyops.libs.logging import logger
-            logger.trace(f'Filelock timeout for {self.filepath}')
-            raise e
-        
+        except filelock.Timeout as exc:  # pragma: no cover - timing dependent
+            from lazyops.libs.logging import logger as lazy_logger
+
+            lazy_logger.trace(f"Filelock timeout for {self.filepath}")
+            raise exc
+
     @contextlib.contextmanager
-    def ctx(self) -> Generator[Dict[str, Union[List[Any], Dict[str, Any], Any]], None, None]:
-        """
-        Returns the context
-        """
+    def ctx(self) -> t.Generator[MutableMappingT, None, None]:
+        """Context manager yielding mutable JSON data with automatic flush."""
+
         try:
             with self.filelock.acquire():
                 data = self._load_data()
                 try:
                     yield data
                 finally:
-                    self.filepath.write_text(self.serializer.dumps(data, indent = 2))
-        except filelock.Timeout as e:
-            logger.trace(f'Filelock timeout for {self.filepath}', e)
-            raise e
-    
-    def get(self, key: str, default: Optional[Any] = None) -> Any:
-        """
-        Returns the value for the given key
-        """
+                    self.filepath.write_text(self.serializer.dumps(data, indent=2))
+        except filelock.Timeout as exc:  # pragma: no cover - timing dependent
+            logger.trace(f"Filelock timeout for {self.filepath}", exc)
+            raise exc
+
+    def get(self, key: str, default: t.Any | None = None) -> t.Any:
+        """Return ``data[key]`` if present, otherwise ``default``."""
+
         return self.data.get(key, default)
-    
+
     def __contains__(self, key: str) -> bool:
-        """
-        Returns whether the key is in the data
-        """
+        """Return ``True`` when ``key`` exists in the cached data."""
+
         return key in self.data
-    
-    def __getitem__(self, key: str) -> Any:
-        """
-        Returns the value for the given key
-        """
+
+    def __getitem__(self, key: str) -> t.Any:
+        """Return the value stored for ``key`` or ``None`` when missing."""
+
         return self.data.get(key)
-    
-    def __setitem__(self, key: str, value: Any):
-        """
-        Sets the value for the given key
-        """
+
+    def __setitem__(self, key: str, value: t.Any) -> None:
+        """Persist ``value`` under ``key`` and flush to disk immediately."""
+
         with self.ctx() as data:
             data[key] = value
 
-    def __delitem__(self, key: str):
-        """
-        Deletes the value for the given key
-        """
+    def __delitem__(self, key: str) -> None:
+        """Remove ``key`` from the stored data."""
+
         with self.ctx() as data:
             del data[key]
 
+    def __iter__(self) -> t.Iterator[str]:
+        """Return an iterator over stored keys."""
 
-    def __iter__(self):
-        """
-        Returns the iterator
-        """
         return iter(self.data)
-    
+
     def __len__(self) -> int:
-        """
-        Returns the length
-        """
+        """Return the number of stored keys."""
+
         return len(self.data)
-    
-    def __repr__(self) -> str:
-        """
-        Returns the representation
-        """
+
+    def __repr__(self) -> str:  # pragma: no cover - convenience method
         return repr(self.data)
-    
-    def __str__(self) -> str:
-        """
-        Returns the string representation
-        """
+
+    def __str__(self) -> str:  # pragma: no cover - convenience method
         return str(self.data)
-    
+
     def __bool__(self) -> bool:
-        """
-        Returns whether the data is empty
-        """
+        """Return ``True`` when the store contains at least one value."""
+
         return bool(self.data)
-    
-    def __eq__(self, other: Any) -> bool:
-        """
-        Returns whether the data is equal to the other
-        """
+
+    def __eq__(self, other: t.Any) -> bool:
+        """Compare the stored data with an arbitrary object."""
+
         return self.data == other
-    
-    def keys(self) -> Set[str]:
-        """
-        Returns the keys
-        """
+
+    def keys(self) -> t.Set[str]:
+        """Return the set-like view of stored keys."""
+
         return self.data.keys()
-    
-    def setdefault(self, key: str, default: Any) -> Any:
-        """
-        Sets the default value for the given key
-        """
+
+    def setdefault(self, key: str, default: t.Any) -> t.Any:
+        """Return ``data[key]`` if present, otherwise persist and return ``default``."""
+
         with self.ctx() as data:
             value = data.setdefault(key, default)
         return value
-        
-    def close(self):
-        """
-        Closes the filelock
-        """
+
+    def close(self) -> None:
+        """Release the file lock safeguarding the JSON payload."""
+
         self.filelock.release()
 
-    def append(self, key: str, value: Any) -> bool:
-        """
-        Appends the value to the list
-        """
+    def append(self, key: str, value: t.Any) -> bool:
+        """Append ``value`` to the list stored at ``key`` if it is unique."""
+
         with self.ctx() as data:
             if key not in data:
                 data[key] = []
@@ -213,46 +197,46 @@ class TemporaryData(abc.ABC):
                 return False
         return True
 
-    def cleanup_on_exit(self):
-        """
-        Cleans up on exit
-        """
+    def cleanup_on_exit(self) -> None:
+        """Remove the persisted files when the interpreter shuts down."""
+
         if not self.filepath.exists() and not self.filelock_path.exists():
             return
-        if self.is_multithreaded and self['process_id'] != os.getpid():
+        if self.is_multithreaded and self["process_id"] != os.getpid():
             return
         with contextlib.suppress(Exception):
             self.close()
             self.filepath.unlink()
             self.filelock_path.unlink()
-            if self._created_dir: 
-                # See if the directory is empty
-                _fs = os.listdir(self.filepath.parent.as_posix())
-                if not _fs: self.filepath.parent.rmdir()
-
+            if self._created_dir:
+                contents = os.listdir(self.filepath.parent.as_posix())
+                if not contents:
+                    self.filepath.parent.rmdir()
 
     def has_logged(self, key: str) -> bool:
-        """
-        Returns whether the key has been logged
-        """
-        return self.append('logged', key)
-        
+        """Return ``True`` if ``key`` has already been appended to ``logged``."""
+
+        return self.append("logged", key)
+
     @classmethod
     def from_module(
-        cls, 
-        module_name: str, 
-        data_dir: Optional[str] = '.data', 
-        is_multithreaded: Optional[bool] = False,
-        **kwargs
-    ) -> TemporaryData:
-        """
-        Returns a temporary data from the module
-        """
+        cls,
+        module_name: str,
+        data_dir: str | None = ".data",
+        is_multithreaded: bool | None = False,
+        **kwargs: t.Any,
+    ) -> "TemporaryData":
+        """Construct a :class:`TemporaryData` instance scoped to ``module_name``."""
+
         from lzo.utils.helpers.base import get_module_path
+
         module_path = get_module_path(module_name)
-        module_dir = module_path.joinpath(data_dir)
-        module_dir.mkdir(parents = True, exist_ok = True)
-        filepath = module_dir.joinpath(f'{module_name}.tmp.json')
+        module_dir = module_path.joinpath(data_dir or ".data")
+        module_dir.mkdir(parents=True, exist_ok=True)
+        filepath = module_dir.joinpath(f"{module_name}.tmp.json")
         if not filepath.exists():
-            filepath.write_text('{}')
-        return cls(filepath = filepath, is_multithreaded = is_multithreaded, **kwargs)
+            filepath.write_text("{}")
+        return cls(filepath=filepath, is_multithreaded=is_multithreaded, **kwargs)
+
+
+__all__ = ["TemporaryData"]

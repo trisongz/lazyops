@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-"""
-A Background Task Queue
-"""
+"""Minimal asynchronous background queue primitives."""
 
 
 import abc
@@ -17,23 +15,17 @@ from lzo.utils import Timer
 
 @dataclasses.dataclass
 class Stats:
-    """
-    The Task Queue Stats
-    """
+    """Aggregate counts for background task execution results."""
     successful: int = 0
     failed: int = 0
 
     @property
     def total(self) -> int:
-        """
-        Returns the total
-        """
+        """Return the total number of processed items."""
         return self.successful + self.failed
 
 class BackgroundTaskQueue(abc.ABC):
-    """
-    The Background Task Queue
-    """
+    """Abstract base class for cooperative background task queues."""
 
     _extra: t.Dict[str, t.Any] = {}
 
@@ -44,16 +36,17 @@ class BackgroundTaskQueue(abc.ABC):
         interval: float = 0.1,
         min_items: t.Optional[int] = None,
         max_items: int = 100,
-        **kwargs
+        **kwargs: t.Any,
     ):
-        """
-        A Background Task Queue
+        """Initialise a background queue without starting any workers.
 
-        - `name`: The name of the queue
-        - `num_workers`: The number of workers to use for the queue
-        - `interval`: The interval to check for tasks and send them
-        - `min_items`: The minimum number of items to process before sending
-        - `max_items`: The maximum number of items to process before sending
+        Args:
+            name: Human readable identifier used in log messages.
+            num_workers: Number of concurrent worker tasks to spawn.
+            interval: Delay (in seconds) between queue polling iterations.
+            min_items: Optional lower bound before dispatching batched work.
+            max_items: Hard cap on the number of items processed per cycle.
+            **kwargs: Additional keyword arguments reserved for subclasses.
         """
         self.name = name
         self.num_workers = num_workers
@@ -70,34 +63,28 @@ class BackgroundTaskQueue(abc.ABC):
 
     @property
     def started(self) -> bool:
-        """
-        Returns True if the client is started
-        """
+        """Return ``True`` when the main worker task has been created."""
         return self.main_task is not None
 
     @eproperty
     def lock(self) -> asyncio.Lock:
-        """
-        Returns the Lock
-        """
+        """Create and memoise an asyncio lock guarding queue operations."""
         return asyncio.Lock()
 
     @eproperty
     def task_queue(self) -> asyncio.Queue:
-        """
-        Returns the Task Queue
-        """
+        """Create the backing asyncio queue on first access."""
         return asyncio.Queue()
     
 
-    def start_task_queue(self, num_workers: t.Optional[int] = None):
-        """
-        Starts the Task Queue
-        """
-        if self.started: return
+    def start_task_queue(self, num_workers: t.Optional[int] = None) -> None:
+        """Spawn the background worker task if it is not already running."""
+
+        if self.started:
+            return
         num_workers = num_workers or self.num_workers
         logger.info(f'Starting {self.name} Queue with |g|{num_workers}|e| Workers', colored = True)
         self.started_time = Timer()
-        self.event_queue = EventQueue()
+        self.event_queue = EventQueue()  # type: ignore[name-defined]
         self.main_task = asyncio.create_task(self.run_task_queue(num_workers = num_workers))
         

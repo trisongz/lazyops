@@ -32,5 +32,7 @@ it updated so new contributors have a single reference for style expectations.
 ## Testing
 - Prefer deterministic transports (for example `httpx.MockTransport`) when
   exercising HTTP clients to keep tests network-free and CI friendly.
+- Use `tmp_path`/`tmp_path_factory` for filesystem-heavy utilities such as
+  `lzl.io.persistence` to avoid leaving artefacts on developer machines.
 
 _Last updated: September 18, 2025_

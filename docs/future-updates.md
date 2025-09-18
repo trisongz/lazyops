@@ -19,3 +19,11 @@ remain intentional.
   behaviour in a future sprint.
 - Evaluate whether importing heavy SQLAlchemy dependencies at module import time
   can be deferred to improve startup performance for non-database use cases.
+
+## lzl.io
+- `lzl.io.queue.background` references an `EventQueue` class that is not
+  defined within the package.  Confirm intended implementation and wire in the
+  missing queue before advertising the API publicly.
+- `PersistentDict` still mixes legacy ``typing`` aliases (`Optional`,
+  `Dict`, …); migrate the remainder to ``import typing as t`` once behaviour
+  stabilises to keep type hints consistent with newer modules.
