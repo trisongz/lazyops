@@ -1,71 +1,59 @@
 from __future__ import annotations
 
-"""
-Lazy Function Wrappers
-"""
-import functools
-from typing import TypeVar, Callable, Any
+"""Helpers for lazily initialising higher-order function wrappers."""
 
-WrappedFnReturnT = TypeVar("WrappedFnReturnT")
-WrappedFn = TypeVar("WrappedFn", bound = Callable[..., Any])
-ReturnT = TypeVar("ReturnT")
+import functools
+import typing as t
+
+ReturnT = t.TypeVar("ReturnT")
 
 
 def lazy_function_wrapper(
-    function: Callable[..., ReturnT],
-    *function_args,
-    **function_kwargs,
-) -> Callable[..., ReturnT]:
-    """
-    Lazy Function Wrapper
+    function: t.Callable[..., ReturnT],
+    *function_args: t.Any,
+    **function_kwargs: t.Any,
+) -> t.Callable[[t.Callable[..., ReturnT]], t.Callable[..., ReturnT]]:
+    """Defer wrapper creation until the wrapped function is first invoked.
 
-    This function is used to handle lazily initializing a wrapper function (retry, etc)
-    The execution of the function is deferred until the first call to the wrapper function
-
-    If the returned function is None after initialization is called with arguments, then
-    the initialized function will not be wrapped and the original function will be returned
+    The initialiser ``function`` is executed at most once.  It may return a
+    callable that itself accepts the original function and returns a wrapped
+    version.  When ``function`` returns ``None`` the original callable is used
+    as-is, preserving the legacy behaviour relied on by existing integrations.
     """
+
     _initialized = False
-    _initialized_function = None
+    _initialized_function: t.Optional[t.Callable[[t.Callable[..., ReturnT]], t.Callable[..., ReturnT]]] = None
 
-    def lazywrapped(func: Callable[..., ReturnT]) -> Callable[..., ReturnT]:
-        """
-        Wrapper Function
-        """
-        from lzl.pool import is_coro_func, ThreadPool
+    def lazywrapped(func: t.Callable[..., ReturnT]) -> t.Callable[..., ReturnT]:
+        from lzl.pool import ThreadPool, is_coro_func
 
         if is_coro_func(func):
             @functools.wraps(func)
-            async def _wrapper(*args, **kwargs) -> ReturnT:
-                """
-                Wrapped Function
-                """
-                nonlocal _initialized_function, _initialized
+            async def _wrapper(*args: t.Any, **kwargs: t.Any) -> ReturnT:
+                nonlocal _initialized, _initialized_function
                 if not _initialized:
-                    _initialized_function = await ThreadPool.asyncish(function, *function_args, **function_kwargs)
+                    _initialized_function = await ThreadPool.asyncish(
+                        function,
+                        *function_args,
+                        **function_kwargs,
+                    )
                     _initialized = True
                 if _initialized_function is None:
                     return await func(*args, **kwargs)
                 return await _initialized_function(func)(*args, **kwargs)
+
             return _wrapper
-        
 
         @functools.wraps(func)
-        def _wrapper(*args, **kwargs) -> ReturnT:
-            """
-            Wrapped Function
-            """
-            nonlocal _initialized_function, _initialized
+        def _wrapper(*args: t.Any, **kwargs: t.Any) -> ReturnT:
+            nonlocal _initialized, _initialized_function
             if not _initialized:
                 _initialized_function = function(*function_args, **function_kwargs)
                 _initialized = True
-
             if _initialized_function is None:
-                # If the function is None, return the original function
                 return func(*args, **kwargs)
-            
             return _initialized_function(func)(*args, **kwargs)
-        return _wrapper
-    
-    return lazywrapped
 
+        return _wrapper
+
+    return lazywrapped

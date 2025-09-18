@@ -27,3 +27,11 @@ remain intentional.
 - `PersistentDict` still mixes legacy ``typing`` aliases (`Optional`,
   `Dict`, …); migrate the remainder to ``import typing as t`` once behaviour
   stabilises to keep type hints consistent with newer modules.
+
+## lzl.load
+- Investigate whether the default ``install_missing=True`` flag for
+  :class:`LazyLoad` should be scoped behind an explicit opt-in to avoid
+  surprising installations at runtime.
+- Consider exposing a public API for clearing the module/object caches managed
+  by ``lazy_import`` to support long-lived processes that hot-reload
+  configuration.
