@@ -36,5 +36,7 @@ it updated so new contributors have a single reference for style expectations.
   `lzl.io.persistence` to avoid leaving artefacts on developer machines.
 - Prefer standard-library modules (for example `math`) when exercising
   `LazyLoad` to keep tests deterministic and dependency-free.
+- When testing `ThreadPool`, await background tasks or consume futures so the
+  event loop does not emit "task was destroyed" warnings during teardown.
 
 _Last updated: September 18, 2025_

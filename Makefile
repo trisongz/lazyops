@@ -4,7 +4,7 @@ PYTHON ?= python
 PYTEST ?= pytest
 PYTEST_OPTS ?=
 
-.PHONY: test test-lzl-io test-lzl-load test-lzl-logging test-lzl
+.PHONY: test test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool test-lzl
 
 ## test: Run the entire pytest suite
 test:
@@ -25,5 +25,9 @@ test-lzl-load:
 test-lzl-logging:
 	$(PYTEST) $(PYTEST_OPTS) tests/lzl/test_logging_basic.py
 
+## test-lzl-pool: Run LazyOps thread pool tests
+test-lzl-pool:
+	$(PYTEST) $(PYTEST_OPTS) tests/lzl/test_pool.py
+
 ## test-lzl: Run documentation-focused submodule tests
-test-lzl: test-lzl-io test-lzl-load test-lzl-logging
+test-lzl: test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool

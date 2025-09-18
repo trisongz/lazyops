@@ -35,3 +35,9 @@ remain intentional.
 - Consider exposing a public API for clearing the module/object caches managed
   by ``lazy_import`` to support long-lived processes that hot-reload
   configuration.
+
+## lzl.pool
+- `ThreadPool.run` currently requires `anyio`; evaluate providing a graceful
+  fallback or clearer error message when the optional dependency is missing.
+- Consider pooling executors across interpreter restarts to avoid spinning up
+  multiple thread pools in short-lived CLI contexts.

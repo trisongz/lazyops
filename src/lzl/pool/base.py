@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-"""
-ThreadPool Implementation
-
-- v3: Transform into a singleton proxy object class
-"""
+"""Thread and coroutine interop helpers backing LazyOps utilities."""
 
 import os
 import abc
@@ -50,27 +46,24 @@ _concurrency_limit: Optional[int] = None
 def set_concurrency_limit(
     limit: Optional[int] = None
 ):
-    """
-    Set the concurrency limit
+    """Override the maximum number of concurrently scheduled background tasks.
+
+    When ``limit`` is ``None`` the value falls back to ``os.cpu_count() * 4``
+    for parity with the original implementation.
     """
     global _concurrency_limit
     if limit is None: limit = os.cpu_count() * 4
     _concurrency_limit = limit
 
 def get_concurrency_limit() -> Optional[int]:
-    """
-    Get the concurrency limit
-    """
+    """Return the currently configured concurrency limit."""
     global _concurrency_limit
     if _concurrency_limit is None: set_concurrency_limit()
     return _concurrency_limit
 
 
 def is_coro_func(obj, func_name: str = None) -> bool:
-    """
-    This is probably in the library elsewhere but returns bool
-    based on if the function is a coro
-    """
+    """Return ``True`` when ``obj`` (or ``obj.func_name``) is awaitable."""
     try:
         if inspect.iscoroutinefunction(obj): return True
         if inspect.isawaitable(obj): return True
@@ -87,17 +80,7 @@ async def amap_iterable(
     concurrency_limit: Optional[int] = None,
     return_when: Optional[str] = 'FIRST_COMPLETED',
 ):
-    """
-    Limit the concurrency of an iterable
-
-    Args:
-        mapped_iterable (Union[Callable[[], Awaitable[Any]], Awaitable[Any], Coroutine[Any, Any, Any], Callable[[], Any]]): The iterable to limit the concurrency of
-        limit (Optional[int], optional): The limit of the concurrency. Defaults to None.
-        return_when (Optional[ReturnWhenType], optional): The return when type. Defaults to ReturnWhenType.FIRST_COMPLETED.
-    
-    Yields:
-        [type]: [description]
-    """
+    """Yield tasks from ``mapped_iterable`` while respecting ``concurrency_limit``."""
     try:
         iterable = aiter(mapped_iterable)
         is_async = True
@@ -131,18 +114,7 @@ async def async_map(
     return_when: Optional[str] = 'FIRST_COMPLETED',
     **kwargs,
 ) -> AsyncGenerator[RT, None]:
-    """
-    Async Map of a function with args and kwargs
-
-    Args:
-        func (Callable[..., Awaitable[Any]]): The function to map
-        iterable (Iterable[Any]): The iterable to map
-        limit (Optional[int], optional): The limit of the concurrency. Defaults to None.
-        return_when (Optional[ReturnWhenType], optional): The return when type. Defaults to ReturnWhenType.FIRST_COMPLETED.
-    
-    Yields:
-        [type]: [description]
-    """
+    """Yield results from applying ``func`` to ``iterable`` as tasks complete."""
     func = ensure_coro(func)
     partial = functools.partial(func, *args, **kwargs)
     try:
@@ -193,9 +165,7 @@ async def _stream_subprocess(
 
 @proxied
 class ThreadPool(abc.ABC):
-    """
-    Pooler Base Class
-    """
+    """Singleton-style proxy wrapping LazyOps thread/process pools."""
 
     allow_task_completion: Optional[bool] = True
     register_exit: Optional[bool] = True
@@ -207,9 +177,7 @@ class ThreadPool(abc.ABC):
         register_exit: Optional[bool] = None,
         **kwargs
     ):
-        """
-        Initializes the Pooler
-        """
+        """Initialise backing executors and configure automatic shutdown hooks."""
         if allow_task_completion is not None: self.allow_task_completion = allow_task_completion
         if register_exit is not None: self.register_exit = register_exit
         if max_workers is None:
@@ -227,15 +195,11 @@ class ThreadPool(abc.ABC):
 
     @staticmethod
     def is_coro(obj: Any) -> bool:
-        """
-        Checks if an object is a coroutine function
-        """
+        """Return ``True`` when ``obj`` is a coroutine function or awaitable."""
         return is_coro_func(obj)
     
     def ensure_coro(self, func: Callable[..., RT]) -> Callable[..., Awaitable[RT]]:
-        """
-        Ensure that the function is a coroutine
-        """
+        """Return an awaitable wrapper around ``func`` when it is sync."""
         if asyncio.iscoroutinefunction(func): return func
         @functools.wraps(func)
         async def inner(*args, **kwargs):
@@ -243,10 +207,7 @@ class ThreadPool(abc.ABC):
         return inner
     
     def ensure_coro_function(self, func: Callable[..., RT]) -> Callable[..., Awaitable[RT]]:
-        """
-        Ensure that the function is a coroutine
-        - Adds contextvars
-        """
+        """Return an awaitable wrapper preserving context variables."""
         if asyncio.iscoroutinefunction(func): return func
         @functools.wraps(func)
         async def inner(*args, **kwargs):
@@ -260,27 +221,21 @@ class ThreadPool(abc.ABC):
     
     @property
     def pool(self) -> futures.ThreadPoolExecutor:
-        """
-        Returns the ThreadPoolExecutor
-        """
+        """Return (and lazily create) the shared thread pool executor."""
         if self._pool is None:
             self._pool = futures.ThreadPoolExecutor(max_workers = self.max_workers)
         return self._pool
     
     @property
     def ppool(self) -> futures.ProcessPoolExecutor:
-        """
-        Returns the ProcessPoolExecutor
-        """
+        """Return (and lazily create) the shared process pool executor."""
         if self._ppool is None:
             self._ppool = futures.ProcessPoolExecutor(max_workers = self.max_workers)
         return self._ppool
     
     @property
     def in_async_loop(self) -> bool:
-        """
-        Returns True if the current thread is in an async loop
-        """
+        """Return ``True`` when executed inside a running event loop."""
         try:
             return asyncio.get_running_loop() is not None
         except RuntimeError:
@@ -291,9 +246,7 @@ class ThreadPool(abc.ABC):
         num_workers: Optional[int] = None, 
         process_pool: bool = False
     ) -> futures.Executor:
-        """
-        Returns the ThreadPoolExecutor or ProcessPoolExecutor
-        """
+        """Create a dedicated executor honouring ``num_workers`` preferences."""
         pool_cls = futures.ProcessPoolExecutor if process_pool else futures.ThreadPoolExecutor
         if num_workers is None: num_workers = self.max_workers
         return pool_cls(max_workers = num_workers)
@@ -305,9 +258,7 @@ class ThreadPool(abc.ABC):
         callback_args: Optional[Tuple] = None,
         callback_kwargs: Optional[Dict] = None
     ):
-        """
-        Adds a task to the current tasks
-        """
+        """Track ``task`` and optionally invoke ``callback`` when it completes."""
         self.tasks.add(task)
         if callback is not None:
             if callback_args or callback_kwargs:
@@ -319,9 +270,7 @@ class ThreadPool(abc.ABC):
 
 
     def on_exit(self):
-        """
-        Cleans up the ThreadPoolExecutor and Tasks
-        """
+        """Cancel tracked tasks and shut down executors at interpreter exit."""
         for task in self.tasks:
             with contextlib.suppress(Exception):
                 task.cancel()
@@ -335,9 +284,7 @@ class ThreadPool(abc.ABC):
     """
 
     def run(self, func: Coroutine[RT], *args, **kwargs) -> RT:
-        """
-        Runs an Async Function as a Sync Function
-        """
+        """Execute ``func`` synchronously, bridging any active AnyIO loop."""
         current_async_module = getattr(anyio._core._eventloop.threadlocals, "current_async_module", None)
         partial_f = functools.partial(func, *args, **kwargs)
         if current_async_module is None:
@@ -346,18 +293,13 @@ class ThreadPool(abc.ABC):
     
 
     async def arun(self, func: Callable[..., RT], *args, **kwargs) -> RT:
-        """
-        Runs a Sync Function as an Async Function
-        """
+        """Execute ``func`` in the shared thread pool and await the result."""
         blocking = functools.partial(func, *args, **kwargs)
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(self.pool, blocking)
     
     async def asyncish(self, func: Callable[..., RT], *args, **kwargs) -> RT:
-        """
-        Runs a Function as an Async Function if it is an Async Function
-        otherwise wraps it around `arun`
-        """
+        """Await ``func`` when async, otherwise delegate to :meth:`arun`."""
         if is_coro_func(func): return await func(*args, **kwargs)
         return await self.arun(func, *args, **kwargs)
     
@@ -377,9 +319,7 @@ class ThreadPool(abc.ABC):
         task_callback_kwargs: Optional[Dict] = None,
         **kwargs
     ) -> futures.Future[RT]:
-        """
-        Creates a threadpool task
-        """
+        """Submit ``func`` to the thread pool and return the future."""
         task = self.pool.submit(func, *args, **kwargs)
         self.add_task(task, task_callback, callback_args=task_callback_args, callback_kwargs=task_callback_kwargs)
         return task
@@ -393,9 +333,7 @@ class ThreadPool(abc.ABC):
         task_callback_kwargs: Optional[Dict] = None,
         **kwargs
     ) -> Awaitable[RT]:
-        """
-        Creates a background task
-        """
+        """Schedule ``func`` in the appropriate executor based on loop state."""
         if inspect.isawaitable(func): task = asyncio.create_task(func)
         else: task = asyncio.create_task(self.asyncish(func, *args, **kwargs))
         self.add_task(task, task_callback, callback_args = task_callback_args, callback_kwargs=task_callback_kwargs)
@@ -438,9 +376,7 @@ class ThreadPool(abc.ABC):
         use_process_pool: Optional[bool] = False, 
         **kwargs
     ) -> List[RT]:  # sourcery skip: assign-if-exp
-        """
-        Iterates over an iterable and runs a function on each item in the iterable.
-        """
+        """Return the results of applying ``func`` across ``iterable``."""
         num_workers = kwargs.pop('num_workers', None)
         partial_func = functools.partial(func, *args, **kwargs)
         with self.get_pool(num_workers = num_workers, process_pool = use_process_pool) as executor:
@@ -461,9 +397,7 @@ class ThreadPool(abc.ABC):
         return_ordered: Optional[bool] = True,
         **kwargs
     ) -> Generator[RT, None, None]:  # sourcery skip: assign-if-exp
-        """
-        Iterates over an iterable and runs a function on each item in the iterable.
-        """
+        """Yield items produced by applying ``func`` across ``iterable``."""
         num_workers = kwargs.pop('num_workers', None)
         partial_func = functools.partial(func, *args, **kwargs)
         with self.get_pool(num_workers = num_workers, process_pool = use_process_pool) as executor:
@@ -487,9 +421,7 @@ class ThreadPool(abc.ABC):
         concurrency_limit: Optional[int] = None,
         **kwargs,
     ) -> List[RT]:
-        """
-        Creates an Async Generator that iterates over an iterable and runs a function on each item in the iterable.
-        """
+        """Await results serially while respecting the concurrency limit."""
         return_when = kwargs.pop('return_when', 'ALL_COMPLETED' if return_ordered else 'FIRST_COMPLETED')
         concurrency_limit = kwargs.pop('limit', concurrency_limit)
         func = self.ensure_coro(func)
@@ -514,23 +446,7 @@ class ThreadPool(abc.ABC):
         concurrency_limit: Optional[int] = None,
         **kwargs,
     ) -> AsyncGenerator[RT, None]:
-        """
-        Creates an Async Generator that iterates over an iterable and runs a function on each item in the iterable.
-
-
-        Usage:
-        ```
-        async for result in pool.aiterate(
-            func,
-            iterable,
-            *args,
-            return_ordered = True,
-            concurrency_limit = 10,
-            **kwargs
-        ):
-            yield result
-        ```
-        """
+        """Async generator yielding results as soon as underlying tasks finish."""
         return_when = kwargs.pop('return_when', 'ALL_COMPLETED' if return_ordered else 'FIRST_COMPLETED')
         concurrency_limit = kwargs.pop('limit', concurrency_limit)
         func = self.ensure_coro(func)
@@ -580,11 +496,7 @@ class ThreadPool(abc.ABC):
         *args,
         **kwargs
     ) -> Union[str, asyncio.subprocess.Process]:
-        """
-        Executes a Shell command using `asyncio.subprocess.create_subprocess_shell`
-
-        Returns str if output_only else `asyncio.subprocess.Process`
-        """
+        """Execute a shell command asynchronously, optionally returning stdout."""
         if isinstance(command, list): command = ' '.join(command)
         p = await asyncio.subprocess.create_subprocess_shell(command, *args, stdout = stdout, stderr = stderr, **kwargs)
         if not output_only: return p
@@ -605,11 +517,7 @@ class ThreadPool(abc.ABC):
         output_errors: str = 'ignore', 
         **kwargs
     ) -> Union[str, asyncio.subprocess.Process]:
-        """
-        Executes a Shell command using `asyncio.subprocess.create_subprocess_shell`
-
-        Returns str if output_only else `asyncio.subprocess.Process`
-        """
+        """Execute a command using ``create_subprocess_exec`` and return stdout when requested."""
         if isinstance(command, str): command = shlex.split(command)
         p = await asyncio.subprocess.create_subprocess_exec(*command, stdout = stdout, stderr = stderr, **kwargs)
         if not output_only: return p
@@ -623,9 +531,7 @@ class ThreadPool(abc.ABC):
         stderr_cb: t.Optional[t.Union[t.Callable, t.Awaitable]] = None,
         **kwargs 
     ) -> asyncio.subprocess.Process:
-        """
-        Streams the Subprocess Output into the Callbacks
-        """
+        """Stream subprocess output into the supplied callbacks."""
         return await _stream_subprocess(command, stdout_cb, stderr_cb, **kwargs)
     
 
@@ -633,12 +539,9 @@ class ThreadPool(abc.ABC):
 def ensure_coro(
     func: Callable[..., Any]
 ) -> Callable[..., Awaitable[Any]]:
-    """
-    Ensure that the function is a coroutine
-    """
+    """Return an awaitable wrapper around ``func`` using :class:`ThreadPool`."""
     if asyncio.iscoroutinefunction(func): return func
     @functools.wraps(func)
     async def inner(*args, **kwargs):
         return await ThreadPool.arun(func, *args, **kwargs)
     return inner
-
