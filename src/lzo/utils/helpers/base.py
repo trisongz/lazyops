@@ -8,8 +8,10 @@ import asyncio
 import collections.abc
 import contextlib
 import functools
+import hashlib
 import importlib.util
 import inspect
+import json
 import pathlib
 import random
 import string
@@ -170,12 +172,56 @@ def fail_after(delay: t.Union[int, float] = 5.0) -> t.Callable[[t.Callable[..., 
 
     
 
+_PRIMITIVE_TYPES = (str, int, float, bool, bytes)
+
+
+def _is_primitive(value: t.Any) -> bool:
+    return value is None or isinstance(value, _PRIMITIVE_TYPES)
+
+
+def _normalized_value(value: t.Any) -> t.Any:
+    if _is_primitive(value):
+        return value
+    if isinstance(value, collections.abc.Mapping):
+        return tuple(sorted((k, _normalized_value(v)) for k, v in value.items()))
+    if isinstance(value, (list, tuple)):
+        return tuple(_normalized_value(item) for item in value)
+    if isinstance(value, set):
+        return tuple(sorted(_normalized_value(item) for item in value))
+    if isinstance(value, collections.abc.Iterable) and not isinstance(value, (bytes, bytearray)):
+        return tuple(_normalized_value(item) for item in value)
+    return repr(value)
+
+
+def _hash_value(value: t.Any) -> str:
+    normalized = _normalized_value(value)
+    if isinstance(normalized, t.Hashable):
+        return str(hash(normalized))
+    serialized = json.dumps(normalized, sort_keys=True, default=repr)
+    return hashlib.sha256(serialized.encode('utf-8')).hexdigest()
+
+
+def _deduplicate_list(items: t.Iterable[t.Any]) -> t.List[t.Any]:
+    seen: t.Set[t.Hashable] = set()
+    unique: t.List[t.Any] = []
+    for item in items:
+        if _is_primitive(item):
+            key = t.cast(t.Hashable, item)
+        else:
+            key = _hash_value(item)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(item)
+    return unique
+
 
 def update_dict(
     d: t.Dict[t.Hashable, t.Any],
     u: t.Mapping[t.Hashable, t.Any],
     exclude_none: bool = False,
     unset_value: t.Optional[str] = 'UNSET',
+    deduplicate: bool = True,
 ) -> t.Dict[t.Hashable, t.Any]:
     """Recursively update a dictionary, respecting unset sentinels."""
     unset_keys = []
@@ -186,9 +232,21 @@ def update_dict(
             unset_keys.append(k)
             continue
         if isinstance(v, collections.abc.Mapping):
-            d[k] = update_dict(d.get(k, {}), v)
+            d[k] = update_dict(
+                d.get(k, {}),
+                v,
+                exclude_none=exclude_none,
+                unset_value=unset_value,
+                deduplicate=deduplicate,
+            )
         elif isinstance(v, list):
-            d[k] = d.get(k, []) + v
+            existing = d.get(k, [])
+            if not isinstance(existing, list):
+                existing = []
+            combined = existing + v
+            if deduplicate:
+                combined = _deduplicate_list(combined)
+            d[k] = combined
         else:
             d[k] = v
     for k in unset_keys:

@@ -583,7 +583,6 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Returns all the Keys
         """
-        # self._run_expiration_check()
         self.exp_backend._check(validate = True)
         f_keys = self._fetch_objstr_f_keys()
         if as_file: return f_keys
@@ -618,7 +617,6 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Returns True if the Cache contains the Key
         """
-        # self._run_expiration_check(key)
         self.exp_backend._check(key)
         f_key = self.get_key(key)
         return f_key.exists()
@@ -627,7 +625,6 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Returns True if the Cache contains the Key
         """
-        # await self._arun_expiration_check(key)
         await self.exp_backend._acheck(key)
         f_key = self.get_key(key)
         return await f_key.aexists()
@@ -637,14 +634,12 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         Expires a Key
         """
         self.exp_backend._set(key, ex = ex, validate = True)
-        # self._set_expiration(key, ex = ex, validate = True)
     
     async def aexpire(self, key: str, ex: int, **kwargs) -> None:
         """
         Expires a Key
         """
         await self.exp_backend._aset(key, ex = ex, validate = True)
-        # await self._aset_expiration(key, ex = ex, validate = True)
 
     def purge(self, **kwargs) -> None:
         """
