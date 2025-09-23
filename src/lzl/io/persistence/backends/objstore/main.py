@@ -507,16 +507,8 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         Returns the Keys within the current object storage
         """
         self.exp_backend._check(validate = True)
-        # self._run_expiration_check()
-        # f_keys = [f_key for f_key in self.base_key.glob(pattern = pattern) if f_key.is_file() and 'metadata.expires' not in f_key.name]
         return [f_key for f_key in self.base_key.glob(pattern = pattern) if f_key.is_file() and 'metadata.expires' not in f_key.name]
 
-
-        # if self.expiration_backend == 'file':
-            # if self.exp_file is not None:
-        #     f_keys = [f_key for f_key in f_keys if f_key.name != self.exp_backend.exp_file.name]
-        # return f_keys
-    
     async def _afetch_objstr_f_keys(
         self,
         pattern: Optional[str] = '*', 
@@ -525,16 +517,9 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Returns the Keys within the current object storage
         """
-        # await self._arun_expiration_check()
         await self.exp_backend._acheck(validate = True)
         f_keys: List['File'] = list(await self.base_key.aglob(pattern=pattern))
-        # f_keys = [f_key for f_key in f_keys if f_key.is_file()]
         return [f_key for f_key in f_keys if f_key.is_file() and 'metadata.expires' not in f_key.name]
-        # if self.expiration_backend == 'file':
-
-        # # if self.exp_file is not None:
-        #     f_keys = [f_key for f_key in f_keys if f_key.name != self.exp_backend.exp_file.name]
-        # return f_keys
 
     def _parse_f_keys_to_str(
         self,
