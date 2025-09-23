@@ -311,14 +311,11 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         f_key = self.get_key(key)
         f_key.rm(missing_ok=True)
-        # f_key.unlink(missing_ok=True)
-        # logger.info(f'Deleted Key: {key}: {f_key.exists()}', prefix = f_key.as_posix())
 
     def delete(self, key: str, **kwargs) -> None:
         """
         Deletes a Value from the Object Store
         """
-        # self._remove_expiration(key)
         self.exp_backend._remove(key)
         self._delete_one(key, **kwargs)
         
@@ -420,13 +417,11 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         f_key = self.get_key(key)
         await f_key.arm(missing_ok=True)
-        # logger.info(f'Deleted Key: {f_key}: {f_key.exists()}', prefix = f_key.as_posix())
 
     async def aget(self, key: str, default: Optional[Any] = None, _raw: Optional[bool] = None, **kwargs) -> Optional[Any]:
         """
         Gets a Value from the Object Store
         """
-        # await self._arun_expiration_check(key)
         await self.exp_backend._acheck(key)
         return await self._afetch_one(key, default, _raw = _raw, **kwargs)
 
@@ -434,7 +429,6 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         """
         Gets a Value from the DB
         """
-        # await self._arun_expiration_check(*keys)
         await self.exp_backend._acheck(*keys)
         results = []
         async for result in ThreadPool.aiterate(
@@ -454,7 +448,6 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         f_key = await self._aset_one(key, value, _raw = _raw, **kwargs)
         if f_key is None: return
         await self.exp_backend._aset(key, ex = ex)
-        # await self._aset_expiration(key, ex = ex)
         return f_key
         
 
