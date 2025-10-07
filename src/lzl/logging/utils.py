@@ -129,6 +129,7 @@ def format_message(
     max_length: int | None = None,
     level: str | None = None,
     colored: bool | None = False,
+    extra: dict[str, t.Any] | None = None,
 ) -> str:
     """Render a message plus optional extras into a single string."""
 
@@ -146,6 +147,13 @@ def format_message(
         for arg in args:
             rendered += "\n"
             rendered += format_item(arg, max_length=max_length, colored=colored, level=level)
+    if extra:
+        extras_rendered = format_item(extra, max_length=max_length, colored=colored, level=level)
+        extras_rendered = extras_rendered.lstrip("\n")
+        if extras_rendered:
+            if rendered:
+                rendered += "\n"
+            rendered += extras_rendered
     if colored:
         rendered = rendered.replace("<fg", ">|fg")
         rendered = rendered.replace("<", "\\</")

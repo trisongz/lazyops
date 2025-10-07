@@ -222,6 +222,7 @@ class Logger(_Logger, LoggingMixin):
         max_length: Optional[int] = None,
         level: Optional[str] = None,
         colored: Optional[bool] = False,
+        extra: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
         Formats the message
@@ -229,7 +230,15 @@ class Logger(_Logger, LoggingMixin):
         "example |b|msg|e|"
         -> "example <blue>msg</><reset>"
         """
-        return format_message(message, max_length = max_length, colored = colored, level = level, prefix = prefix, *args)
+        return format_message(
+            message,
+            *args,
+            prefix = prefix,
+            max_length = max_length,
+            level = level,
+            colored = colored,
+            extra = extra,
+        )
     
     def log_if(
         self, 
@@ -261,7 +270,15 @@ class Logger(_Logger, LoggingMixin):
         Log ``message.format(*args, **kwargs)`` with severity ``level``.
         """
         level = self._get_level(level)
-        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored, level = level)
+        extra = kwargs.pop('extra', None)
+        message = self._format_message(
+            message,
+            prefix = prefix,
+            max_length = max_length,
+            colored = colored,
+            level = level,
+            extra = extra,
+        )
         try:
             self._log(level, False, self._get_opts(colored = colored), message, args, kwargs)
         except TypeError:
@@ -285,7 +302,16 @@ class Logger(_Logger, LoggingMixin):
         Log ``message.format(*args, **kwargs)`` with severity ``'INFO'``.
         """
         if colored is None and isinstance(message, str) and '|e|' in message: colored = True
-        message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored, level = 'INFO')
+        extra = kwargs.pop('extra', None)
+        message = self._format_message(
+            message,
+            *args,
+            prefix = prefix,
+            max_length = max_length,
+            colored = colored,
+            level = 'INFO',
+            extra = extra,
+        )
         if not is_global_muted():
             try:
                 self._log("INFO", False, self._get_opts(colored = colored), message, args, kwargs)
@@ -305,7 +331,16 @@ class Logger(_Logger, LoggingMixin):
         **kwargs
     ):  # noqa: N805
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'SUCCESS'``."""
-        message = self._format_message(message, *args, prefix = prefix, max_length = max_length, colored = colored, level = 'SUCCESS')
+        extra = kwargs.pop('extra', None)
+        message = self._format_message(
+            message,
+            *args,
+            prefix = prefix,
+            max_length = max_length,
+            colored = colored,
+            level = 'SUCCESS',
+            extra = extra,
+        )
         if not is_global_muted():
             try:
                 self._log("SUCCESS", False, self._get_opts(colored = colored), message, args, kwargs)
@@ -325,7 +360,15 @@ class Logger(_Logger, LoggingMixin):
         **kwargs
     ):  # noqa: N805
         r"""Log ``message.format(*args, **kwargs)`` with severity ``'WARNING'``."""
-        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored, level = 'WARNING')
+        extra = kwargs.pop('extra', None)
+        message = self._format_message(
+            message,
+            prefix = prefix,
+            max_length = max_length,
+            colored = colored,
+            level = 'WARNING',
+            extra = extra,
+        )
     
         try:
             self._log("WARNING", False, self._get_opts(colored = colored), message, args, kwargs)
@@ -348,7 +391,15 @@ class Logger(_Logger, LoggingMixin):
         """
         Log ``message.format(*args, **kwargs)`` with severity ``'ERROR'``.
         """
-        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored, level = 'ERROR')
+        extra = kwargs.pop('extra', None)
+        message = self._format_message(
+            message,
+            prefix = prefix,
+            max_length = max_length,
+            colored = colored,
+            level = 'ERROR',
+            extra = extra,
+        )
         if exc_info: message += f"\n{traceback.format_exc()}"
 
         try:
@@ -376,8 +427,27 @@ class Logger(_Logger, LoggingMixin):
         :param error: The exception to log.
         """
         _depth = kwargs.pop('depth', None)
+        extra = kwargs.pop('extra', None)
         if _depth is not None: limit = _depth
-        _msg = msg if isinstance(msg, str) else self._format_message(msg, colored = colored, level = level, prefix = prefix, max_length = max_length)
+        if isinstance(msg, str):
+            _msg = msg
+            if extra:
+                extras_rendered = format_item(extra, max_length = max_length, colored = colored, level = level)
+                extras_rendered = extras_rendered.lstrip('\n')
+                if extras_rendered:
+                    if _msg:
+                        _msg += f"\n{extras_rendered}"
+                    else:
+                        _msg = extras_rendered
+        else:
+            _msg = self._format_message(
+                msg,
+                colored = colored,
+                level = level,
+                prefix = prefix,
+                max_length = max_length,
+                extra = extra,
+            )
         # pprint.pformat(msg)
         _msg += f"\n{traceback.format_exc(chain = chain, limit = limit)}"
         if error: _msg += f" - {error}"
@@ -402,7 +472,16 @@ class Logger(_Logger, LoggingMixin):
         """
         Log ``message.format(*args, **kwargs)`` with severity ``'ERROR'``.
         """
-        message = self._format_message(message, prefix = prefix, max_length = max_length, colored = colored, level = 'ERROR')
+        extra = kwargs.get('extra')
+        message = self._format_message(
+            message,
+            *args,
+            prefix = prefix,
+            max_length = max_length,
+            colored = colored,
+            level = 'ERROR',
+            extra = extra,
+        )
         super().exception(message, *args, **kwargs)
         self.run_logging_hooks(message, hook = hook)
 
@@ -472,5 +551,3 @@ class InterceptHandler(logging.Handler):
             depth += 1
         log = logger.bind(request_id=None)
         log.opt(depth=depth, exception=record.exc_info).log(level, record.getMessage())
-
-

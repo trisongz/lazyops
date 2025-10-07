@@ -49,6 +49,7 @@ class NullLogger(logging.Logger, LoggingMixin):
         max_length: int | None = None,
         level: str | None = None,
         colored: bool | None = False,
+        extra: dict[str, t.Any] | None = None,
     ) -> str:
         return format_message(
             message,
@@ -57,6 +58,7 @@ class NullLogger(logging.Logger, LoggingMixin):
             max_length=max_length,
             level=level,
             colored=colored,
+            extra=extra,
         )
 
     def _get_level(self, level: t.Union[str, int]) -> str:
@@ -76,6 +78,7 @@ class NullLogger(logging.Logger, LoggingMixin):
         if not hook:
             return
         resolved_level = self._get_level(level)
+        extra = kwargs.get("extra")
         rendered = self._format_message(
             message,
             *args,
@@ -83,6 +86,7 @@ class NullLogger(logging.Logger, LoggingMixin):
             max_length=max_length,
             colored=colored,
             level=resolved_level,
+            extra=extra,
         )
         self.run_logging_hooks(rendered, hook=hook)
 
@@ -116,7 +120,23 @@ class NullLogger(logging.Logger, LoggingMixin):
         depth = kwargs.pop("depth", None)
         if depth is not None:
             limit = depth
-        rendered = msg if isinstance(msg, str) else self._format_message(msg, colored=True, prefix=prefix, max_length=max_length)
+        extra = kwargs.get("extra")
+        if isinstance(msg, str):
+            rendered = msg
+            if extra:
+                extra_rendered = format_item(extra, max_length=max_length, colored=colored, level=level)
+                extra_rendered = extra_rendered.lstrip("\n")
+                if extra_rendered:
+                    rendered = f"{rendered}\n{extra_rendered}" if rendered else extra_rendered
+        else:
+            rendered = self._format_message(
+                msg,
+                colored=colored,
+                prefix=prefix,
+                max_length=max_length,
+                level=level,
+                extra=extra,
+            )
         rendered += f"\n{traceback.format_exc(chain=chain, limit=limit)}"
         if error:
             rendered += f" - {error}"

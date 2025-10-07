@@ -172,7 +172,7 @@ class LoggingMixin(abc.ABC):
         """
         _log = self.get_log_mode(level)
         try:
-            from fileio.io import Yaml
+            from lzl.io.ser import Yaml
             _log('\n' + Yaml.dumps(objs, **kwargs))
         
         except Exception as e:
