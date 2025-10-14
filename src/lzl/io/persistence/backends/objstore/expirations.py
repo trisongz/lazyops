@@ -391,19 +391,23 @@ class RedisExpirationBackend(ExpirationBackend):
         Handles the migration
         """
         # Check whether the key exists
-        with self.lock:
-            if self.session.exists(self.exp_base_key): return
+        with contextlib.suppress(Exception):
+            with self.lock:
+                if self.session.exists(self.exp_base_key): return
 
-            exp_file: 'File' = self.backend.base_key.joinpath(f'.{self.backend.name}.metadata.expires')
-            if not exp_file.exists(): return
+                exp_file: 'File' = self.backend.base_key.joinpath(f'.{self.backend.name}.metadata.expires')
+                if not exp_file.exists(): return
 
-            logger.info(f'Migrating Expirations from {exp_file} to {self.exp_base_key} (File -> Redis)')
-            exps: 'ExpirationFile' = self.ser.loads(exp_file.read_text())
-            set_data = {key: exp.expires_at.timestamp() for key, exp in exps.index.items()}
+                logger.info(f'Migrating Expirations from {exp_file} to {self.exp_base_key} (File -> Redis)')
+                exps: 'ExpirationFile' = self.ser.loads(exp_file.read_text())
+                set_data = {key: exp.expires_at.timestamp() for key, exp in exps.index.items()}
+                if set_data:
+                    self.session.hmset(self.exp_base_key, set_data)
+                    logger.info(f'Migrated `{len(set_data)}` Expirations from {exp_file} to {self.exp_base_key} (File -> Redis)')
+                else: 
+                    logger.info(f'No Expirations to Migrate from {exp_file} to {self.exp_base_key} (File -> Redis)')
+                    exp_file.unlink()
 
-            self.session.hmset(self.exp_base_key, set_data)
-            logger.info(f'Migrated `{len(set_data)}` Expirations from {exp_file} to {self.exp_base_key} (File -> Redis)')
-        
         # exp_file.unlink()
 
     @classmethod
