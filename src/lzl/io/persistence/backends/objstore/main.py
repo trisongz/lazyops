@@ -552,6 +552,20 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         if as_file: return f_keys
         return self._parse_f_keys_to_str(f_keys, exclude_base_key = exclude_base_key, **kwargs)
 
+    def get_all_data(
+        self, 
+        exclude_base_key: Optional[bool] = False, 
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Loads all the Data
+        """
+        self.exp_backend._check(validate = True)
+        f_keys = self._fetch_objstr_f_keys()
+        keys = self._parse_f_keys_to_str(f_keys, exclude_base_key = exclude_base_key, **kwargs)
+        values = self.get_values(keys)
+        return {k: v for k, v in zip(keys, values)}
+
     def get_all_keys(
         self, 
         exclude_base_key: Optional[bool] = False, 
@@ -566,6 +580,19 @@ class ObjStorageStatefulBackend(BaseStatefulBackend):
         if as_file: return f_keys
         return self._parse_f_keys_to_str(f_keys, exclude_base_key = exclude_base_key, **kwargs)
     
+    async def aget_all_data(
+        self, 
+        exclude_base_key: Optional[bool] = False, 
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Loads all the Data
+        """
+        await self.exp_backend._acheck(validate = True)
+        f_keys = await self._afetch_objstr_f_keys()
+        keys = self._parse_f_keys_to_str(f_keys, exclude_base_key = exclude_base_key, **kwargs)
+        values = await self.aget_values(keys)
+        return {k: v for k, v in zip(keys, values)}
 
     def length(self, **kwargs) -> int:
         """
