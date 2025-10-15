@@ -919,7 +919,12 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
         """
         Finalize any in-memory objects
         """
-        await self._asave_mutation_objects(*keys)
+        try:
+            import anyio
+            with anyio.move_on_after(2):
+                await self._asave_mutation_objects(*keys)
+        except ImportError:
+            await self._asave_mutation_objects(*keys)
     
 
     def get_all_data_raw(self, exclude_base_key: Optional[bool] = False, **kwargs) -> Dict[str, Any]:
