@@ -5,7 +5,7 @@ on:
   push:
     paths:
       - 'src/version.py'
-      - 'lazyops/version.py'
+      - 'src/lzl/version.py'
 
 
 jobs:

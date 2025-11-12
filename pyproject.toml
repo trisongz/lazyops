@@ -98,7 +98,7 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.dynamic]
-version = { attr = "src.version.VERSION" }
+version = { attr = "lzl.version.VERSION" }
 
 [dependency-groups]
 builder-ci = [
