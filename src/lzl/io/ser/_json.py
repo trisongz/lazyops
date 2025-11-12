@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, Optional, Union, Type, Tuple, TYPE_CHECKING
 from lzl.load import lazy_import
 from .base import BaseSerializer, ObjectValue, SchemaType, SerializableObject, BaseModel, logger, ThreadPool, ModuleType
-from .utils import serialize_object
+from .utils import serialize_object, SerMode
 from .defaults import default_json, JsonLibT
 
 class JsonSerializer(BaseSerializer):
@@ -79,15 +79,19 @@ class JsonSerializer(BaseSerializer):
         mode = mode or self.ser_mode
         if 'disable_nested_values' not in kwargs and self.disable_nested_values is not None:
             kwargs['disable_nested_values'] = self.disable_nested_values
+        if 'disable_object_serialization' in kwargs:
+            disable_object_serialization = kwargs.pop('disable_object_serialization')
+            mode = 'raw' if disable_object_serialization else mode
+        elif self.disable_object_serialization:
+            mode = 'raw'
         return serialize_object(obj, mode = mode, **kwargs)
     
-
-    def encode_value(self, value: Union[Any, SchemaType], **kwargs) -> str:
+    def encode_value(self, value: Union[Any, SchemaType], mode: Optional[SerMode] = None, **kwargs) -> str:
         """
         Encode the value with the JSON Library
         """
         try:
-            value_dict = self.serialize_obj(value, **kwargs, **self.serialization_obj_kwargs)
+            value_dict = self.serialize_obj(value, mode = mode, **kwargs, **self.serialization_obj_kwargs)
             encoded = self.jsonlib.dumps(value_dict, **kwargs)
             return self.coerce_output_value(encoded)
 
@@ -163,6 +167,7 @@ class JsonSerializer(BaseSerializer):
             separators: Optional[Tuple[str, str]] = None,
             default: Optional[Any] = None, 
             sort_keys: bool = False,
+            mode: Optional[SerMode] = None,
             **kwargs
         ) -> Union[str, bytes]:
             """Serialize ``obj`` to a JSON formatted ``str``.
