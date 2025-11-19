@@ -97,6 +97,24 @@ from lzo.registry import settings
 
 ---
 
+### Documentation
+
+Full documentation is available and built with [MkDocs](https://www.mkdocs.org/) using the [Material theme](https://squidfunk.github.io/mkdocs-material/):
+
+- **Online**: Documentation is automatically deployed to GitHub Pages on updates to the `main` branch
+- **Local Preview**: Run `make mkdocs-serve` to preview documentation locally at `http://127.0.0.1:8000/`
+- **Build**: Run `make mkdocs-build` to build static documentation
+
+To install documentation dependencies:
+
+```bash
+pip install -e ".[docs]"
+```
+
+See [`docs/mkdocs-setup.md`](docs/mkdocs-setup.md) for more information about the documentation setup.
+
+---
+
 ### Contributing
 
 Contributions are welcome! Please read the **[`CONTRIBUTING.md`](CONTRIBUTING.md)** file for guidelines on code style, formatting, type hinting, docstrings, and the development process.
