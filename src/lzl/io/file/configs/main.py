@@ -15,6 +15,7 @@ from .providers import (
     S3CompatConfig,
     CloudflareR2Config,
 )
+from .performance import PerformanceConfig
 from typing import Optional, Dict, Any, List, Union, Tuple, TYPE_CHECKING
 
 ProviderConfig = Union[AWSConfig, GCPConfig, MinioConfig, S3CompatConfig, CloudflareR2Config]
@@ -36,6 +37,13 @@ class FileIOConfig(BaseSettings, RegisteredSettings.configure_registered(module 
     class Config:
         env_prefix = "FILEIO_"
         case_sensitive = False
+
+    @eproperty
+    def performance(self) -> PerformanceConfig:
+        """
+        Returns the Performance Config
+        """
+        return PerformanceConfig()
 
     @eproperty
     def aws(self) -> AWSConfig:

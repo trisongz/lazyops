@@ -220,6 +220,11 @@ _FilePathT = t.TypeVar('_FilePathT', bound = 'FilePath')
 class FilePath(Path, FilePurePath):
     """
     Our customized class that incorporates both sync and async methods
+    
+    This class provides comprehensive file I/O operations with both synchronous
+    and asynchronous methods. For large files (50MB+), consider using the
+    optimized methods (aread_optimized, awrite_optimized, acopy_to_optimized)
+    which automatically adapt buffer sizes and use concurrent operations.
     """
     _flavour = _pathz_posix_flavour if os.name != 'nt' else _pathz_windows_flavour
     _accessor = _pathz_accessor
@@ -1928,6 +1933,104 @@ class FilePath(Path, FilePurePath):
         Returns the size of the object
         """
         return ObjectSize(obj)
+
+    # Enhanced async methods for improved performance with large files
+    async def aread_optimized(
+        self,
+        mode: str = 'rb',
+        chunk_size: t.Optional[int] = None,
+        use_concurrent: bool = True,
+        **kwargs
+    ) -> t.Union[str, bytes]:
+        """Optimized async file read with adaptive buffering.
+        
+        This method automatically selects optimal buffer sizes based on file size
+        and uses concurrent chunk reading for large files (50MB+).
+        
+        Args:
+            mode: File open mode ('rb' for binary, 'r' for text).
+            chunk_size: Override automatic chunk size selection.
+            use_concurrent: Use concurrent chunk reading for large files.
+            **kwargs: Additional arguments passed to aopen.
+        
+        Returns:
+            File contents as bytes or string.
+        """
+        from .enhanced import EnhancedAsyncMixin
+        return await EnhancedAsyncMixin.aread_optimized(self, mode, chunk_size, use_concurrent, **kwargs)
+    
+    async def awrite_optimized(
+        self,
+        data: t.Union[bytes, str],
+        mode: str = 'wb',
+        chunk_size: t.Optional[int] = None,
+        use_concurrent: bool = True,
+        **kwargs
+    ) -> int:
+        """Optimized async file write with adaptive buffering.
+        
+        This method automatically selects optimal buffer sizes and uses
+        concurrent chunk writing for large data (50MB+).
+        
+        Args:
+            data: Data to write (bytes or string).
+            mode: File open mode ('wb' for binary, 'w' for text).
+            chunk_size: Override automatic chunk size selection.
+            use_concurrent: Use concurrent chunk writing for large data.
+            **kwargs: Additional arguments passed to aopen.
+        
+        Returns:
+            Number of bytes written.
+        """
+        from .enhanced import EnhancedAsyncMixin
+        return await EnhancedAsyncMixin.awrite_optimized(self, data, mode, chunk_size, use_concurrent, **kwargs)
+    
+    async def acopy_to_optimized(
+        self,
+        dest: Paths,
+        overwrite: bool = False,
+        chunk_size: t.Optional[int] = None,
+        use_concurrent: bool = True,
+        **kwargs
+    ) -> 'FilePath':
+        """Optimized async file copy with concurrent chunk processing.
+        
+        This method uses concurrent chunk reading and writing for improved
+        throughput when copying large files (50MB+).
+        
+        Args:
+            dest: Destination path.
+            overwrite: Whether to overwrite existing file.
+            chunk_size: Override automatic chunk size selection.
+            use_concurrent: Use concurrent operations for large files.
+            **kwargs: Additional arguments.
+        
+        Returns:
+            Destination file path.
+        """
+        from .enhanced import EnhancedAsyncMixin
+        return await EnhancedAsyncMixin.acopy_to_optimized(self, dest, overwrite, chunk_size, use_concurrent, **kwargs)
+    
+    async def aiter_raw_optimized(
+        self,
+        chunk_size: t.Optional[int] = None,
+        use_concurrent: bool = True,
+    ) -> t.AsyncIterator[bytes]:
+        """Optimized async iteration over file bytes.
+        
+        This method uses adaptive chunk sizing and buffers chunks ahead
+        for improved throughput with large files.
+        
+        Args:
+            chunk_size: Override automatic chunk size selection.
+            use_concurrent: Use concurrent buffering for large files.
+        
+        Yields:
+            Byte chunks from the file.
+        """
+        from .enhanced import EnhancedAsyncMixin
+        async for chunk in EnhancedAsyncMixin.aiter_raw_optimized(self, chunk_size, use_concurrent):
+            yield chunk
 
     # We sort of assume that it will be used to open a file
     def __enter__(self):
