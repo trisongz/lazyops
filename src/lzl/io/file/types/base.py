@@ -1956,8 +1956,37 @@ class FilePath(Path, FilePurePath):
         Returns:
             File contents as bytes or string.
         """
-        from .enhanced import EnhancedAsyncMixin
-        return await EnhancedAsyncMixin.aread_optimized(self, mode, chunk_size, use_concurrent, **kwargs)
+        from ..utils.registry import fileio_settings
+        from ..utils.async_helpers import read_file_chunks_concurrent
+        
+        # Get file size for optimization
+        try:
+            file_size = await self.asize()
+            perf_config = fileio_settings.performance
+            
+            # Determine optimal settings
+            if chunk_size is None:
+                chunk_size = perf_config.get_optimal_chunk_size(file_size)
+            buffer_size = perf_config.get_optimal_buffer_size(file_size)
+            
+            # Use concurrent reading for large files
+            if use_concurrent and file_size >= perf_config.multipart_threshold:
+                chunks = []
+                async for chunk in read_file_chunks_concurrent(self, chunk_size):
+                    chunks.append(chunk)
+                
+                result = b''.join(chunks)
+                if 'b' not in mode:
+                    return result.decode('utf-8')
+                return result
+            
+            # Standard async read with optimized buffer
+            async with self.aopen(mode, buffering=buffer_size, **kwargs) as f:
+                return await f.read()
+        
+        except Exception:
+            # Fallback to standard read if optimization fails
+            return await self.aread(mode, **kwargs)
     
     async def awrite_optimized(
         self,
@@ -1982,8 +2011,39 @@ class FilePath(Path, FilePurePath):
         Returns:
             Number of bytes written.
         """
-        from .enhanced import EnhancedAsyncMixin
-        return await EnhancedAsyncMixin.awrite_optimized(self, data, mode, chunk_size, use_concurrent, **kwargs)
+        from ..utils.registry import fileio_settings
+        from ..utils.async_helpers import write_file_chunks_concurrent
+        
+        # Convert string to bytes if needed
+        if isinstance(data, str) and 'b' in mode:
+            data = data.encode('utf-8')
+        elif isinstance(data, bytes) and 'b' not in mode:
+            data = data.decode('utf-8')
+        
+        data_size = len(data)
+        perf_config = fileio_settings.performance
+        
+        # Determine optimal settings
+        if chunk_size is None:
+            chunk_size = perf_config.get_optimal_chunk_size(data_size)
+        buffer_size = perf_config.get_optimal_buffer_size(data_size)
+        
+        # Use concurrent writing for large data
+        if use_concurrent and data_size >= perf_config.multipart_threshold:
+            # Ensure data is bytes
+            if isinstance(data, str):
+                data = data.encode('utf-8')
+            
+            # Create async iterator of chunks
+            async def chunk_generator():
+                for i in range(0, len(data), chunk_size):
+                    yield data[i:i + chunk_size]
+            
+            return await write_file_chunks_concurrent(self, chunk_generator())
+        
+        # Standard async write with optimized buffer
+        async with self.aopen(mode, buffering=buffer_size, **kwargs) as f:
+            return await f.write(data)
     
     async def acopy_to_optimized(
         self,
@@ -2008,8 +2068,45 @@ class FilePath(Path, FilePurePath):
         Returns:
             Destination file path.
         """
-        from .enhanced import EnhancedAsyncMixin
-        return await EnhancedAsyncMixin.acopy_to_optimized(self, dest, overwrite, chunk_size, use_concurrent, **kwargs)
+        from ..utils.registry import fileio_settings
+        from ..utils.async_helpers import copy_file_concurrent
+        
+        dst = self.get_pathlike_(dest)
+        
+        if not overwrite and await dst.aexists():
+            raise FileExistsError(
+                f"Destination file {dst} exists and overwrite is False"
+            )
+        
+        # Get file size for optimization
+        try:
+            file_size = await self.asize()
+            perf_config = fileio_settings.performance
+            
+            # Determine optimal settings
+            if chunk_size is None:
+                chunk_size = perf_config.get_optimal_chunk_size(file_size)
+            
+            # Use concurrent copy for large files
+            if use_concurrent and file_size >= perf_config.multipart_threshold:
+                max_concurrent = perf_config.get_concurrent_chunks(file_size)
+                return await copy_file_concurrent(
+                    self,
+                    dst,
+                    chunk_size=chunk_size,
+                    max_concurrent=max_concurrent,
+                    overwrite=overwrite,
+                )
+        
+        except Exception:
+            pass  # Fall through to standard copy
+        
+        # Standard async copy with optimized chunk size
+        async with dst.aopen('wb') as f:
+            async for chunk in self.aiter_raw(chunk_size=chunk_size):
+                await f.write(chunk)
+        
+        return dst
     
     async def aiter_raw_optimized(
         self,
@@ -2028,8 +2125,32 @@ class FilePath(Path, FilePurePath):
         Yields:
             Byte chunks from the file.
         """
-        from .enhanced import EnhancedAsyncMixin
-        async for chunk in EnhancedAsyncMixin.aiter_raw_optimized(self, chunk_size, use_concurrent):
+        from ..utils.registry import fileio_settings
+        from ..utils.async_helpers import read_file_chunks_concurrent
+        
+        # Get file size for optimization
+        try:
+            file_size = await self.asize()
+            perf_config = fileio_settings.performance
+            
+            # Determine optimal settings
+            if chunk_size is None:
+                chunk_size = perf_config.get_optimal_chunk_size(file_size)
+            
+            # Use concurrent reading for large files
+            if use_concurrent and file_size >= perf_config.large_file_chunk_size:
+                max_concurrent = perf_config.get_concurrent_chunks(file_size)
+                async for chunk in read_file_chunks_concurrent(
+                    self, chunk_size, max_concurrent
+                ):
+                    yield chunk
+                return
+        
+        except Exception:
+            pass  # Fall through to standard iteration
+        
+        # Standard iteration with optimized chunk size
+        async for chunk in self.aiter_raw(chunk_size=chunk_size):
             yield chunk
 
     # We sort of assume that it will be used to open a file
