@@ -17,9 +17,10 @@ try:
     from lzl.io import File
     IMPORTS_AVAILABLE = True
 except ImportError:
+    import sys
     print("Error: lzl.io.File not available. Install with: pip install -e .[file]")
     IMPORTS_AVAILABLE = False
-    exit(1)
+    sys.exit(1)
 
 
 def format_size(size_bytes: int) -> str:

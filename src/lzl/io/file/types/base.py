@@ -2034,10 +2034,13 @@ class FilePath(Path, FilePurePath):
             if isinstance(data, str):
                 data = data.encode('utf-8')
             
-            # Create async iterator of chunks
+            # Create async iterator of chunks using memoryview for efficiency
             async def chunk_generator():
+                # Use memoryview to avoid creating many slice objects
+                view = memoryview(data)
                 for i in range(0, len(data), chunk_size):
-                    yield data[i:i + chunk_size]
+                    # Convert memoryview slice back to bytes for writing
+                    yield bytes(view[i:i + chunk_size])
             
             return await write_file_chunks_concurrent(self, chunk_generator())
         

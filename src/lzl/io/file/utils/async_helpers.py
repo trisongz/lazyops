@@ -219,28 +219,41 @@ async def write_file_chunks_concurrent(
     """
     total_bytes = 0
     chunk_queue: asyncio.Queue = asyncio.Queue(maxsize=max_concurrent)
+    write_task = None
     
     async def write_chunks():
         """Write chunks from the queue."""
         nonlocal total_bytes
-        async with file_path.aopen('wb') as f:
-            while True:
-                chunk = await chunk_queue.get()
-                if chunk is None:
+        try:
+            async with file_path.aopen('wb') as f:
+                while True:
+                    chunk = await chunk_queue.get()
+                    if chunk is None:
+                        break
+                    await f.write(chunk)
+                    total_bytes += len(chunk)
+        except Exception:
+            # Drain queue on error to unblock producers
+            while not chunk_queue.empty():
+                try:
+                    chunk_queue.get_nowait()
+                except asyncio.QueueEmpty:
                     break
-                await f.write(chunk)
-                total_bytes += len(chunk)
-    
-    # Start writing chunks in background
-    write_task = asyncio.create_task(write_chunks())
+            raise
     
     try:
+        # Start writing chunks in background
+        write_task = asyncio.create_task(write_chunks())
+        
         # Put chunks in the queue
         async for chunk in chunks:
             await chunk_queue.put(chunk)
     finally:
-        await chunk_queue.put(None)  # Sentinel to signal completion
-        await write_task
+        # Signal completion
+        await chunk_queue.put(None)
+        # Ensure write task completes
+        if write_task:
+            await write_task
     
     return total_bytes
 
@@ -312,6 +325,9 @@ async def copy_file_concurrent(
     Raises:
         FileExistsError: If destination exists and overwrite is False.
     """
+    # Note: This check is not atomic with the write operation, but provides
+    # a reasonable guard against accidental overwrites in most cases.
+    # For truly atomic operations, consider using file locks or O_EXCL flag.
     if not overwrite and await dst_path.aexists():
         raise FileExistsError(f"Destination file {dst_path} exists and overwrite is False")
     
