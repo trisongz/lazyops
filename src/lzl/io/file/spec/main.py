@@ -49,6 +49,11 @@ from .paths.r2 import (
     FileR2PosixPath,
     FileR2WindowsPath,
 )
+from .paths.smb import (
+    FileSMBPath,
+    FileSMBPosixPath,
+    FileSMBWindowsPath,
+)
 
 PathLike = t.TypeVar(
     'PathLike', 
@@ -61,6 +66,7 @@ PathLike = t.TypeVar(
         FileMinioPath,
         FileS3CPath,
         FileR2Path,
+        FileSMBPath,
     ]
 )
 
@@ -71,6 +77,7 @@ ProviderPathLike = t.TypeVar(
         FileMinioPath,
         FileS3CPath,
         FileR2Path,
+        FileSMBPath,
     ]
 )
 
@@ -83,6 +90,7 @@ FileLikeT = t.TypeVar(
         FileMinioPath,
         FileS3CPath,
         FileR2Path,
+        FileSMBPath,
     ]
 )
 
@@ -92,6 +100,7 @@ FileLike = t.Union[
     FileS3Path,
     FileMinioPath,
     FileS3CPath,
+    FileSMBPath,
 ]
 
 # FileLikeT = t.TypeVar(
@@ -115,6 +124,7 @@ PREFIXES_TO_FP: t.Dict[str, t.Type[ProviderPathLike]] = {
     's3compat://': FileS3CPath,
 
     'r2://': FileR2Path,
+    'smb://': FileSMBPath,
 }
 
 _FILESPEC_CLS: t.Tuple[FileLikeT, ...] = (
@@ -137,6 +147,10 @@ _FILESPEC_CLS: t.Tuple[FileLikeT, ...] = (
     FileR2Path,
     FileR2PosixPath,
     FileR2WindowsPath,
+
+    FileSMBPath,
+    FileSMBPosixPath,
+    FileSMBWindowsPath,
 )
 
 

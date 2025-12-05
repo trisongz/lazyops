@@ -39,6 +39,7 @@ _SupportedProviders: t.List[str] = [
     'minio',
     's3c',
     'r2',
+    'smb',
 ]
 
 class CloudFileSystemMeta(type):
@@ -76,6 +77,22 @@ class CloudFileSystemMeta(type):
         """
         return bool(cls.fsa and cls.fs)
     
+    def build_smb(
+        cls,
+        provider: t.Optional[str] = 'smb',
+        **auth_config: t.Any,
+    ):
+        """
+        Builds the SMB Client
+        """
+        from fsspec.implementations.smb import SMBFileSystem
+
+        config, pconfig = cls.settings.get_provider_config(provider, **auth_config)
+        # SMBFileSystem usually takes host, username, password, etc. in kwargs or URL
+        # Our config dict has them.
+        cls.fs = SMBFileSystem(asynchronous = False, **config)
+        cls.fsa = rewrite_async_syntax(SMBFileSystem(asynchronous=True, **config))
+        cls.fsconfig = pconfig.model_copy()
 
     def build_s3c(
         cls,
@@ -138,6 +155,8 @@ class CloudFileSystemMeta(type):
         
         if self.fs_name in _SupportedProviders:
             provider = _MappedProviderAliases.get(self.fs_name, self.fs_name)
+            if provider == 'smb':
+                return self.build_smb(provider = provider, **auth_config)
             return self.build_s3c(provider = provider, **auth_config)
         raise NotImplementedError(f'Cloud File System `{self.fs_name}` is not supported')
 
