@@ -29,7 +29,7 @@ from ..path.flavours import _pathz_windows_flavour, _pathz_posix_flavour, _pathz
 from .static.content_types import CONTENT_TYPE_BY_EXTENSION
 # from .providers.main import AccessorLike, FileSystemLike, ProviderManager
 from .utils import get_async_file, get_fsspec_file, AsyncFile
-
+from ..types.enhanced import EnhancedAsyncMixin
 
 
 if t.TYPE_CHECKING:
@@ -94,7 +94,7 @@ class PureCloudFileSystemWindowsPath(CloudFileSystemPurePath):
 
 CloudPathT = t.TypeVar('CloudPathT', bound = 'CloudFileSystemPath')
 
-class CloudFileSystemPath(Path, CloudFileSystemPurePath):
+class CloudFileSystemPath(Path, CloudFileSystemPurePath, EnhancedAsyncMixin):
     """
     Our customized class that incorporates both sync and async methods
     """
@@ -473,10 +473,24 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         yield from decoder.flush()
 
 
-    async def aiter_raw(self, chunk_size: t.Optional[int] = None) -> t.AsyncIterator[bytes]:
+    async def aiter_raw(self, chunk_size: t.Optional[int] = None, optimized: t.Union[bool, str] = 'auto') -> t.AsyncIterator[bytes]:
         """
         Iterates over the bytes of a file
         """
+        if optimized is True:
+            async for chunk in self.aiter_raw_optimized(chunk_size=chunk_size):
+                yield chunk
+            return
+        elif optimized == 'auto':
+            try:
+                # Auto-optimization: Use optimized iter for files > 5MB
+                if await self.asize() > 5 * 1024 * 1024:
+                    async for chunk in self.aiter_raw_optimized(chunk_size=chunk_size):
+                        yield chunk
+                    return
+            except Exception:
+                pass
+
         from lzl.io.file.utils.decoders import ByteChunker
         chunker = ByteChunker(chunk_size = chunk_size)
         chunk_size = chunk_size if chunk_size is not None else -1
@@ -532,11 +546,22 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
                 f.write(chunk)
         return dst
     
-    async def acopy_to(self, dest: 'PathLike', overwrite: bool = False, chunk_size: t.Optional[int] = None, **kwargs) -> 'FileLike':
+    async def acopy_to(self, dest: 'PathLike', overwrite: bool = False, chunk_size: t.Optional[int] = None, optimized: t.Union[bool, str] = 'auto', **kwargs) -> 'FileLike':
         """
         Copies this file to the destination path.
         """
         dst = self.get_pathlike_(dest)
+        
+        if optimized is True:
+            return await self.acopy_to_optimized(dst, overwrite=overwrite, chunk_size=chunk_size, **kwargs)
+        elif optimized == 'auto':
+            try:
+                # Auto-optimization: Use optimized copy for files > 5MB
+                if await self.asize() > 5 * 1024 * 1024:
+                    return await self.acopy_to_optimized(dst, overwrite=overwrite, chunk_size=chunk_size, **kwargs)
+            except Exception:
+                pass
+
         if not overwrite and await dst.aexists():
             raise FileExistsError(f"Destination file {dst} exists and overwrite is False")
         async with dst.aopen('wb') as f:
@@ -724,10 +749,20 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             if offset: file.seek(offset)
             return file.read(size)
         
-    async def aread(self, mode: FileMode = 'rb', size: t.Optional[int] = -1, offset: t.Optional[int] = 0, **kwargs):
+    async def aread(self, mode: FileMode = 'rb', size: t.Optional[int] = -1, offset: t.Optional[int] = 0, optimized: t.Union[bool, str] = 'auto', **kwargs):
         """
         Read and return the file's contents.
         """
+        if optimized is True:
+            return await self.aread_optimized(mode=mode, **kwargs)
+        elif optimized == 'auto':
+            try:
+                # Auto-optimization: Use optimized read for files > 5MB
+                if await self.asize() > 5 * 1024 * 1024:
+                    return await self.aread_optimized(mode=mode, **kwargs)
+            except Exception:
+                pass
+
         async with self.aopen(mode=mode, **kwargs) as file:
             if offset: await file.seek(offset)
             return await file.read(size = size)
@@ -922,10 +957,17 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         with self.open(mode='wb') as f:
             return f.write(data)
 
-    async def awrite_bytes(self, data: bytes) -> int:
+    async def awrite_bytes(self, data: bytes, optimized: t.Union[bool, str] = 'auto') -> int:
         """
         Open the file in bytes mode, write to it, and close the file.
         """
+        if optimized is True:
+            return await self.awrite_optimized(data, mode='wb')
+        elif optimized == 'auto':
+            # Auto-optimization: Use optimized write for data > 5MB
+            if len(data) > 5 * 1024 * 1024:
+                return await self.awrite_optimized(data, mode='wb')
+
         # type-check for the buffer interface before truncating the file
         if self.fsconfig.write_chunking_enabled: 
             return await self.awrite_chunked_data(data)
@@ -966,13 +1008,21 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
             return f.write(data)
 
-    async def awrite_text(self, data: str, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE) -> int:
+    async def awrite_text(self, data: str, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, optimized: t.Union[bool, str] = 'auto') -> int:
         """
         Open the file in text mode, write to it, and close the file.
         """
+        if not isinstance(data, str): raise TypeError(f'data must be str, not {type(data).__name__}')
+        
+        if optimized is True:
+            return await self.awrite_optimized(data, mode='w', encoding=encoding, errors=errors, newline=newline)
+        elif optimized == 'auto':
+            # Auto-optimization: Use optimized write for data > 5MB
+            if len(data) > 5 * 1024 * 1024:
+                return await self.awrite_optimized(data, mode='w', encoding=encoding, errors=errors, newline=newline)
+
         if self.fsconfig.write_chunking_enabled: 
             return await self.awrite_chunked_data(data, encoding = encoding, errors = errors, newline = newline)
-        if not isinstance(data, str): raise TypeError(f'data must be str, not {type(data).__name__}')
         async with self.aopen(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
             return await f.write(data)
 
@@ -2015,6 +2065,85 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             return self._download_with_tmgr(dest, callbacks, **kwargs)
         return self.copy_file(dest, overwrite = overwrite, **kwargs)
     
+    async def _adownload_with_tmgr(
+        self, 
+        dest: 'FileLike',
+        callbacks: t.Optional[t.Dict[str, t.Callable]] = None,
+        **kwargs
+    ) -> 'FileLike':
+        """
+        Downloads the current file to the dest
+        """
+        future = self.fss3tm.download(
+            self.bucket_,
+            self.get_path_key(self.name),
+            dest.as_posix(),
+            subscribers = callbacks,
+            **kwargs,
+        )
+        await ThreadPool.run_async(future.result)
+        return dest
+
+    async def adownload(
+        self, 
+        dest: 'PathLike',
+        filename: t.Optional[str] = None,
+        overwrite: t.Optional[bool] = None,
+        callbacks: t.Optional[t.Dict[str, t.Callable]] = None,
+        **kwargs
+    ) -> 'FileLike':
+        """
+        Downloads the dest to the current path
+        """
+        dest = self.get_pathlike_(dest)
+        new = dest.joinpath(filename or self.name) if self.is_dir() else self
+        if await new.aexists() and not overwrite:
+            raise FileExistsError(f'File {new.path_} exists and overwrite is False')
+        if self._has_tmgr:
+            return await self._adownload_with_tmgr(dest, callbacks, **kwargs)
+        return await self.acopy_file(dest, overwrite = overwrite, **kwargs)
+
+    async def _aupload_with_tmgr(
+        self, 
+        src: 'FileLike',
+        callbacks: t.Optional[t.Dict[str, t.Callable]] = None,
+        **kwargs
+    ) -> 'FileLike':
+        """
+        Uploads the src to the current path
+        """
+        future = self.fss3tm.upload(
+            src.as_posix(),
+            self.bucket_,
+            self.get_path_key(self.name),
+            subscribers = callbacks,
+            **kwargs,
+        )
+        await ThreadPool.run_async(future.result)
+        await self.ainvalidate_cache()
+        return src
+
+    async def aupload(
+        self, 
+        src: 'PathLike',
+        filename: t.Optional[str] = None, 
+        overwrite: t.Optional[bool] = None,
+        callbacks: t.Optional[t.Dict[str, t.Callable]] = None,
+        **kwargs
+    ) -> 'FileLike':
+        """
+        Uploads the src to the current path
+        """
+        src = self.get_pathlike_(src)
+        new = self.joinpath(filename or src.name) if self.is_dir() else self
+        if await new.aexists() and not overwrite:
+            raise FileExistsError(f'File {new.path_} exists and overwrite is False')
+        if not await src.aexists():
+            raise FileNotFoundError(f'File {src.path_} does not exist')
+        if self._has_tmgr:
+            return await self._aupload_with_tmgr(src, callbacks, **kwargs)
+        return await self.acopy_file(src, overwrite = overwrite, **kwargs)
+
     def _upload_with_tmgr(
         self, 
         src: 'FileLike',

@@ -323,6 +323,80 @@ class EnhancedAsyncMixin:
         # Process all copy operations
         return await processor.process_items(file_pairs, copy_file)
 
+    async def batch_exists(
+        self: 'FilePath',
+        files: t.List['PathLike'],
+        max_concurrent: t.Optional[int] = None,
+    ) -> t.Dict['PathLike', bool]:
+        """Check existence of multiple files concurrently.
+        
+        Args:
+            files: List of file paths to check.
+            max_concurrent: Maximum concurrent checks.
+        
+        Returns:
+            Dictionary mapping paths to existence status (bool).
+        """
+        from ..utils.registry import fileio_settings
+        from ..utils.async_helpers import AsyncBatchProcessor
+        
+        if max_concurrent is None:
+            max_concurrent = fileio_settings.performance.max_concurrent_transfers
+        
+        processor = AsyncBatchProcessor(
+            batch_size=20,
+            max_concurrent_batches=max_concurrent,
+        )
+        
+        async def check_file(path: 'PathLike') -> t.Tuple['PathLike', bool]:
+            p = self.get_pathlike_(path)
+            return (path, await p.aexists())
+        
+        results = await processor.process_items(files, check_file)
+        return dict(results)
+
+    async def batch_delete(
+        self: 'FilePath',
+        files: t.List['PathLike'],
+        max_concurrent: t.Optional[int] = None,
+        missing_ok: bool = True,
+    ) -> None:
+        """Delete multiple files concurrently.
+        
+        Args:
+            files: List of file paths to delete.
+            max_concurrent: Maximum concurrent delete operations.
+            missing_ok: If True, ignore missing files.
+        """
+        from ..utils.registry import fileio_settings
+        from ..utils.async_helpers import AsyncBatchProcessor
+        
+        if max_concurrent is None:
+            max_concurrent = fileio_settings.performance.max_concurrent_transfers
+        
+        processor = AsyncBatchProcessor(
+            batch_size=20,
+            max_concurrent_batches=max_concurrent,
+        )
+        
+        async def delete_file(path: 'PathLike') -> None:
+            p = self.get_pathlike_(path)
+            try:
+                # Try arm_file first, fallback to arm/aunlink
+                if hasattr(p, 'arm_file'):
+                    await p.arm_file(missing_ok=missing_ok)
+                elif hasattr(p, 'aunlink'):
+                    await p.aunlink(missing_ok=missing_ok)
+                else:
+                    # Fallback to standard delete
+                    await p.arm() if await p.ais_dir() else await p.aunlink()
+            except Exception:
+                if not missing_ok:
+                    raise
+        
+        await processor.process_items(files, delete_file)
+
+
 
 # Helper function to add enhanced methods to FilePath instances
 def enhance_filepath_instance(instance: 'FilePath') -> 'FilePath':

@@ -38,6 +38,7 @@ from ..path.flavours import (
 )
 from .misc import ObjectSize
 from .errors import *
+from .enhanced import EnhancedAsyncMixin
 from .utils import (
     scandir_sync,
     close,
@@ -217,7 +218,7 @@ class PureFileWindowsPath(FilePurePath):
 
 _FilePathT = t.TypeVar('_FilePathT', bound = 'FilePath')
 
-class FilePath(Path, FilePurePath):
+class FilePath(Path, FilePurePath, EnhancedAsyncMixin):
     """
     Our customized class that incorporates both sync and async methods
     
@@ -516,11 +517,26 @@ class FilePath(Path, FilePurePath):
         yield from decoder.flush()
 
 
-    async def aiter_raw(self, chunk_size: t.Optional[int] = None) -> t.AsyncIterator[bytes]:
+    async def aiter_raw(self, chunk_size: t.Optional[int] = None, optimized: t.Union[bool, str] = 'auto') -> t.AsyncIterator[bytes]:
         """
         Iterates over the bytes of a file
         """
         if self._closed: self._raise_closed()
+        
+        if optimized is True:
+            async for chunk in self.aiter_raw_optimized(chunk_size=chunk_size):
+                yield chunk
+            return
+        elif optimized == 'auto':
+            try:
+                # Auto-optimization: Use optimized iter for files > 5MB
+                if await self.asize() > 5 * 1024 * 1024:
+                    async for chunk in self.aiter_raw_optimized(chunk_size=chunk_size):
+                        yield chunk
+                    return
+            except Exception:
+                pass
+
         from lzl.io.file.utils.decoders import ByteChunker
         chunker = ByteChunker(chunk_size = chunk_size)
         chunk_size = chunk_size if chunk_size is not None else -1
@@ -573,11 +589,22 @@ class FilePath(Path, FilePurePath):
                 f.write(chunk)
         return dst
     
-    async def acopy_to(self, dest: 'PathLike', overwrite: bool = False, chunk_size: t.Optional[int] = None, **kwargs) -> 'FilePath':
+    async def acopy_to(self, dest: 'PathLike', overwrite: bool = False, chunk_size: t.Optional[int] = None, optimized: t.Union[bool, str] = 'auto', **kwargs) -> 'FilePath':
         """
         Copies this file to the destination path.
         """
         dst = self.get_pathlike_(dest)
+        
+        if optimized is True:
+            return await self.acopy_to_optimized(dst, overwrite=overwrite, chunk_size=chunk_size, **kwargs)
+        elif optimized == 'auto':
+            try:
+                # Auto-optimization: Use optimized copy for files > 5MB
+                if await self.asize() > 5 * 1024 * 1024:
+                    return await self.acopy_to_optimized(dst, overwrite=overwrite, chunk_size=chunk_size, **kwargs)
+            except Exception:
+                pass
+
         if not overwrite and await dst.aexists():
             raise FileExistsError(f"Destination file {dst} exists and overwrite is False")
         async with dst.aopen('wb') as f:
@@ -636,10 +663,20 @@ class FilePath(Path, FilePurePath):
             return file.read(size)
             # return file.read(size, offset)
 
-    async def aread(self, mode: FileMode = 'rb', size: t.Optional[int] = -1, offset: t.Optional[int] = 0, **kwargs):
+    async def aread(self, mode: FileMode = 'rb', size: t.Optional[int] = -1, offset: t.Optional[int] = 0, optimized: t.Union[bool, str] = 'auto', **kwargs):
         """
         Read and return the file's contents.
         """
+        if optimized is True:
+            return await self.aread_optimized(mode=mode, **kwargs)
+        elif optimized == 'auto':
+            try:
+                # Auto-optimization: Use optimized read for files > 5MB
+                if await self.asize() > 5 * 1024 * 1024:
+                    return await self.aread_optimized(mode=mode, **kwargs)
+            except Exception:
+                pass
+
         async with self.aopen(mode=mode, **kwargs) as file:
             if offset: await file.seek(offset)
             return await file.read(size)
@@ -687,11 +724,20 @@ class FilePath(Path, FilePurePath):
         with self.open(mode='wb') as f:
             return f.write(data)
 
-    async def awrite_bytes(self, data: bytes) -> int:
+    async def awrite_bytes(self, data: bytes, optimized: t.Union[bool, str] = 'auto', **kwargs) -> int:
         """
         Open the file in bytes mode, write to it, and close the file.
         """
+        if optimized is True:
+            return await self.awrite_optimized(data, mode='wb', **kwargs)
+        elif optimized == 'auto':
+            # Auto-optimization: Use optimized write for data > 5MB
+            if len(data) > 5 * 1024 * 1024:
+                return await self.awrite_optimized(data, mode='wb', **kwargs)
+
         # type-check for the buffer interface before truncating the file
+        if getattr(self, 'fsconfig', None) and self.fsconfig.write_chunking_enabled: 
+            return await self.awrite_chunked_data(data)
         view = memoryview(data)
         async with self.aopen(mode='wb') as f:
             return await f.write(data)
@@ -724,11 +770,22 @@ class FilePath(Path, FilePurePath):
         with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
             return f.write(data)
 
-    async def awrite_text(self, data: str, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE) -> int:
+    async def awrite_text(self, data: str, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, optimized: t.Union[bool, str] = 'auto', **kwargs) -> int:
         """
         Open the file in text mode, write to it, and close the file.
         """
         if not isinstance(data, str): raise TypeError(f'data must be str, not {type(data).__name__}')
+        
+        if optimized is True:
+            return await self.awrite_optimized(data, mode='w', encoding=encoding, errors=errors, newline=newline, **kwargs)
+        elif optimized == 'auto':
+            # Auto-optimization: Use optimized write for data > 5MB
+            # Approximation: len(data) chars * 1 byte (min)
+            if len(data) > 5 * 1024 * 1024:
+                return await self.awrite_optimized(data, mode='w', encoding=encoding, errors=errors, newline=newline, **kwargs)
+
+        if getattr(self, 'fsconfig', None) and self.fsconfig.write_chunking_enabled: 
+            return await self.awrite_chunked_data(data, encoding = encoding, errors = errors, newline = newline)
         async with self.aopen(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
             return await f.write(data)
 
@@ -1116,6 +1173,46 @@ class FilePath(Path, FilePurePath):
             raise NotImplementedError('Only fsspec is supported for now')
         return src.upload(self, filename = filename, overwrite = overwrite, callbacks = callbacks, **kwargs)
 
+
+    async def adownload(
+        self, 
+        dest: 'PathLike',
+        filename: t.Optional[str] = None,
+        overwrite: t.Optional[bool] = None,
+        callbacks: t.Optional[t.Dict[str, t.Callable]] = None,
+        **kwargs
+    ) -> 'FileLike':
+        """
+        Downloads the dest to the current path
+        """
+        dest = self.get_pathlike_(dest)
+        new = dest.joinpath(filename or self.name) if self.is_dir() else self
+        if await new.aexists() and not overwrite:
+            raise FileExistsError(f'File {new.path_} exists and overwrite is False')
+        if not dest.is_fsspec:
+            raise NotImplementedError('Only fsspec is supported for now')
+        return await dest.adownload(self, filename = filename, overwrite = overwrite, callbacks = callbacks, **kwargs)
+    
+    async def aupload(
+        self, 
+        dest: 'PathLike',
+        filename: t.Optional[str] = None,
+        overwrite: t.Optional[bool] = None,
+        callbacks: t.Optional[t.Dict[str, t.Callable]] = None,
+        **kwargs
+    ) -> 'FileLike':
+        """
+        Uploads the current file to the dest
+        """
+        dest = self.get_pathlike_(dest)
+        new = self.joinpath(filename or dest.name) if self.is_dir() else self
+        if await new.aexists() and not overwrite:
+            raise FileExistsError(f'File {new.path_} exists and overwrite is False')
+        if not await self.aexists():
+            raise FileNotFoundError(f'File {self.path_} does not exist')
+        if not dest.is_fsspec:
+            raise NotImplementedError('Only fsspec is supported for now')
+        return await dest.aupload(self, filename = filename, overwrite = overwrite, callbacks = callbacks, **kwargs)
 
     def rm(self, **kwargs):
         """

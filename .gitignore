@@ -68,3 +68,4 @@ tests/lzl/file_08262025.py
 # MkDocs build artifacts
 site/
 .cache/
+examples/file_performance_benchmark.py
