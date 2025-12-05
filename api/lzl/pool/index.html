@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#lzlpool-thread-pool-utilities" class="md-skip">
+        <a href="#lzlpool-thread-async-utilities" class="md-skip">
           Skip to content
         </a>
       
@@ -938,9 +938,27 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../io/" class="md-nav__link">
+    
+    
+    
+    
+      
+      
         
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4_1_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_1_6" id="__nav_4_1_6_label" tabindex="0">
+            
   
   
   <span class="md-ellipsis">
@@ -954,7 +972,135 @@
   
   
 
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_4_1_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_1_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    IO
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../io/file/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    File
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../io/persistence/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Persistence
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../io/ser/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Serialization
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1111,10 +1257,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#module-reference" class="md-nav__link">
+  <a href="#threadpool" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Module Reference
+        ThreadPool
       
     </span>
   </a>
@@ -1122,19 +1268,19 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#lzl.pool" class="md-nav__link">
+  <a href="#lzl.pool.base" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;pool
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;base
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label=" pool">
+    <nav class="md-nav" aria-label=" base">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ThreadPool
@@ -1146,7 +1292,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.pool" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.pool" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;pool
@@ -1157,7 +1303,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.ppool" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.ppool" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ppool
@@ -1168,7 +1314,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.in_async_loop" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.in_async_loop" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;in_async_loop
@@ -1179,7 +1325,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.run_sync" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.run_sync" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;run_sync
@@ -1190,7 +1336,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.create_background" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.create_background" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;create_background
@@ -1201,7 +1347,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.async_iterate" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.async_iterate" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;async_iterate
@@ -1212,7 +1358,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.is_coro" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.is_coro" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;is_coro
@@ -1223,7 +1369,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.ensure_coro" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.ensure_coro" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;ensure_coro
@@ -1234,7 +1380,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.ensure_coro_function" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.ensure_coro_function" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;ensure_coro_function
@@ -1245,7 +1391,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.get_pool" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.get_pool" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;get_pool
@@ -1256,7 +1402,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.add_task" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.add_task" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;add_task
@@ -1267,7 +1413,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.on_exit" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.on_exit" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;on_exit
@@ -1278,7 +1424,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.run" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.run" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;run
@@ -1289,7 +1435,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.arun" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.arun" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;arun
@@ -1300,7 +1446,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.asyncish" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.asyncish" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;asyncish
@@ -1311,7 +1457,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.threadpool_task" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.threadpool_task" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;threadpool_task
@@ -1322,7 +1468,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.background_task" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.background_task" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;background_task
@@ -1333,7 +1479,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.background" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.background" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;background
@@ -1344,7 +1490,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.map" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.map" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;map
@@ -1355,7 +1501,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.iterate" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.iterate" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;iterate
@@ -1366,7 +1512,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.amap" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.amap" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;amap
@@ -1377,7 +1523,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.aiterate" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.aiterate" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;aiterate
@@ -1388,7 +1534,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.acmd" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.acmd" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;acmd
@@ -1399,7 +1545,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.acmd_exec" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.acmd_exec" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;acmd_exec
@@ -1410,7 +1556,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.acmd_stream" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.acmd_stream" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;acmd_stream
@@ -1425,8 +1571,36 @@
   
 </li>
         
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concurrency-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concurrency Helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lzl.pool.base" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;base
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" base">
+      <ul class="md-nav__list">
+        
           <li class="md-nav__item">
-  <a href="#lzl.pool.amap_iterable" class="md-nav__link">
+  <a href="#lzl.pool.base.amap_iterable" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;amap_iterable
@@ -1437,7 +1611,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ensure_coro" class="md-nav__link">
+  <a href="#lzl.pool.base.async_map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;async_map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lzl.pool.base.ensure_coro" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;ensure_coro
@@ -1448,18 +1633,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.get_concurrency_limit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;get_concurrency_limit
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#lzl.pool.is_coro_func" class="md-nav__link">
+  <a href="#lzl.pool.base.is_coro_func" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;is_coro_func
@@ -1469,61 +1643,28 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#lzl.pool.set_concurrency_limit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;set_concurrency_limit
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#lzl.pool.is_in_async_loop" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;is_in_async_loop
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#usage-guide" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Usage Guide
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#usage-examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Usage Examples
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Usage Examples">
+    <nav class="md-nav" aria-label="Usage Guide">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#basic-thread-pool" class="md-nav__link">
+  <a href="#running-sync-code-asynchronously" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Basic Thread Pool
+        Running Sync Code Asynchronously
       
     </span>
   </a>
@@ -1531,10 +1672,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#async-context-manager" class="md-nav__link">
+  <a href="#background-tasks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Async Context Manager
+        Background Tasks
       
     </span>
   </a>
@@ -1542,21 +1683,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#batch-processing" class="md-nav__link">
+  <a href="#parallel-execution" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Batch Processing
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#resource-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Resource Management
+        Parallel Execution
       
     </span>
   </a>
@@ -1565,28 +1695,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Features
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration
-      
-    </span>
-  </a>
   
 </li>
       
@@ -2014,10 +2122,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#module-reference" class="md-nav__link">
+  <a href="#threadpool" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Module Reference
+        ThreadPool
       
     </span>
   </a>
@@ -2025,19 +2133,19 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#lzl.pool" class="md-nav__link">
+  <a href="#lzl.pool.base" class="md-nav__link">
     <span class="md-ellipsis">
       
-        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;pool
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;base
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label=" pool">
+    <nav class="md-nav" aria-label=" base">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-class"></code>&nbsp;ThreadPool
@@ -2049,7 +2157,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.pool" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.pool" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;pool
@@ -2060,7 +2168,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.ppool" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.ppool" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;ppool
@@ -2071,7 +2179,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.in_async_loop" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.in_async_loop" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;in_async_loop
@@ -2082,7 +2190,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.run_sync" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.run_sync" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;run_sync
@@ -2093,7 +2201,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.create_background" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.create_background" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;create_background
@@ -2104,7 +2212,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.async_iterate" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.async_iterate" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-attribute"></code>&nbsp;async_iterate
@@ -2115,7 +2223,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.is_coro" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.is_coro" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;is_coro
@@ -2126,7 +2234,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.ensure_coro" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.ensure_coro" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;ensure_coro
@@ -2137,7 +2245,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.ensure_coro_function" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.ensure_coro_function" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;ensure_coro_function
@@ -2148,7 +2256,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.get_pool" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.get_pool" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;get_pool
@@ -2159,7 +2267,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.add_task" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.add_task" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;add_task
@@ -2170,7 +2278,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.on_exit" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.on_exit" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;on_exit
@@ -2181,7 +2289,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.run" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.run" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;run
@@ -2192,7 +2300,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.arun" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.arun" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;arun
@@ -2203,7 +2311,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.asyncish" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.asyncish" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;asyncish
@@ -2214,7 +2322,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.threadpool_task" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.threadpool_task" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;threadpool_task
@@ -2225,7 +2333,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.background_task" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.background_task" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;background_task
@@ -2236,7 +2344,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.background" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.background" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;background
@@ -2247,7 +2355,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.map" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.map" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;map
@@ -2258,7 +2366,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.iterate" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.iterate" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;iterate
@@ -2269,7 +2377,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.amap" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.amap" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;amap
@@ -2280,7 +2388,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.aiterate" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.aiterate" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;aiterate
@@ -2291,7 +2399,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.acmd" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.acmd" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;acmd
@@ -2302,7 +2410,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.acmd_exec" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.acmd_exec" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;acmd_exec
@@ -2313,7 +2421,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ThreadPool.acmd_stream" class="md-nav__link">
+  <a href="#lzl.pool.base.ThreadPool.acmd_stream" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-method"></code>&nbsp;acmd_stream
@@ -2328,8 +2436,36 @@
   
 </li>
         
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#concurrency-helpers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Concurrency Helpers
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#lzl.pool.base" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-module"></code>&nbsp;base
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label=" base">
+      <ul class="md-nav__list">
+        
           <li class="md-nav__item">
-  <a href="#lzl.pool.amap_iterable" class="md-nav__link">
+  <a href="#lzl.pool.base.amap_iterable" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;amap_iterable
@@ -2340,7 +2476,18 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.ensure_coro" class="md-nav__link">
+  <a href="#lzl.pool.base.async_map" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;async_map
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#lzl.pool.base.ensure_coro" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;ensure_coro
@@ -2351,18 +2498,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#lzl.pool.get_concurrency_limit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;get_concurrency_limit
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#lzl.pool.is_coro_func" class="md-nav__link">
+  <a href="#lzl.pool.base.is_coro_func" class="md-nav__link">
     <span class="md-ellipsis">
       
         <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;is_coro_func
@@ -2372,61 +2508,28 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#lzl.pool.set_concurrency_limit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;set_concurrency_limit
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#lzl.pool.is_in_async_loop" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        <code class="doc-symbol doc-symbol-toc doc-symbol-function"></code>&nbsp;is_in_async_loop
-      
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#overview" class="md-nav__link">
+  <a href="#usage-guide" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Overview
+        Usage Guide
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#usage-examples" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Usage Examples
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Usage Examples">
+    <nav class="md-nav" aria-label="Usage Guide">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#basic-thread-pool" class="md-nav__link">
+  <a href="#running-sync-code-asynchronously" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Basic Thread Pool
+        Running Sync Code Asynchronously
       
     </span>
   </a>
@@ -2434,10 +2537,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#async-context-manager" class="md-nav__link">
+  <a href="#background-tasks" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Async Context Manager
+        Background Tasks
       
     </span>
   </a>
@@ -2445,21 +2548,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#batch-processing" class="md-nav__link">
+  <a href="#parallel-execution" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Batch Processing
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#resource-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Resource Management
+        Parallel Execution
       
     </span>
   </a>
@@ -2468,28 +2560,6 @@
         
       </ul>
     </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Features
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#configuration" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configuration
-      
-    </span>
-  </a>
   
 </li>
       
@@ -2513,20 +2583,21 @@
   
 
 
-<h1 id="lzlpool-thread-pool-utilities">lzl.pool - Thread Pool Utilities<a class="headerlink" href="#lzlpool-thread-pool-utilities" title="Permanent link">&para;</a></h1>
-<p>The <code>lzl.pool</code> module provides thread pool management and execution utilities for concurrent operations.</p>
-<h2 id="module-reference">Module Reference<a class="headerlink" href="#module-reference" title="Permanent link">&para;</a></h2>
+<h1 id="lzlpool-thread-async-utilities">lzl.pool - Thread &amp; Async Utilities<a class="headerlink" href="#lzlpool-thread-async-utilities" title="Permanent link">&para;</a></h1>
+<p>The <code>lzl.pool</code> module provides a unified interface for concurrency, bridging the gap between synchronous threading and <code>asyncio</code> event loops.</p>
+<h2 id="threadpool">ThreadPool<a class="headerlink" href="#threadpool" title="Permanent link">&para;</a></h2>
+<p>A singleton-style proxy that manages a global <code>ThreadPoolExecutor</code> and <code>ProcessPoolExecutor</code>.</p>
 
 
 <div class="doc doc-object doc-module">
 
 
 
-<h2 id="lzl.pool" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-module"></code>            <code>lzl.pool</code>
+<h2 id="lzl.pool.base" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-module"></code>            <code>lzl.pool.base</code>
 
 
-<a href="#lzl.pool" class="headerlink" title="Permanent link">&para;</a></h2>
+<a href="#lzl.pool.base" class="headerlink" title="Permanent link">&para;</a></h2>
 
     <div class="doc doc-contents first">
 
@@ -2553,11 +2624,11 @@
 
 
 
-<h3 id="lzl.pool.ThreadPool" class="doc doc-heading">
+<h3 id="lzl.pool.base.ThreadPool" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <code>ThreadPool</code>
 
 
-<a href="#lzl.pool.ThreadPool" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#lzl.pool.base.ThreadPool" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -3333,14 +3404,14 @@
 
 
 
-<h4 id="lzl.pool.ThreadPool.pool" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.pool" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">pool</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.pool" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.pool" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3355,14 +3426,14 @@
 
 
 
-<h4 id="lzl.pool.ThreadPool.ppool" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.ppool" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">ppool</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.ppool" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.ppool" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3377,14 +3448,14 @@
 
 
 
-<h4 id="lzl.pool.ThreadPool.in_async_loop" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.in_async_loop" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">in_async_loop</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.in_async_loop" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.in_async_loop" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3399,7 +3470,7 @@
 
 
 
-<h4 id="lzl.pool.ThreadPool.run_sync" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.run_sync" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">run_sync</span> <span class="o">=</span> <span class="n">run</span></code>
 
   <span class="doc doc-labels">
@@ -3407,7 +3478,7 @@
       <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.run_sync" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.run_sync" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3422,7 +3493,7 @@
 
 
 
-<h4 id="lzl.pool.ThreadPool.create_background" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.create_background" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">create_background</span> <span class="o">=</span> <span class="n">background</span></code>
 
   <span class="doc doc-labels">
@@ -3430,7 +3501,7 @@
       <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.create_background" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.create_background" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3445,7 +3516,7 @@
 
 
 
-<h4 id="lzl.pool.ThreadPool.async_iterate" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.async_iterate" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <code class="highlight language-python"><span class="n">async_iterate</span> <span class="o">=</span> <span class="n">aiterate</span></code>
 
   <span class="doc doc-labels">
@@ -3453,7 +3524,7 @@
       <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.async_iterate" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.async_iterate" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3470,14 +3541,14 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.is_coro" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.is_coro" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">is_coro</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.is_coro" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.is_coro" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3503,10 +3574,10 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.ensure_coro" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.ensure_coro" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">ensure_coro</span><span class="p">(</span><span class="n">func</span><span class="p">)</span></code>
 
-<a href="#lzl.pool.ThreadPool.ensure_coro" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.ensure_coro" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3538,10 +3609,10 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.ensure_coro_function" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.ensure_coro_function" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">ensure_coro_function</span><span class="p">(</span><span class="n">func</span><span class="p">)</span></code>
 
-<a href="#lzl.pool.ThreadPool.ensure_coro_function" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.ensure_coro_function" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3583,10 +3654,10 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.get_pool" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.get_pool" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">get_pool</span><span class="p">(</span><span class="n">num_workers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">process_pool</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
 
-<a href="#lzl.pool.ThreadPool.get_pool" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.get_pool" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3622,10 +3693,10 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.add_task" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.add_task" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">add_task</span><span class="p">(</span><span class="n">task</span><span class="p">,</span> <span class="n">callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">callback_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">callback_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
-<a href="#lzl.pool.ThreadPool.add_task" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.add_task" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3675,10 +3746,10 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.on_exit" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.on_exit" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">on_exit</span><span class="p">()</span></code>
 
-<a href="#lzl.pool.ThreadPool.on_exit" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.on_exit" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3714,10 +3785,10 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.run" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.run" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">run</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
-<a href="#lzl.pool.ThreadPool.run" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.run" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3749,14 +3820,14 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.arun" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.arun" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">arun</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-async"><code>async</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.arun" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.arun" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3784,14 +3855,14 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.asyncish" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.asyncish" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">asyncish</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-async"><code>async</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.asyncish" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.asyncish" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3817,10 +3888,10 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.threadpool_task" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.threadpool_task" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">threadpool_task</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">task_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">task_callback_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">task_callback_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
-<a href="#lzl.pool.ThreadPool.threadpool_task" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.threadpool_task" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3864,10 +3935,10 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.background_task" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.background_task" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">background_task</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">task_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">task_callback_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">task_callback_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
-<a href="#lzl.pool.ThreadPool.background_task" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.background_task" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3913,10 +3984,10 @@
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.background" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.background" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">background</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">task_callback</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">task_callback_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">task_callback_kwargs</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
-<a href="#lzl.pool.ThreadPool.background" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.background" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -3976,10 +4047,10 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.map" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.map" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="nb">map</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">iterable</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">return_ordered</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">use_process_pool</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
-<a href="#lzl.pool.ThreadPool.map" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.map" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -4035,10 +4106,10 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.iterate" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.iterate" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">iterate</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">iterable</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">use_process_pool</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">return_ordered</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
-<a href="#lzl.pool.ThreadPool.iterate" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.iterate" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -4102,14 +4173,14 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.amap" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.amap" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">amap</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">iterable</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">return_ordered</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">concurrency_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-async"><code>async</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.amap" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.amap" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -4175,14 +4246,14 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.aiterate" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.aiterate" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">aiterate</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">iterable</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">return_ordered</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">concurrency_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-async"><code>async</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.aiterate" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.aiterate" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -4244,7 +4315,7 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.acmd" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.acmd" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">acmd</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">output_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">output_encoding</span><span class="o">=</span><span class="s1">&#39;UTF-8&#39;</span><span class="p">,</span> <span class="n">output_errors</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
@@ -4252,7 +4323,7 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
       <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.acmd" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.acmd" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -4304,7 +4375,7 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.acmd_exec" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.acmd_exec" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">acmd_exec</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">output_only</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">stdout</span><span class="o">=</span><span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">stderr</span><span class="o">=</span><span class="n">asyncio</span><span class="o">.</span><span class="n">subprocess</span><span class="o">.</span><span class="n">PIPE</span><span class="p">,</span> <span class="n">output_encoding</span><span class="o">=</span><span class="s1">&#39;UTF-8&#39;</span><span class="p">,</span> <span class="n">output_errors</span><span class="o">=</span><span class="s1">&#39;ignore&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
@@ -4312,7 +4383,7 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
       <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.acmd_exec" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.acmd_exec" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -4362,7 +4433,7 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h4 id="lzl.pool.ThreadPool.acmd_stream" class="doc doc-heading">
+<h4 id="lzl.pool.base.ThreadPool.acmd_stream" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <code class="highlight language-python"><span class="n">acmd_stream</span><span class="p">(</span><span class="n">command</span><span class="p">,</span> <span class="n">stdout_cb</span><span class="p">,</span> <span class="n">stderr_cb</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
@@ -4370,7 +4441,7 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
       <small class="doc doc-label doc-label-staticmethod"><code>staticmethod</code></small>
   </span>
 
-<a href="#lzl.pool.ThreadPool.acmd_stream" class="headerlink" title="Permanent link">&para;</a></h4>
+<a href="#lzl.pool.base.ThreadPool.acmd_stream" class="headerlink" title="Permanent link">&para;</a></h4>
 
 
     <div class="doc doc-contents ">
@@ -4412,17 +4483,59 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
 </div>
 
 
+
+
+  </div>
+
+    </div>
+
+</div><h2 id="concurrency-helpers">Concurrency Helpers<a class="headerlink" href="#concurrency-helpers" title="Permanent link">&para;</a></h2>
+<p>Utilities for running functions in the background, mapping iterables concurrently, and more.</p>
+
+
+<div class="doc doc-object doc-module">
+
+
+
+<h2 id="lzl.pool.base" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-module"></code>            <code>lzl.pool.base</code>
+
+
+<a href="#lzl.pool.base" class="headerlink" title="Permanent link">&para;</a></h2>
+
+    <div class="doc doc-contents first">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
 <div class="doc doc-object doc-function">
 
 
-<h3 id="lzl.pool.amap_iterable" class="doc doc-heading">
+<h3 id="lzl.pool.base.amap_iterable" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">amap_iterable</span><span class="p">(</span><span class="n">mapped_iterable</span><span class="p">,</span> <span class="n">concurrency_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">return_when</span><span class="o">=</span><span class="s1">&#39;FIRST_COMPLETED&#39;</span><span class="p">)</span></code>
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-async"><code>async</code></small>
   </span>
 
-<a href="#lzl.pool.amap_iterable" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#lzl.pool.base.amap_iterable" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -4496,10 +4609,69 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="lzl.pool.ensure_coro" class="doc doc-heading">
+<h3 id="lzl.pool.base.async_map" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">async_map</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">iterable</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="n">limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">return_when</span><span class="o">=</span><span class="s1">&#39;FIRST_COMPLETED&#39;</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span></code>
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-async"><code>async</code></small>
+  </span>
+
+<a href="#lzl.pool.base.async_map" class="headerlink" title="Permanent link">&para;</a></h3>
+
+
+    <div class="doc doc-contents ">
+
+        <p>Yield results from applying <code>func</code> to <code>iterable</code> as tasks complete.</p>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>src/lzl/pool/base.py</code></summary>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-109">109</a></span>
+<span class="normal"><a href="#__codelineno-0-110">110</a></span>
+<span class="normal"><a href="#__codelineno-0-111">111</a></span>
+<span class="normal"><a href="#__codelineno-0-112">112</a></span>
+<span class="normal"><a href="#__codelineno-0-113">113</a></span>
+<span class="normal"><a href="#__codelineno-0-114">114</a></span>
+<span class="normal"><a href="#__codelineno-0-115">115</a></span>
+<span class="normal"><a href="#__codelineno-0-116">116</a></span>
+<span class="normal"><a href="#__codelineno-0-117">117</a></span>
+<span class="normal"><a href="#__codelineno-0-118">118</a></span>
+<span class="normal"><a href="#__codelineno-0-119">119</a></span>
+<span class="normal"><a href="#__codelineno-0-120">120</a></span>
+<span class="normal"><a href="#__codelineno-0-121">121</a></span>
+<span class="normal"><a href="#__codelineno-0-122">122</a></span>
+<span class="normal"><a href="#__codelineno-0-123">123</a></span>
+<span class="normal"><a href="#__codelineno-0-124">124</a></span>
+<span class="normal"><a href="#__codelineno-0-125">125</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-109"><a id="__codelineno-0-109" name="__codelineno-0-109"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">async_map</span><span class="p">(</span>
+</span><span id="__span-0-110"><a id="__codelineno-0-110" name="__codelineno-0-110"></a>    <span class="n">func</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="n">Awaitable</span><span class="p">[</span><span class="n">Any</span><span class="p">]],</span>
+</span><span id="__span-0-111"><a id="__codelineno-0-111" name="__codelineno-0-111"></a>    <span class="n">iterable</span><span class="p">:</span> <span class="n">Iterable</span><span class="p">[</span><span class="n">Any</span><span class="p">],</span> 
+</span><span id="__span-0-112"><a id="__codelineno-0-112" name="__codelineno-0-112"></a>    <span class="o">*</span><span class="n">args</span><span class="p">,</span>
+</span><span id="__span-0-113"><a id="__codelineno-0-113" name="__codelineno-0-113"></a>    <span class="n">limit</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-114"><a id="__codelineno-0-114" name="__codelineno-0-114"></a>    <span class="n">return_when</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;FIRST_COMPLETED&#39;</span><span class="p">,</span>
+</span><span id="__span-0-115"><a id="__codelineno-0-115" name="__codelineno-0-115"></a>    <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
+</span><span id="__span-0-116"><a id="__codelineno-0-116" name="__codelineno-0-116"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">AsyncGenerator</span><span class="p">[</span><span class="n">RT</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+</span><span id="__span-0-117"><a id="__codelineno-0-117" name="__codelineno-0-117"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Yield results from applying ``func`` to ``iterable`` as tasks complete.&quot;&quot;&quot;</span>
+</span><span id="__span-0-118"><a id="__codelineno-0-118" name="__codelineno-0-118"></a>    <span class="n">func</span> <span class="o">=</span> <span class="n">ensure_coro</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+</span><span id="__span-0-119"><a id="__codelineno-0-119" name="__codelineno-0-119"></a>    <span class="n">partial</span> <span class="o">=</span> <span class="n">functools</span><span class="o">.</span><span class="n">partial</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+</span><span id="__span-0-120"><a id="__codelineno-0-120" name="__codelineno-0-120"></a>    <span class="k">try</span><span class="p">:</span>
+</span><span id="__span-0-121"><a id="__codelineno-0-121" name="__codelineno-0-121"></a>        <span class="n">mapped_iterable</span> <span class="o">=</span> <span class="nb">map</span><span class="p">(</span><span class="n">partial</span><span class="p">,</span> <span class="n">iterable</span><span class="p">)</span>
+</span><span id="__span-0-122"><a id="__codelineno-0-122" name="__codelineno-0-122"></a>    <span class="k">except</span> <span class="ne">TypeError</span><span class="p">:</span>
+</span><span id="__span-0-123"><a id="__codelineno-0-123" name="__codelineno-0-123"></a>        <span class="n">mapped_iterable</span> <span class="o">=</span> <span class="p">(</span><span class="n">partial</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">async</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">iterable</span><span class="p">)</span>
+</span><span id="__span-0-124"><a id="__codelineno-0-124" name="__codelineno-0-124"></a>    <span class="k">async</span> <span class="k">for</span> <span class="n">task</span> <span class="ow">in</span> <span class="n">amap_iterable</span><span class="p">(</span><span class="n">mapped_iterable</span><span class="p">,</span> <span class="n">limit</span> <span class="o">=</span> <span class="n">limit</span><span class="p">,</span> <span class="n">return_when</span> <span class="o">=</span> <span class="n">return_when</span><span class="p">):</span>
+</span><span id="__span-0-125"><a id="__codelineno-0-125" name="__codelineno-0-125"></a>        <span class="k">yield</span> <span class="k">await</span> <span class="n">task</span>
+</span></code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h3 id="lzl.pool.base.ensure_coro" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">ensure_coro</span><span class="p">(</span><span class="n">func</span><span class="p">)</span></code>
 
-<a href="#lzl.pool.ensure_coro" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#lzl.pool.base.ensure_coro" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -4535,41 +4707,10 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
 <div class="doc doc-object doc-function">
 
 
-<h3 id="lzl.pool.get_concurrency_limit" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">get_concurrency_limit</span><span class="p">()</span></code>
-
-<a href="#lzl.pool.get_concurrency_limit" class="headerlink" title="Permanent link">&para;</a></h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Return the currently configured concurrency limit.</p>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>src/lzl/pool/base.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-58">58</a></span>
-<span class="normal"><a href="#__codelineno-0-59">59</a></span>
-<span class="normal"><a href="#__codelineno-0-60">60</a></span>
-<span class="normal"><a href="#__codelineno-0-61">61</a></span>
-<span class="normal"><a href="#__codelineno-0-62">62</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-58"><a id="__codelineno-0-58" name="__codelineno-0-58"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_concurrency_limit</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
-</span><span id="__span-0-59"><a id="__codelineno-0-59" name="__codelineno-0-59"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the currently configured concurrency limit.&quot;&quot;&quot;</span>
-</span><span id="__span-0-60"><a id="__codelineno-0-60" name="__codelineno-0-60"></a>    <span class="k">global</span> <span class="n">_concurrency_limit</span>
-</span><span id="__span-0-61"><a id="__codelineno-0-61" name="__codelineno-0-61"></a>    <span class="k">if</span> <span class="n">_concurrency_limit</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> <span class="n">set_concurrency_limit</span><span class="p">()</span>
-</span><span id="__span-0-62"><a id="__codelineno-0-62" name="__codelineno-0-62"></a>    <span class="k">return</span> <span class="n">_concurrency_limit</span>
-</span></code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="lzl.pool.is_coro_func" class="doc doc-heading">
+<h3 id="lzl.pool.base.is_coro_func" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">is_coro_func</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">func_name</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
-<a href="#lzl.pool.is_coro_func" class="headerlink" title="Permanent link">&para;</a></h3>
+<a href="#lzl.pool.base.is_coro_func" class="headerlink" title="Permanent link">&para;</a></h3>
 
 
     <div class="doc doc-contents ">
@@ -4606,150 +4747,53 @@ Otherwise, it returns a <code>futures.Future</code>.</p>
 
 </div>
 
-<div class="doc doc-object doc-function">
-
-
-<h3 id="lzl.pool.set_concurrency_limit" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">set_concurrency_limit</span><span class="p">(</span><span class="n">limit</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
-
-<a href="#lzl.pool.set_concurrency_limit" class="headerlink" title="Permanent link">&para;</a></h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Override the maximum number of concurrently scheduled background tasks.</p>
-<p>When <code>limit</code> is <code>None</code> the value falls back to <code>os.cpu_count() * 4</code>
-for parity with the original implementation.</p>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>src/lzl/pool/base.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-46">46</a></span>
-<span class="normal"><a href="#__codelineno-0-47">47</a></span>
-<span class="normal"><a href="#__codelineno-0-48">48</a></span>
-<span class="normal"><a href="#__codelineno-0-49">49</a></span>
-<span class="normal"><a href="#__codelineno-0-50">50</a></span>
-<span class="normal"><a href="#__codelineno-0-51">51</a></span>
-<span class="normal"><a href="#__codelineno-0-52">52</a></span>
-<span class="normal"><a href="#__codelineno-0-53">53</a></span>
-<span class="normal"><a href="#__codelineno-0-54">54</a></span>
-<span class="normal"><a href="#__codelineno-0-55">55</a></span>
-<span class="normal"><a href="#__codelineno-0-56">56</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-46"><a id="__codelineno-0-46" name="__codelineno-0-46"></a><span class="k">def</span><span class="w"> </span><span class="nf">set_concurrency_limit</span><span class="p">(</span>
-</span><span id="__span-0-47"><a id="__codelineno-0-47" name="__codelineno-0-47"></a>    <span class="n">limit</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
-</span><span id="__span-0-48"><a id="__codelineno-0-48" name="__codelineno-0-48"></a><span class="p">):</span>
-</span><span id="__span-0-49"><a id="__codelineno-0-49" name="__codelineno-0-49"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Override the maximum number of concurrently scheduled background tasks.</span>
-</span><span id="__span-0-50"><a id="__codelineno-0-50" name="__codelineno-0-50"></a>
-</span><span id="__span-0-51"><a id="__codelineno-0-51" name="__codelineno-0-51"></a><span class="sd">    When ``limit`` is ``None`` the value falls back to ``os.cpu_count() * 4``</span>
-</span><span id="__span-0-52"><a id="__codelineno-0-52" name="__codelineno-0-52"></a><span class="sd">    for parity with the original implementation.</span>
-</span><span id="__span-0-53"><a id="__codelineno-0-53" name="__codelineno-0-53"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-54"><a id="__codelineno-0-54" name="__codelineno-0-54"></a>    <span class="k">global</span> <span class="n">_concurrency_limit</span>
-</span><span id="__span-0-55"><a id="__codelineno-0-55" name="__codelineno-0-55"></a>    <span class="k">if</span> <span class="n">limit</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> <span class="n">limit</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span> <span class="o">*</span> <span class="mi">4</span>
-</span><span id="__span-0-56"><a id="__codelineno-0-56" name="__codelineno-0-56"></a>    <span class="n">_concurrency_limit</span> <span class="o">=</span> <span class="n">limit</span>
-</span></code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
-<div class="doc doc-object doc-function">
-
-
-<h3 id="lzl.pool.is_in_async_loop" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <code class="highlight language-python"><span class="n">is_in_async_loop</span><span class="p">()</span></code>
-
-<a href="#lzl.pool.is_in_async_loop" class="headerlink" title="Permanent link">&para;</a></h3>
-
-
-    <div class="doc doc-contents ">
-
-        <p>Return <code>True</code> when called from within a running event loop.</p>
-
-
-            <details class="mkdocstrings-source">
-              <summary>Source code in <code>src/lzl/pool/utils.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-7"> 7</a></span>
-<span class="normal"><a href="#__codelineno-0-8"> 8</a></span>
-<span class="normal"><a href="#__codelineno-0-9"> 9</a></span>
-<span class="normal"><a href="#__codelineno-0-10">10</a></span>
-<span class="normal"><a href="#__codelineno-0-11">11</a></span>
-<span class="normal"><a href="#__codelineno-0-12">12</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">is_in_async_loop</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Return ``True`` when called from within a running event loop.&quot;&quot;&quot;</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9"></a>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10"></a>    <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11"></a>        <span class="k">return</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_event_loop</span><span class="p">()</span><span class="o">.</span><span class="n">is_running</span><span class="p">()</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12"></a>    <span class="k">return</span> <span class="kc">False</span>
-</span></code></pre></div></td></tr></table></div>
-            </details>
-    </div>
-
-</div>
-
 
 
   </div>
 
     </div>
 
-</div><h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
-<p>The pool module offers efficient thread pool management for CPU-bound and I/O-bound tasks, with support for both synchronous and asynchronous execution patterns.</p>
-<h2 id="usage-examples">Usage Examples<a class="headerlink" href="#usage-examples" title="Permanent link">&para;</a></h2>
-<h3 id="basic-thread-pool">Basic Thread Pool<a class="headerlink" href="#basic-thread-pool" title="Permanent link">&para;</a></h3>
+</div><h2 id="usage-guide">Usage Guide<a class="headerlink" href="#usage-guide" title="Permanent link">&para;</a></h2>
+<h3 id="running-sync-code-asynchronously">Running Sync Code Asynchronously<a class="headerlink" href="#running-sync-code-asynchronously" title="Permanent link">&para;</a></h3>
+<p>Use <code>ThreadPool</code> to offload blocking operations to a worker thread while awaiting them in an async function.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lzl.pool</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPool</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">pool</span> <span class="o">=</span> <span class="n">ThreadPool</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">process_item</span><span class="p">(</span><span class="n">item</span><span class="p">):</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="k">return</span> <span class="n">item</span> <span class="o">*</span> <span class="mi">2</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1"># Submit tasks to the pool</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">futures</span> <span class="o">=</span> <span class="p">[</span><span class="n">pool</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">process_item</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">10</span><span class="p">)]</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
-</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># Get results</span>
-</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">results</span> <span class="o">=</span> <span class="p">[</span><span class="n">f</span><span class="o">.</span><span class="n">result</span><span class="p">()</span> <span class="k">for</span> <span class="n">f</span> <span class="ow">in</span> <span class="n">futures</span><span class="p">]</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">blocking_io</span><span class="p">():</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="c1"># Simulate heavy work</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="k">return</span> <span class="s2">&quot;done&quot;</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>    <span class="c1"># Runs in a thread, non-blocking for the event loop</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>    <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">ThreadPool</span><span class="o">.</span><span class="n">arun</span><span class="p">(</span><span class="n">blocking_io</span><span class="p">)</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
 </span></code></pre></div>
-<h3 id="async-context-manager">Async Context Manager<a class="headerlink" href="#async-context-manager" title="Permanent link">&para;</a></h3>
+<h3 id="background-tasks">Background Tasks<a class="headerlink" href="#background-tasks" title="Permanent link">&para;</a></h3>
+<p>Fire-and-forget background tasks that work regardless of whether you are in a sync or async context.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lzl.pool</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPool</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">main</span><span class="p">():</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="k">async</span> <span class="k">with</span> <span class="n">ThreadPool</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span> <span class="k">as</span> <span class="n">pool</span><span class="p">:</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>        <span class="n">result</span> <span class="o">=</span> <span class="k">await</span> <span class="n">pool</span><span class="o">.</span><span class="n">run_in_thread</span><span class="p">(</span><span class="n">blocking_function</span><span class="p">,</span> <span class="n">arg1</span><span class="p">,</span> <span class="n">arg2</span><span class="p">)</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">background_job</span><span class="p">(</span><span class="n">user_id</span><span class="p">):</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processing </span><span class="si">{</span><span class="n">user_id</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="c1"># Works from async functions</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="k">await</span> <span class="n">ThreadPool</span><span class="o">.</span><span class="n">background</span><span class="p">(</span><span class="n">background_job</span><span class="p">,</span> <span class="mi">123</span><span class="p">)</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="c1"># Works from sync functions too</span>
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="n">ThreadPool</span><span class="o">.</span><span class="n">background</span><span class="p">(</span><span class="n">background_job</span><span class="p">,</span> <span class="mi">456</span><span class="p">)</span>
 </span></code></pre></div>
-<h3 id="batch-processing">Batch Processing<a class="headerlink" href="#batch-processing" title="Permanent link">&para;</a></h3>
+<h3 id="parallel-execution">Parallel Execution<a class="headerlink" href="#parallel-execution" title="Permanent link">&para;</a></h3>
+<p>Concurrent mapping over iterables.</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lzl.pool</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPool</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="k">def</span><span class="w"> </span><span class="nf">process_batch</span><span class="p">(</span><span class="n">items</span><span class="p">):</span>
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">pool</span> <span class="o">=</span> <span class="n">ThreadPool</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">results</span> <span class="o">=</span> <span class="n">pool</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">process_item</span><span class="p">,</span> <span class="n">items</span><span class="p">)</span>
-</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">results</span><span class="p">)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">items</span> <span class="o">=</span> <span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">5</span><span class="p">]</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="k">return</span> <span class="n">x</span> <span class="o">*</span> <span class="n">x</span>
 </span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
-</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">items</span> <span class="o">=</span> <span class="nb">range</span><span class="p">(</span><span class="mi">100</span><span class="p">)</span>
-</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="n">processed</span> <span class="o">=</span> <span class="n">process_batch</span><span class="p">(</span><span class="n">items</span><span class="p">)</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># Parallel execution using threads</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="n">results</span> <span class="o">=</span> <span class="n">ThreadPool</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">process</span><span class="p">,</span> <span class="n">items</span><span class="p">,</span> <span class="n">num_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
 </span></code></pre></div>
-<h3 id="resource-management">Resource Management<a class="headerlink" href="#resource-management" title="Permanent link">&para;</a></h3>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">lzl.pool</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPool</span>
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="c1"># Pool automatically cleans up threads</span>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="k">with</span> <span class="n">ThreadPool</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span> <span class="k">as</span> <span class="n">pool</span><span class="p">:</span>
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">pool</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">task1</span><span class="p">)</span>
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">pool</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">task2</span><span class="p">)</span>
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Threads are shut down here</span>
-</span></code></pre></div>
-<h2 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h2>
-<ul>
-<li><strong>Automatic Scaling</strong>: Thread count adapts to workload</li>
-<li><strong>Resource Management</strong>: Proper cleanup with context managers</li>
-<li><strong>Async Integration</strong>: Works seamlessly with asyncio</li>
-<li><strong>Error Handling</strong>: Proper exception propagation</li>
-<li><strong>Monitoring</strong>: Track pool status and worker utilization</li>
-</ul>
-<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">&para;</a></h2>
-<p>Thread pool behavior can be customized:</p>
-<ul>
-<li><code>max_workers</code>: Maximum number of worker threads</li>
-<li><code>thread_name_prefix</code>: Prefix for thread names (useful for debugging)</li>
-<li><code>initializer</code>: Function to run when each thread starts</li>
-<li><code>initargs</code>: Arguments for the initializer function</li>
-</ul>
 
 
 
