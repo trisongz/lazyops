@@ -91,7 +91,11 @@ nav:
       - Command Line: api/lzl/cmd.md
       - Database: api/lzl/db.md
       - Extensions: api/lzl/ext.md
-      - IO: api/lzl/io.md
+      - IO:
+        - Overview: api/lzl/io.md
+        - File: api/lzl/io/file.md
+        - Persistence: api/lzl/io/persistence.md
+        - Serialization: api/lzl/io/ser.md
       - Kubernetes: api/lzl/kops.md
       - Load: api/lzl/load.md
       - Logging: api/lzl/logging.md

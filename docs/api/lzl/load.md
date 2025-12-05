@@ -1,63 +1,70 @@
 # lzl.load - Lazy Loading
 
-The `lzl.load` module provides utilities for lazy loading of modules and dependencies, enabling deferred imports and reducing startup time.
+The `lzl.load` module provides the `LazyLoad` proxy and other utilities for deferred imports. This pattern drastically reduces application startup time by only loading heavy dependencies when they are first accessed.
 
-## Module Reference
+## Key Components
 
-::: lzl.load
+### LazyLoad
+
+The core proxy class. It intercepts attribute access to trigger the import.
+
+::: lzl.load.main
     options:
-      show_root_heading: true
-      show_source: true
+        members:
+            - LazyLoad
+            - lazy_load
+            - load
+            - reload
 
-## Overview
-
-Lazy loading defers the import of modules until they are actually needed, which can significantly improve application startup time and reduce memory footprint.
-
-## Usage Examples
+## Usage Guide
 
 ### Basic Lazy Loading
 
-```python
-from lzl.load import LazyLoad
-
-# Create a lazy reference to a module
-numpy = LazyLoad('numpy')
-
-# The module is only imported when accessed
-array = numpy.array([1, 2, 3])  # Import happens here
-```
-
-### Lazy Loading with Aliases
+Instead of top-level imports, define a proxy.
 
 ```python
 from lzl.load import LazyLoad
 
-# Load with an alias
-pd = LazyLoad('pandas', 'pd')
+# 'numpy' is NOT imported yet
+np = LazyLoad("numpy")
 
-# Use as normal
-df = pd.DataFrame({'a': [1, 2, 3]})
+def process_data(data):
+    # 'numpy' is imported here, on the first attribute access
+    return np.array(data)
 ```
 
-### Conditional Imports
+### Handling Optional Dependencies
+
+You can configure `LazyLoad` to automatically install missing packages (though use with caution in production).
 
 ```python
-from lzl.load import LazyLoad
-
-# Only import if actually used
-optional_module = LazyLoad('some.optional.module')
-
-if needs_feature:
-    optional_module.do_something()
+# If 'pandas' is missing, it will attempt to pip install it
+pd = LazyLoad("pandas", install_missing=True)
 ```
 
-## Benefits
+### Dependency Chains
 
-- **Faster Startup**: Modules are only imported when needed
-- **Reduced Memory**: Unused modules don't consume memory
-- **Simplified Dependencies**: Optional dependencies can be handled gracefully
-- **Better Testing**: Mock imports more easily in tests
+If a module depends on another lazy module being loaded first (e.g., for side effects), you can declare dependencies.
 
-## Implementation Details
+```python
+# specific_setup must be loaded before my_module
+setup = LazyLoad("my_app.specific_setup")
+mod = LazyLoad("my_app.my_module", dependencies=setup)
+```
 
-The `LazyLoad` class uses Python's import system to defer module loading. When you access an attribute on a lazy-loaded module, the actual import is triggered transparently.
+### Type Checking
+
+For static analysis (mypy/pyright), you can use `TYPE_CHECKING` blocks to keep type hints working while using lazy loading at runtime.
+
+```python
+from typing import TYPE_CHECKING
+from lzl.load import LazyLoad
+
+if TYPE_CHECKING:
+    import pandas as pd
+else:
+    pd = LazyLoad("pandas")
+
+def get_df() -> "pd.DataFrame":
+    return pd.DataFrame()
+```

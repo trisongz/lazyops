@@ -1,153 +1,104 @@
-# lzo.registry - Object Registry
+# lzo.registry - Object Registries
 
-The `lzo.registry` module provides the `MRegistry` core with hook support for pre/post instantiation along with helpers for registering clients and settings.
+The `lzo.registry` module provides patterns for managing global object registries, plugins, and configuration settings. It supports lazy instantiation, hook injection, and string-based import resolution.
 
-## Module Reference
+## MRegistry
 
-::: lzo.registry
+The `MRegistry` (Mutable Registry) is the core class. It manages three internal maps:
+1.  **mregistry**: Classes/Functions registered directly.
+2.  **uninit_registry**: String import paths for lazy loading.
+3.  **init_registry**: Cached, instantiated objects.
+
+::: lzo.registry.base
     options:
-      show_root_heading: true
-      show_source: true
+      members:
+        - MRegistry
 
-## Overview
+### Usage Examples
 
-The registry pattern centralizes object lifecycle management with support for dependency injection, singleton patterns, and lifecycle hooks.
-
-## Usage Examples
-
-### Basic Registry
+#### Basic Registration
 
 ```python
 from lzo.registry import MRegistry
 
-# Create a registry
-registry = MRegistry()
+# Create a named registry
+Services = MRegistry("services")
 
-# Register an object
-registry.register('config', {'key': 'value'})
+# Register a class
+@Services.register("email_sender")
+class EmailService:
+    def send(self, msg): ...
 
-# Retrieve the object
-config = registry.get('config')
+# Lazy instantiation (created on first access)
+sender = Services.get("email_sender")
 ```
 
-### Factory Registration
+#### Lazy Import Paths
+
+Register objects without importing them at the top level.
 
 ```python
-from lzo.registry import MRegistry
+# Registers the string path; import happens only when 'db' is requested
+Services.register("db", "my_app.database.PostgresConnection")
 
-registry = MRegistry()
-
-# Register a factory function
-def create_client():
-    return DatabaseClient(host='localhost')
-
-registry.register_factory('db', create_client)
-
-# Client is created on first access
-client = registry.get('db')
+# Triggers import and instantiation
+db = Services.get("db") 
 ```
 
-### Lifecycle Hooks
+#### Lifecycle Hooks
+
+Inject logic before or after object instantiation.
 
 ```python
-from lzo.registry import MRegistry
+def configure_db(db_instance):
+    db_instance.connect()
+    return db_instance
 
-registry = MRegistry()
+# Post-hook: runs after instantiation
+Services.register_posthook("db", configure_db)
 
-def pre_init_hook(name, **kwargs):
-    print(f"Creating {name}")
+# Pre-hook: modifies kwargs before instantiation
+def inject_credentials(**kwargs):
+    kwargs['password'] = 'secret'
     return kwargs
 
-def post_init_hook(name, instance):
-    print(f"Created {name}")
-    instance.setup()
-    return instance
-
-registry.register_hooks(
-    pre_init=pre_init_hook,
-    post_init=post_init_hook
-)
+Services.register_prehook("db", inject_credentials)
 ```
 
-### Settings Registry
+## Settings Registry
+
+A specialized registry for application settings, often used with Pydantic `BaseSettings`.
+
+::: lzo.registry.settings
+    options:
+      members:
+        - register_settings
+        - get_app_settings
+
+### Usage
 
 ```python
-from lzo.registry import settings
+from lzo.registry import register_settings, get_app_settings
 from lzo.types import BaseSettings
 
-class AppSettings(BaseSettings):
-    api_key: str
-    timeout: int = 30
+# Define your settings
+class AppConfig(BaseSettings):
+    app_name: str = "MyApp"
+    
+    class Config:
+        # Special attributes for registry
+        _rmodule = "my_app"
 
-# Register settings
-settings.register('app', AppSettings)
+# Register them
+register_settings(AppConfig)
 
-# Access anywhere
-app_config = settings['app']
+# Retrieve globally
+config = get_app_settings("my_app")
+print(config.app_name)
 ```
 
-### Client Registry
+## Client Registry
 
-```python
-from lzo.registry import clients
+Registry for managing API clients and services.
 
-# Register API clients
-clients.register('stripe', stripe_client)
-clients.register('sendgrid', sendgrid_client)
-
-# Access clients
-stripe = clients['stripe']
-```
-
-## Features
-
-- **Lazy Initialization**: Objects created only when accessed
-- **Singleton Support**: Control whether objects are shared or recreated
-- **Lifecycle Hooks**: Pre/post instantiation callbacks
-- **Type Safety**: Full typing support
-- **Thread Safety**: Safe for concurrent access
-- **Dependency Injection**: Automatic resolution of dependencies
-
-## Registry Patterns
-
-### Global Registries
-
-The module provides pre-configured global registries:
-
-- `settings`: For application settings and configuration
-- `clients`: For API clients and external services
-- `state`: For application state management
-
-### Custom Registries
-
-Create custom registries for specific use cases:
-
-```python
-from lzo.registry import MRegistry
-
-# Create a specialized registry
-cache_registry = MRegistry()
-cache_registry.register('user_cache', UserCache())
-cache_registry.register('session_cache', SessionCache())
-```
-
-## Advanced Features
-
-### Dependency Resolution
-
-```python
-registry.register('logger', create_logger)
-registry.register('database', create_database, deps=['logger'])
-# Database will have logger injected
-```
-
-### Context Managers
-
-```python
-with registry.scoped() as scoped_registry:
-    # Objects created in this scope are automatically cleaned up
-    scoped_registry.register('temp', TempResource())
-# TempResource.__exit__() called here
-```
-
-See the `src/lzo/registry/README.md` file for detailed information and run `make test-lzo-registry` to exercise the tests.
+::: lzo.registry.clients

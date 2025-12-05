@@ -1,86 +1,78 @@
-# lzl.pool - Thread Pool Utilities
+# lzl.pool - Thread & Async Utilities
 
-The `lzl.pool` module provides thread pool management and execution utilities for concurrent operations.
+The `lzl.pool` module provides a unified interface for concurrency, bridging the gap between synchronous threading and `asyncio` event loops.
 
-## Module Reference
+## ThreadPool
 
-::: lzl.pool
+A singleton-style proxy that manages a global `ThreadPoolExecutor` and `ProcessPoolExecutor`.
+
+::: lzl.pool.base
     options:
-      show_root_heading: true
-      show_source: true
+        members:
+            - ThreadPool
 
-## Overview
+## Concurrency Helpers
 
-The pool module offers efficient thread pool management for CPU-bound and I/O-bound tasks, with support for both synchronous and asynchronous execution patterns.
+Utilities for running functions in the background, mapping iterables concurrently, and more.
 
-## Usage Examples
+::: lzl.pool.base
+    options:
+        members:
+            - amap_iterable
+            - async_map
+            - ensure_coro
+            - is_coro_func
 
-### Basic Thread Pool
+## Usage Guide
 
-```python
-from lzl.pool import ThreadPool
+### Running Sync Code Asynchronously
 
-pool = ThreadPool(max_workers=4)
-
-def process_item(item):
-    return item * 2
-
-# Submit tasks to the pool
-futures = [pool.submit(process_item, i) for i in range(10)]
-
-# Get results
-results = [f.result() for f in futures]
-```
-
-### Async Context Manager
+Use `ThreadPool` to offload blocking operations to a worker thread while awaiting them in an async function.
 
 ```python
 from lzl.pool import ThreadPool
+
+def blocking_io():
+    # Simulate heavy work
+    import time
+    time.sleep(1)
+    return "done"
 
 async def main():
-    async with ThreadPool(max_workers=4) as pool:
-        result = await pool.run_in_thread(blocking_function, arg1, arg2)
+    # Runs in a thread, non-blocking for the event loop
+    result = await ThreadPool.arun(blocking_io)
+    print(result)
 ```
 
-### Batch Processing
+### Background Tasks
+
+Fire-and-forget background tasks that work regardless of whether you are in a sync or async context.
 
 ```python
 from lzl.pool import ThreadPool
 
-def process_batch(items):
-    pool = ThreadPool(max_workers=8)
-    results = pool.map(process_item, items)
-    return list(results)
+def background_job(user_id):
+    print(f"Processing {user_id}...")
 
-items = range(100)
-processed = process_batch(items)
+# Works from async functions
+await ThreadPool.background(background_job, 123)
+
+# Works from sync functions too
+ThreadPool.background(background_job, 456)
 ```
 
-### Resource Management
+### Parallel Execution
+
+Concurrent mapping over iterables.
 
 ```python
 from lzl.pool import ThreadPool
 
-# Pool automatically cleans up threads
-with ThreadPool(max_workers=4) as pool:
-    pool.submit(task1)
-    pool.submit(task2)
-# Threads are shut down here
+items = [1, 2, 3, 4, 5]
+
+def process(x):
+    return x * x
+
+# Parallel execution using threads
+results = ThreadPool.map(process, items, num_workers=4)
 ```
-
-## Features
-
-- **Automatic Scaling**: Thread count adapts to workload
-- **Resource Management**: Proper cleanup with context managers
-- **Async Integration**: Works seamlessly with asyncio
-- **Error Handling**: Proper exception propagation
-- **Monitoring**: Track pool status and worker utilization
-
-## Configuration
-
-Thread pool behavior can be customized:
-
-- `max_workers`: Maximum number of worker threads
-- `thread_name_prefix`: Prefix for thread names (useful for debugging)
-- `initializer`: Function to run when each thread starts
-- `initargs`: Arguments for the initializer function
