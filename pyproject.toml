@@ -26,7 +26,9 @@ dependencies = [
     "anyio>=3.7.1",
     "typer>=0.17.3",
 ]
-urls.Homepage = "https://github.com/trisongz/lazyops"
+
+[urls]
+Homepage = "https://github.com/trisongz/lazyops"
 
 [build-system]
 requires = ["setuptools"]
@@ -100,6 +102,9 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = { attr = "lzl.version.VERSION" }
 
 [dependency-groups]
 builder-ci = [

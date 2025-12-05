@@ -30,6 +30,7 @@ if t.TYPE_CHECKING:
 
 _lock = threading.Lock()
 _logger_contexts: t.Dict[str, Logger] = {}
+_DISABLE_QUEUE = os.getenv('LZL_DISABLE_LOGURU_QUEUE', '0') == '1'
 
 __all__ = [
     "create_global_logger",
@@ -114,7 +115,7 @@ def create_global_logger(
 
     _logger.add(
         sys.stdout,
-        enqueue = True,
+        enqueue = not _DISABLE_QUEUE,
         backtrace = True,
         colorize = True,
         level = level,
@@ -189,7 +190,7 @@ def create_default_logger(
             
             _logger.add(
                 sys.stdout,
-                enqueue = True,
+                enqueue = not _DISABLE_QUEUE,
                 backtrace = True,
                 colorize = True,
                 level = level,
