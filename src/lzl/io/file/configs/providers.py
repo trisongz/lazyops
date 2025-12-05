@@ -687,4 +687,71 @@ class CloudflareR2Config(ConfigMixin):
             'region_name': self.r2_region,
             'endpoint_url': self.r2_endpoint,
         }
+
+
+class SMBConfig(ConfigMixin):
+    """
+    The SMB Config
+    """
+    smb_host: Optional[str] = None
+    smb_username: Optional[str] = None
+    smb_password: Optional[str] = None
+    smb_port: Optional[int] = 445
+    smb_domain: Optional[str] = None
+    smb_timeout: Optional[int] = 30
+    
+    smb_fs_config: Optional[Union[str, Dict[str, Any]]] = None
+
+    @field_validator("smb_fs_config", mode = 'before')
+    def validate_smb_fs_config(cls, value: Optional[Union[str, Dict[str, Any]]]) -> Union[str, Dict[str, Any]]:
+        """
+        Validates the SMB FS Config
+        """
+        if value is None: return {}
+        if isinstance(value, str):
+            value = json.loads(value)
+        return value
+
+    def set_env(self):
+        """
+        Sets the environment variables
+        """
+        if self.smb_host: os.environ["SMB_HOST"] = self.smb_host
+        if self.smb_username: os.environ["SMB_USERNAME"] = self.smb_username
+        if self.smb_password: os.environ["SMB_PASSWORD"] = self.smb_password
+        if self.smb_port: os.environ["SMB_PORT"] = str(self.smb_port)
+        if self.smb_domain: os.environ["SMB_DOMAIN"] = self.smb_domain
+
+    def build_fs_config(self) -> Dict[str, Any]:
+        """
+        Builds the smb fs config dict
+        """
+        config = {
+            **(self.smb_fs_config or {})
+        }
+        if self.smb_host: config['host'] = self.smb_host
+        if self.smb_username: config['username'] = self.smb_username
+        if self.smb_password: config['password'] = self.smb_password
+        if self.smb_port: config['port'] = self.smb_port
+        if self.smb_domain: config['domain'] = self.smb_domain
+        if self.smb_timeout: config['timeout'] = self.smb_timeout
+        return config
+
+    def update_fs(self, **kwargs):
+        """
+        Updates the fs config
+        """
+        self.provider_fsm.get_accessor('smb', _reset = True)
+
+    def get_boto_config(self) -> Dict[str, Any]:
+        """
+        Returns the boto config
+        """
+        return {}
+
+    def get_boto_client_config(self) -> Dict[str, Any]:
+        """
+        Returns the boto client config
+        """
+        return {}
         

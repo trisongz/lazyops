@@ -21,10 +21,15 @@ def rewrite_async_syntax(obj, provider: str = 's3'):
     Basically - we're rewriting all the fsspec's async method
     from _method to async_method for syntax
     """
-    _names = ASYNC_SYNTAX_MAPPING[provider]
+    _names = ASYNC_SYNTAX_MAPPING.get(provider, ASYNC_SYNTAX_MAPPING.get('s3'))
+    if not _names: return obj
+    
     for attr in dir(obj):
         if attr.startswith('_') and not attr.startswith('__'):
-            attr_val = getattr(obj, attr)
+            try:
+                attr_val = getattr(obj, attr)
+            except Exception:
+                continue
             if iscoroutinefunction(attr_val) and _names.get(attr):
                 setattr(obj, _names[attr], attr_val)
     return obj

@@ -16,12 +16,17 @@ from .s3 import (
     R2FileSystem,
     R2Accessor,
 )
+from .cached import (
+    CachedFileSystem,
+    CachedAccessor,
+)
 
 AccessorLike = t.Union[
     AWSAccessor,
     MinioAccessor,
     S3CAccessor,
     R2Accessor,
+    CachedAccessor,
 ]
 
 FileSystemLike = t.Union[
@@ -29,6 +34,7 @@ FileSystemLike = t.Union[
     MinioFileSystem,
     S3CFileSystem,
     R2FileSystem,
+    CachedFileSystem,
 ]
 
 ProviderMapping: t.Dict[str, t.Tuple[t.Type[FileSystemLike], t.Type[AccessorLike]]] = {
@@ -56,6 +62,22 @@ class ProviderFileSystemManager(abc.ABC):
         """
         Gets the accessor
         """
+        if "::" in name:
+            # Handle Cached/Chained Protocol
+            if not self.accessors.get(name) or _reset:
+                # Create dynamic classes to isolate state (fs instances) per protocol string
+                class DynamicCachedFileSystem(CachedFileSystem):
+                    pass
+                
+                class DynamicCachedAccessor(CachedAccessor):
+                    class CloudFileSystem(DynamicCachedFileSystem):
+                        pass
+                
+                DynamicCachedFileSystem.build_cached(name, **kwargs)
+                DynamicCachedAccessor.reload_cfs()
+                self.accessors[name] = DynamicCachedAccessor
+            return self.accessors[name]
+
         if name in _ProviderAliases: name = _ProviderAliases[name]
         if not self.accessors.get(name) or _reset:
             if name not in ProviderMapping:
@@ -70,6 +92,9 @@ class ProviderFileSystemManager(abc.ABC):
         """
         Gets the filesystem
         """
+        if "::" in name:
+            return self.get_accessor(name, _reset=_reset, **kwargs).filesys
+
         if name in _ProviderAliases: name = _ProviderAliases[name]
         if name not in ProviderMapping:
             raise ValueError(f"Invalid Provider: {name}")

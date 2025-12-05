@@ -17,6 +17,7 @@ The `File` class is the main entry point. It acts as a factory that instantiates
 - **AWS S3**: `s3://bucket/key`
 - **MinIO**: `minio://bucket/key`
 - **Cloudflare R2**: `r2://bucket/key`
+- **SMB/CIFS**: `smb://host/share/path`
 
 ## Usage Examples
 
@@ -50,6 +51,18 @@ data = await s3_file.read_bytes()
 # Get metadata
 size = s3_file.size
 last_modified = s3_file.stat().st_mtime
+```
+
+### SMB/CIFS Shares
+
+You can access SMB shares using the `smb://` scheme. Configure credentials via environment variables (`SMB_HOST`, `SMB_USERNAME`, `SMB_PASSWORD`) or the registry.
+
+```python
+from lzl.io import File
+
+# Access an SMB share
+smb_file = File("smb://share/data/report.csv")
+content = await smb_file.aread_text()
 ```
 
 ### Pydantic Integration
@@ -89,6 +102,40 @@ File.register_loader(".json", load_json)
 
 # Now you can load directly (implementation dependent on registered hooks)
 # data = File("config.json").load() 
+```
+
+## Performance Optimization
+
+The `lzl.io.File` module includes performance optimizations for handling large files, particularly with object storage.
+
+### Optimized I/O
+
+Standard methods (`aread`, `awrite_bytes`, `acopy_to`, `aiter_raw`) support an `optimized` argument to enable adaptive buffering and concurrent chunk transfers.
+
+- `optimized=True`: Always use the optimized implementation.
+- `optimized=False`: Always use the standard implementation.
+- `optimized='auto'` (default): Automatically switch to optimized methods for files larger than 5MB.
+
+```python
+# Explicitly enable optimization
+data = await File("s3://bucket/large-file.dat").aread(optimized=True)
+
+# 'auto' handles it for you
+await File("local-large.iso").acopy_to("s3://bucket/backup.iso", optimized="auto")
+```
+
+## Batch Operations
+
+When working with multiple files, especially on cloud storage where latency is high, use batch operations to perform actions concurrently.
+
+```python
+files = [File(f"s3://bucket/logs/log_{i}.txt") for i in range(100)]
+
+# Check existence concurrently
+existence_map = await File(".").batch_exists(files)
+
+# Delete concurrently
+await File(".").batch_delete(files)
 ```
 
 ## Advanced Features

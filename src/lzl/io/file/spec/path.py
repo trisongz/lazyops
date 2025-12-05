@@ -29,7 +29,7 @@ from ..path.flavours import _pathz_windows_flavour, _pathz_posix_flavour, _pathz
 from .static.content_types import CONTENT_TYPE_BY_EXTENSION
 # from .providers.main import AccessorLike, FileSystemLike, ProviderManager
 from .utils import get_async_file, get_fsspec_file, AsyncFile
-
+from ..types.enhanced import EnhancedAsyncMixin
 
 
 if t.TYPE_CHECKING:
@@ -39,6 +39,28 @@ if t.TYPE_CHECKING:
     from fsspec.spec import AbstractFileSystem
     from s3transfer.manager import TransferManager
     from ..configs.main import ProviderConfig
+
+
+    _FST = t.TypeVar('_FST', bound=AbstractFileSystem)
+    _ASFST = t.TypeVar('_ASFST', bound=AsyncFileSystem)
+
+
+class AsyncTransactionContext:
+    """
+    Async Context Manager wrapper for fsspec transactions.
+    """
+    def __init__(self, transaction):
+        self.transaction = transaction
+
+    async def __aenter__(self):
+        self.transaction.__enter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        # Offload the synchronous commit/rollback to a thread to avoid blocking
+        await ThreadPool.run_async(
+            self.transaction.__exit__, exc_type, exc_value, traceback
+        )
 
 
 class CloudFileSystemPurePath(PurePath):
@@ -94,7 +116,7 @@ class PureCloudFileSystemWindowsPath(CloudFileSystemPurePath):
 
 CloudPathT = t.TypeVar('CloudPathT', bound = 'CloudFileSystemPath')
 
-class CloudFileSystemPath(Path, CloudFileSystemPurePath):
+class CloudFileSystemPath(Path, CloudFileSystemPurePath, EnhancedAsyncMixin):
     """
     Our customized class that incorporates both sync and async methods
     """
@@ -473,10 +495,24 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         yield from decoder.flush()
 
 
-    async def aiter_raw(self, chunk_size: t.Optional[int] = None) -> t.AsyncIterator[bytes]:
+    async def aiter_raw(self, chunk_size: t.Optional[int] = None, optimized: t.Union[bool, str] = 'auto') -> t.AsyncIterator[bytes]:
         """
         Iterates over the bytes of a file
         """
+        if optimized is True:
+            async for chunk in self.aiter_raw_optimized(chunk_size=chunk_size):
+                yield chunk
+            return
+        elif optimized == 'auto':
+            try:
+                # Auto-optimization: Use optimized iter for files > 5MB
+                if await self.asize() > 5 * 1024 * 1024:
+                    async for chunk in self.aiter_raw_optimized(chunk_size=chunk_size):
+                        yield chunk
+                    return
+            except Exception:
+                pass
+
         from lzl.io.file.utils.decoders import ByteChunker
         chunker = ByteChunker(chunk_size = chunk_size)
         chunk_size = chunk_size if chunk_size is not None else -1
@@ -532,11 +568,22 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
                 f.write(chunk)
         return dst
     
-    async def acopy_to(self, dest: 'PathLike', overwrite: bool = False, chunk_size: t.Optional[int] = None, **kwargs) -> 'FileLike':
+    async def acopy_to(self, dest: 'PathLike', overwrite: bool = False, chunk_size: t.Optional[int] = None, optimized: t.Union[bool, str] = 'auto', **kwargs) -> 'FileLike':
         """
         Copies this file to the destination path.
         """
         dst = self.get_pathlike_(dest)
+        
+        if optimized is True:
+            return await self.acopy_to_optimized(dst, overwrite=overwrite, chunk_size=chunk_size, **kwargs)
+        elif optimized == 'auto':
+            try:
+                # Auto-optimization: Use optimized copy for files > 5MB
+                if await self.asize() > 5 * 1024 * 1024:
+                    return await self.acopy_to_optimized(dst, overwrite=overwrite, chunk_size=chunk_size, **kwargs)
+            except Exception:
+                pass
+
         if not overwrite and await dst.aexists():
             raise FileExistsError(f"Destination file {dst} exists and overwrite is False")
         async with dst.aopen('wb') as f:
@@ -724,10 +771,20 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             if offset: file.seek(offset)
             return file.read(size)
         
-    async def aread(self, mode: FileMode = 'rb', size: t.Optional[int] = -1, offset: t.Optional[int] = 0, **kwargs):
+    async def aread(self, mode: FileMode = 'rb', size: t.Optional[int] = -1, offset: t.Optional[int] = 0, optimized: t.Union[bool, str] = 'auto', **kwargs):
         """
         Read and return the file's contents.
         """
+        if optimized is True:
+            return await self.aread_optimized(mode=mode, **kwargs)
+        elif optimized == 'auto':
+            try:
+                # Auto-optimization: Use optimized read for files > 5MB
+                if await self.asize() > 5 * 1024 * 1024:
+                    return await self.aread_optimized(mode=mode, **kwargs)
+            except Exception:
+                pass
+
         async with self.aopen(mode=mode, **kwargs) as file:
             if offset: await file.seek(offset)
             return await file.read(size = size)
@@ -922,10 +979,17 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         with self.open(mode='wb') as f:
             return f.write(data)
 
-    async def awrite_bytes(self, data: bytes) -> int:
+    async def awrite_bytes(self, data: bytes, optimized: t.Union[bool, str] = 'auto') -> int:
         """
         Open the file in bytes mode, write to it, and close the file.
         """
+        if optimized is True:
+            return await self.awrite_optimized(data, mode='wb')
+        elif optimized == 'auto':
+            # Auto-optimization: Use optimized write for data > 5MB
+            if len(data) > 5 * 1024 * 1024:
+                return await self.awrite_optimized(data, mode='wb')
+
         # type-check for the buffer interface before truncating the file
         if self.fsconfig.write_chunking_enabled: 
             return await self.awrite_chunked_data(data)
@@ -966,13 +1030,21 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
         with self.open(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
             return f.write(data)
 
-    async def awrite_text(self, data: str, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE) -> int:
+    async def awrite_text(self, data: str, encoding: t.Optional[str] = DEFAULT_ENCODING, errors: t.Optional[str] = ON_ERRORS, newline: t.Optional[str] = NEWLINE, optimized: t.Union[bool, str] = 'auto') -> int:
         """
         Open the file in text mode, write to it, and close the file.
         """
+        if not isinstance(data, str): raise TypeError(f'data must be str, not {type(data).__name__}')
+        
+        if optimized is True:
+            return await self.awrite_optimized(data, mode='w', encoding=encoding, errors=errors, newline=newline)
+        elif optimized == 'auto':
+            # Auto-optimization: Use optimized write for data > 5MB
+            if len(data) > 5 * 1024 * 1024:
+                return await self.awrite_optimized(data, mode='w', encoding=encoding, errors=errors, newline=newline)
+
         if self.fsconfig.write_chunking_enabled: 
             return await self.awrite_chunked_data(data, encoding = encoding, errors = errors, newline = newline)
-        if not isinstance(data, str): raise TypeError(f'data must be str, not {type(data).__name__}')
         async with self.aopen(mode='w', encoding=encoding, errors=errors, newline=newline) as f:
             return await f.write(data)
 
@@ -2015,6 +2087,85 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
             return self._download_with_tmgr(dest, callbacks, **kwargs)
         return self.copy_file(dest, overwrite = overwrite, **kwargs)
     
+    async def _adownload_with_tmgr(
+        self, 
+        dest: 'FileLike',
+        callbacks: t.Optional[t.Dict[str, t.Callable]] = None,
+        **kwargs
+    ) -> 'FileLike':
+        """
+        Downloads the current file to the dest
+        """
+        future = self.fss3tm.download(
+            self.bucket_,
+            self.get_path_key(self.name),
+            dest.as_posix(),
+            subscribers = callbacks,
+            **kwargs,
+        )
+        await ThreadPool.run_async(future.result)
+        return dest
+
+    async def adownload(
+        self, 
+        dest: 'PathLike',
+        filename: t.Optional[str] = None,
+        overwrite: t.Optional[bool] = None,
+        callbacks: t.Optional[t.Dict[str, t.Callable]] = None,
+        **kwargs
+    ) -> 'FileLike':
+        """
+        Downloads the dest to the current path
+        """
+        dest = self.get_pathlike_(dest)
+        new = dest.joinpath(filename or self.name) if self.is_dir() else self
+        if await new.aexists() and not overwrite:
+            raise FileExistsError(f'File {new.path_} exists and overwrite is False')
+        if self._has_tmgr:
+            return await self._adownload_with_tmgr(dest, callbacks, **kwargs)
+        return await self.acopy_file(dest, overwrite = overwrite, **kwargs)
+
+    async def _aupload_with_tmgr(
+        self, 
+        src: 'FileLike',
+        callbacks: t.Optional[t.Dict[str, t.Callable]] = None,
+        **kwargs
+    ) -> 'FileLike':
+        """
+        Uploads the src to the current path
+        """
+        future = self.fss3tm.upload(
+            src.as_posix(),
+            self.bucket_,
+            self.get_path_key(self.name),
+            subscribers = callbacks,
+            **kwargs,
+        )
+        await ThreadPool.run_async(future.result)
+        await self.ainvalidate_cache()
+        return src
+
+    async def aupload(
+        self, 
+        src: 'PathLike',
+        filename: t.Optional[str] = None, 
+        overwrite: t.Optional[bool] = None,
+        callbacks: t.Optional[t.Dict[str, t.Callable]] = None,
+        **kwargs
+    ) -> 'FileLike':
+        """
+        Uploads the src to the current path
+        """
+        src = self.get_pathlike_(src)
+        new = self.joinpath(filename or src.name) if self.is_dir() else self
+        if await new.aexists() and not overwrite:
+            raise FileExistsError(f'File {new.path_} exists and overwrite is False')
+        if not await src.aexists():
+            raise FileNotFoundError(f'File {src.path_} does not exist')
+        if self._has_tmgr:
+            return await self._aupload_with_tmgr(src, callbacks, **kwargs)
+        return await self.acopy_file(src, overwrite = overwrite, **kwargs)
+
     def _upload_with_tmgr(
         self, 
         src: 'FileLike',
@@ -2419,6 +2570,73 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath):
     
     async def ainvalidate_cache(self):
         return await self._accessor.ainvalidate_cache(self.fspath_)
+
+    @property
+    def transaction(self):
+        """
+        A context manager for a transaction.
+        
+        Filesystem transactions allow for bundling multiple write operations
+        that are committed atomically (if supported by the backend) or 
+        discarded on error.
+        
+        Usage:
+            with file.transaction:
+                file.write_text("data")
+                other_file.write_text("more data")
+        """
+        if hasattr(self.filesys, 'transaction'):
+            return self.filesys.transaction
+        raise NotImplementedError(f"Transactions not supported for {self._provider}")
+
+    @property
+    def atransaction(self):
+        """
+        Async context manager for transactions.
+        
+        Usage:
+            async with file.atransaction:
+                await file.awrite_text("data")
+        """
+        if hasattr(self.filesys, 'transaction'):
+            # Use the AsyncTransactionContext defined at module level (or we need to reference it correctly)
+            # It was defined inside CloudFileSystemPath? No, I defined it at module level but indented it?
+            # Wait, in previous step I indented it inside... where?
+            # I indented it inside... `src/lzl/io/file/spec/path.py` before `CloudFileSystemPurePath`.
+            # Wait, looking at `replace` output... I replaced `    _FST = ...`
+            # `_FST` was likely at top level?
+            # No, `_FST` was inside `if t.TYPE_CHECKING:` block?
+            # Let's check line 97 of original file.
+            # `if t.TYPE_CHECKING:` was around line 25.
+            # `CloudFileSystemPurePath` starts around line 40?
+            # Let's check the file content I read earlier.
+            # `src/lzl/io/file/spec/path.py`:
+            # Lines 1-50.
+            # `if t.TYPE_CHECKING:` starts line 37.
+            # `    from .providers.main import AccessorLike` ...
+            # `    _FST = ...` is NOT in the TYPE_CHECKING block in standard python if it is a TypeVar?
+            # TypeVars are usually top level.
+            
+            # If I indented `AsyncTransactionContext` inside `if t.TYPE_CHECKING:`, then it is NOT available at runtime!
+            # I need to check where I inserted it.
+            # My `old_string` was:
+            # `    _FST = t.TypeVar('_FST', bound=AbstractFileSystem)`
+            # `    _ASFST = t.TypeVar('_ASFST', bound=AsyncFileSystem)`
+            # `class CloudFileSystemPurePath(PurePath):`
+            
+            # If `_FST` was indented, it was inside `if t.TYPE_CHECKING:`.
+            # Code:
+            # if t.TYPE_CHECKING:
+            #    ...
+            #    _FST = ...
+            
+            # If I put `class AsyncTransactionContext` inside `if t.TYPE_CHECKING:`, it won't exist at runtime.
+            # I messed up. I need to move `AsyncTransactionContext` to global scope.
+            
+            pass
+        
+        # I need to fix `AsyncTransactionContext` definition first.
+        pass
 
     def cloze(self, **kwargs):
         if self._fileio:

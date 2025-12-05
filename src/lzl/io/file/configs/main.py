@@ -14,10 +14,12 @@ from .providers import (
     MinioConfig,
     S3CompatConfig,
     CloudflareR2Config,
+    SMBConfig,
 )
+from .performance import PerformanceConfig
 from typing import Optional, Dict, Any, List, Union, Tuple, TYPE_CHECKING
 
-ProviderConfig = Union[AWSConfig, GCPConfig, MinioConfig, S3CompatConfig, CloudflareR2Config]
+ProviderConfig = Union[AWSConfig, GCPConfig, MinioConfig, S3CompatConfig, CloudflareR2Config, SMBConfig]
 
 class FileIOConfig(BaseSettings, RegisteredSettings.configure_registered(module = 'file')):
     """
@@ -36,6 +38,13 @@ class FileIOConfig(BaseSettings, RegisteredSettings.configure_registered(module 
     class Config:
         env_prefix = "FILEIO_"
         case_sensitive = False
+
+    @eproperty
+    def performance(self) -> PerformanceConfig:
+        """
+        Returns the Performance Config
+        """
+        return PerformanceConfig()
 
     @eproperty
     def aws(self) -> AWSConfig:
@@ -71,6 +80,13 @@ class FileIOConfig(BaseSettings, RegisteredSettings.configure_registered(module 
         Returns the Cloudflare R2 Config
         """
         return CloudflareR2Config()
+    
+    @eproperty
+    def smb(self) -> SMBConfig:
+        """
+        Returns the SMB Config
+        """
+        return SMBConfig()
     
 
     def create_adc(
@@ -144,6 +160,7 @@ class FileIOConfig(BaseSettings, RegisteredSettings.configure_registered(module 
         self.minio.set_env()
         self.s3c.set_env()
         self.r2.set_env()
+        self.smb.set_env()
 
     
     def update_auth(self, update_fs: bool = True, **config):
