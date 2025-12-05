@@ -4,13 +4,14 @@ PYTHON ?= python
 PYTEST ?= pytest
 PYTEST_OPTS ?=
 MINT ?= npx --yes mint
+MKDOCS ?= mkdocs
 DOCS_REMOTE ?= origin
 DOCS_BRANCH ?= main
 
 PYTHONPATH := src$(if $(PYTHONPATH),:$(PYTHONPATH),)
 export PYTHONPATH
 
-.PHONY: test test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool test-lzl-proxied test-lzl-require test-lzl-sysmon test-lzl test-lzo-registry test-lzo-types test-lzo-utils test-lzo docs-preview docs-generate docs-publish
+.PHONY: test test-lzl-io test-lzl-load test-lzl-logging test-lzl-pool test-lzl-proxied test-lzl-require test-lzl-sysmon test-lzl test-lzo-registry test-lzo-types test-lzo-utils test-lzo docs-preview docs-generate docs-publish mkdocs-serve mkdocs-build mkdocs-deploy
 
 ## test: Run the entire pytest suite
 test:
@@ -79,3 +80,15 @@ docs-generate:
 ## docs-publish: Push documentation updates to trigger Mintlify deployment
 docs-publish:
 	git push $(DOCS_REMOTE) $(DOCS_BRANCH)
+
+## mkdocs-serve: Serve MkDocs documentation locally for development
+mkdocs-serve:
+	$(MKDOCS) serve
+
+## mkdocs-build: Build MkDocs documentation site
+mkdocs-build:
+	$(MKDOCS) build
+
+## mkdocs-deploy: Deploy MkDocs documentation to GitHub Pages
+mkdocs-deploy:
+	$(MKDOCS) gh-deploy --force

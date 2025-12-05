@@ -78,7 +78,7 @@ except ImportError:
 
 def get_pydantic_dict(model: typing.Union[BaseModel, BaseSettings], **kwargs) -> typing.Dict[str, typing.Any]:
     """
-    Get a dict from a pydantic model
+    Returns a dictionary representation of a Pydantic model, compatible with v1 (`dict()`) and v2 (`model_dump()`).
     """
     if kwargs: kwargs = {k:v for k,v in kwargs.items() if v is not None}
     if hasattr(model, 'model_dump'):
@@ -87,7 +87,7 @@ def get_pydantic_dict(model: typing.Union[BaseModel, BaseSettings], **kwargs) ->
 
 def get_pydantic_fields_dict(model: typing.Type[typing.Union[BaseModel, BaseSettings]]) -> typing.Dict[str, FieldInfo]:
     """
-    Get a dict of fields from a pydantic model
+    Returns the fields dictionary of a Pydantic model, compatible with v1 (`__fields__`) and v2 (`model_fields`).
     """
     if hasattr(model, 'model_fields'):
         return model.model_fields
@@ -95,19 +95,19 @@ def get_pydantic_fields_dict(model: typing.Type[typing.Union[BaseModel, BaseSett
 
 def get_pydantic_field_names(model: typing.Type[typing.Union[BaseModel, BaseSettings]]) -> typing.List[str]:
     """
-    Get a list of field names from a pydantic model
+    Returns a list of field names from a Pydantic model.
     """
     return list(get_pydantic_fields_dict(model).keys())
 
 def get_pydantic_fields(model: typing.Type[typing.Union[BaseModel, BaseSettings]]) -> typing.List[FieldInfo]:
     """
-    Get a list of fields from a pydantic model
+    Returns a list of FieldInfo objects from a Pydantic model.
     """
     return list(get_pydantic_fields_dict(model).values())
 
 def pydantic_parse_obj(model: typing.Type[typing.Union[BaseModel, BaseSettings]], obj: typing.Any, **kwargs) -> typing.Union[BaseModel, BaseSettings]:
     """
-    Parse an object into a pydantic model
+    Parses an object into a Pydantic model, compatible with v1 (`parse_obj`) and v2 (`model_validate`).
     """
     if hasattr(model, 'model_validate'):
         return model.model_validate(obj, **kwargs)
@@ -115,7 +115,7 @@ def pydantic_parse_obj(model: typing.Type[typing.Union[BaseModel, BaseSettings]]
 
 def get_pydantic_schema(model: typing.Type[typing.Union[BaseModel, BaseSettings]], **kwargs) -> typing.Dict[str, typing.Any]:
     """
-    Get a pydantic schema
+    Returns the JSON schema of a Pydantic model, compatible with v1 (`schema()`) and v2 (`model_json_schema()`).
     """
     if hasattr(model, 'model_json_schema'):
         return model.model_json_schema(**kwargs)

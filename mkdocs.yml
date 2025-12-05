@@ -1,0 +1,115 @@
+site_name: LazyOps Documentation
+site_description: Lazy Operations Toolkit - lzl utilities and lzo registry patterns
+site_author: Tri Songz
+site_url: https://github.com/trisongz/lazyops
+
+repo_name: trisongz/lazyops
+repo_url: https://github.com/trisongz/lazyops
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.tracking
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_toc_entry: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            filters:
+              - "!^_"  # Exclude private members
+            heading_level: 2
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - admonition
+  - toc:
+      permalink: true
+  - tables
+  - attr_list
+  - md_in_html
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Overview: index.md
+    - Code Style: code-style.md
+    - MkDocs Setup: mkdocs-setup.md
+    - Mintlify Workflow: mintlify.md
+  - Planning:
+    - Future Updates: future-updates.md
+    - Todo: todo.md
+  - API Reference:
+    - lzl:
+      - Overview: api/lzl/index.md
+      - API Clients: api/lzl/api.md
+      - Command Line: api/lzl/cmd.md
+      - Database: api/lzl/db.md
+      - Extensions: api/lzl/ext.md
+      - IO: api/lzl/io.md
+      - Kubernetes: api/lzl/kops.md
+      - Load: api/lzl/load.md
+      - Logging: api/lzl/logging.md
+      - Pool: api/lzl/pool.md
+      - Proxied: api/lzl/proxied.md
+      - Require: api/lzl/require.md
+      - Sysmon: api/lzl/sysmon.md
+      - Types: api/lzl/types.md
+    - lzo:
+      - Overview: api/lzo/index.md
+      - Command Line: api/lzo/cmd.md
+      - IO: api/lzo/io.md
+      - Registry: api/lzo/registry.md
+      - State: api/lzo/state.md
+      - Types: api/lzo/types.md
+      - Utils: api/lzo/utils.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/trisongz/lazyops

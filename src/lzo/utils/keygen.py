@@ -147,7 +147,18 @@ def generate_htpasswd_key(
     rounds: int = 10,
     repeat: int = 1,
 ) -> t.Generator[str, None, None]:
-    """Yield bcrypt hashes suitable for ``htpasswd`` entries."""
+    """
+    Generates bcrypt hashes suitable for `htpasswd` file entries.
+
+    Args:
+        secret: The plaintext password to hash.
+        salt: Optional custom salt (if None, a random salt is generated).
+        rounds: The cost factor (logarithmic) for the bcrypt algorithm.
+        repeat: Number of hashes to generate.
+
+    Yields:
+        Bcrypt hashed strings.
+    """
     for _ in range(repeat):
         if salt:
             hashed = bcrypt.hashpw(secret.encode(), salt.encode())
@@ -159,6 +170,15 @@ def validate_htpasswd_key(
     secret: str,
     hashed: str,
 ) -> bool:
-    """Return ``True`` when ``secret`` matches the bcrypt ``hashed`` value."""
+    """
+    Validates a plaintext password against a bcrypt hash.
+
+    Args:
+        secret: The plaintext password to check.
+        hashed: The bcrypt hash to validate against.
+
+    Returns:
+        True if the password matches the hash, False otherwise.
+    """
     return bcrypt.checkpw(secret.encode(), hashed.encode())
     

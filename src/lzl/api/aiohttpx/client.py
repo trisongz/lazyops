@@ -512,7 +512,10 @@ class Client:
 
     def _run_init_hooks(self):
         """
-        Run init hooks if present
+        Run initialization hooks if they haven't been run yet.
+        
+        This processes synchronous hooks. If a hook is an async function (coroutine),
+        it is deferred to the `_incomplete_hooks` list to be handled by the async client.
         """
         if self._sync_init_hooks_completed: return
         if self._init_hooks:
@@ -527,7 +530,10 @@ class Client:
     
     async def _async_run_init_hooks(self):
         """
-        Run init hooks if present
+        Run asynchronous initialization hooks if they haven't been run yet.
+        
+        This processes both synchronous and asynchronous hooks. It also processes
+        any hooks that were deferred by the synchronous `_run_init_hooks` method.
         """
         if self._async_init_hooks_completed: return
         if self._init_hooks:
@@ -836,8 +842,6 @@ class Client:
             Any exceptions raised by the async client.
         """
 
-        #if not self._async_active:
-        #    self._init_clients(_reset_async = True)
         if self._config.debug:
             logger.info(f"Request: {method} {url}")
             logger.info(f"Headers: {headers}")
@@ -1307,8 +1311,6 @@ class Client:
         Raises:
             Any exceptions raised by the sync client.
         """
-        #if not self._sync_active:
-        #    self._init_clients(_reset_sync = True)
         if self._config.debug:
             logger.info(f"Request: {method} {url}")
             logger.info(f"Headers: {headers}")
@@ -1567,20 +1569,32 @@ class Client:
     """
 
     def startup(self) -> None:
+        """
+        Perform any necessary startup tasks for the synchronous client.
+        """
         pass
 
     async def async_startup(self) -> None:
+        """
+        Perform any necessary startup tasks for the asynchronous client.
+        """
         pass
 
     def shutdown(self) -> None:
+        """
+        Perform any necessary shutdown tasks for the synchronous client.
+        """
         pass
 
     async def async_shutdown(self) -> None:
+        """
+        Perform any necessary shutdown tasks for the asynchronous client.
+        """
         pass
 
     def close(self) -> None:
         """
-        Close transport and proxies.
+        Close transport and proxies for the synchronous client.
         """
         self.shutdown()
         if self._sync_active:
@@ -1590,7 +1604,7 @@ class Client:
 
     async def aclose(self) -> None:
         """
-        Close transport and proxies.
+        Close transport and proxies for the asynchronous client.
         """
         await self.async_shutdown()
         if self._async_active:
