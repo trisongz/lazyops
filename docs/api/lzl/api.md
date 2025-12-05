@@ -18,11 +18,20 @@ The `lzl.api` module contains clients and integrations for various external serv
 ### Slack
 ::: lzl.api.slack
 
-### Posthog
-::: lzl.api.posthog
-
 ### Keycloak
 ::: lzl.api.keycloak
 
 ### Argo
 ::: lzl.api.argo
+
+### Hatchet
+::: lzl.api.hatchet
+
+### Qdrant
+::: lzl.api.qdrant
+
+### SearxNG
+::: lzl.api.searxng
+
+### RQLite
+::: lzl.api.aiorqlite
