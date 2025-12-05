@@ -54,6 +54,11 @@ from .paths.smb import (
     FileSMBPosixPath,
     FileSMBWindowsPath,
 )
+from .paths.cached import (
+    FileCachedPath,
+    FileCachedPosixPath,
+    FileCachedWindowsPath,
+)
 
 PathLike = t.TypeVar(
     'PathLike', 
@@ -67,6 +72,7 @@ PathLike = t.TypeVar(
         FileS3CPath,
         FileR2Path,
         FileSMBPath,
+        FileCachedPath,
     ]
 )
 
@@ -78,6 +84,7 @@ ProviderPathLike = t.TypeVar(
         FileS3CPath,
         FileR2Path,
         FileSMBPath,
+        FileCachedPath,
     ]
 )
 
@@ -91,6 +98,7 @@ FileLikeT = t.TypeVar(
         FileS3CPath,
         FileR2Path,
         FileSMBPath,
+        FileCachedPath,
     ]
 )
 
@@ -101,6 +109,7 @@ FileLike = t.Union[
     FileMinioPath,
     FileS3CPath,
     FileSMBPath,
+    FileCachedPath,
 ]
 
 # FileLikeT = t.TypeVar(
@@ -151,6 +160,10 @@ _FILESPEC_CLS: t.Tuple[FileLikeT, ...] = (
     FileSMBPath,
     FileSMBPosixPath,
     FileSMBWindowsPath,
+
+    FileCachedPath,
+    FileCachedPosixPath,
+    FileCachedWindowsPath,
 )
 
 
@@ -173,7 +186,10 @@ def as_path(path: PathLike) -> FileLike:
         uri_splits = path.split('://', maxsplit=1)
         if len(uri_splits) > 1:    
             # str is URI (e.g. `gs://`, `github://`,...)
-            return PREFIXES_TO_FP[f'{uri_splits[0]}://'](path)
+            protocol = uri_splits[0]
+            if '::' in protocol:
+                return FileCachedPath(path, protocol=protocol)
+            return PREFIXES_TO_FP[f'{protocol}://'](path)
         return FilePath(path)
     elif isinstance(path, _FILESPEC_CLS):
         return path

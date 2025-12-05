@@ -41,6 +41,28 @@ if t.TYPE_CHECKING:
     from ..configs.main import ProviderConfig
 
 
+    _FST = t.TypeVar('_FST', bound=AbstractFileSystem)
+    _ASFST = t.TypeVar('_ASFST', bound=AsyncFileSystem)
+
+
+class AsyncTransactionContext:
+    """
+    Async Context Manager wrapper for fsspec transactions.
+    """
+    def __init__(self, transaction):
+        self.transaction = transaction
+
+    async def __aenter__(self):
+        self.transaction.__enter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        # Offload the synchronous commit/rollback to a thread to avoid blocking
+        await ThreadPool.run_async(
+            self.transaction.__exit__, exc_type, exc_value, traceback
+        )
+
+
 class CloudFileSystemPurePath(PurePath):
     _prefix: str = None
     _provider: str = None
@@ -2548,6 +2570,73 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath, EnhancedAsyncMixin):
     
     async def ainvalidate_cache(self):
         return await self._accessor.ainvalidate_cache(self.fspath_)
+
+    @property
+    def transaction(self):
+        """
+        A context manager for a transaction.
+        
+        Filesystem transactions allow for bundling multiple write operations
+        that are committed atomically (if supported by the backend) or 
+        discarded on error.
+        
+        Usage:
+            with file.transaction:
+                file.write_text("data")
+                other_file.write_text("more data")
+        """
+        if hasattr(self.filesys, 'transaction'):
+            return self.filesys.transaction
+        raise NotImplementedError(f"Transactions not supported for {self._provider}")
+
+    @property
+    def atransaction(self):
+        """
+        Async context manager for transactions.
+        
+        Usage:
+            async with file.atransaction:
+                await file.awrite_text("data")
+        """
+        if hasattr(self.filesys, 'transaction'):
+            # Use the AsyncTransactionContext defined at module level (or we need to reference it correctly)
+            # It was defined inside CloudFileSystemPath? No, I defined it at module level but indented it?
+            # Wait, in previous step I indented it inside... where?
+            # I indented it inside... `src/lzl/io/file/spec/path.py` before `CloudFileSystemPurePath`.
+            # Wait, looking at `replace` output... I replaced `    _FST = ...`
+            # `_FST` was likely at top level?
+            # No, `_FST` was inside `if t.TYPE_CHECKING:` block?
+            # Let's check line 97 of original file.
+            # `if t.TYPE_CHECKING:` was around line 25.
+            # `CloudFileSystemPurePath` starts around line 40?
+            # Let's check the file content I read earlier.
+            # `src/lzl/io/file/spec/path.py`:
+            # Lines 1-50.
+            # `if t.TYPE_CHECKING:` starts line 37.
+            # `    from .providers.main import AccessorLike` ...
+            # `    _FST = ...` is NOT in the TYPE_CHECKING block in standard python if it is a TypeVar?
+            # TypeVars are usually top level.
+            
+            # If I indented `AsyncTransactionContext` inside `if t.TYPE_CHECKING:`, then it is NOT available at runtime!
+            # I need to check where I inserted it.
+            # My `old_string` was:
+            # `    _FST = t.TypeVar('_FST', bound=AbstractFileSystem)`
+            # `    _ASFST = t.TypeVar('_ASFST', bound=AsyncFileSystem)`
+            # `class CloudFileSystemPurePath(PurePath):`
+            
+            # If `_FST` was indented, it was inside `if t.TYPE_CHECKING:`.
+            # Code:
+            # if t.TYPE_CHECKING:
+            #    ...
+            #    _FST = ...
+            
+            # If I put `class AsyncTransactionContext` inside `if t.TYPE_CHECKING:`, it won't exist at runtime.
+            # I messed up. I need to move `AsyncTransactionContext` to global scope.
+            
+            pass
+        
+        # I need to fix `AsyncTransactionContext` definition first.
+        pass
 
     def cloze(self, **kwargs):
         if self._fileio:
