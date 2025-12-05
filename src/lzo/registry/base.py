@@ -125,7 +125,20 @@ class MRegistry(t.Generic[RT]):
         obj: t.Union[t.Type[RT], RT],
         **kwargs: t.Any,
     ) -> RT:
-        """Instantiate an object and invoke any configured hooks."""
+        """
+        Instantiates an object (or invokes a callable) and executes configured hooks.
+
+        If a 'prehook' is registered for the key, it modifies the `kwargs` before instantiation.
+        If a 'posthook' is registered, it receives the instantiated object and can modify or replace it.
+
+        Args:
+            key: The registry key associated with the object.
+            obj: The callable/class to instantiate, or an existing instance.
+            **kwargs: Arguments to pass to the object constructor/callable.
+
+        Returns:
+            The initialized (and potentially modified) object.
+        """
 
         if key in self.prehooks:
             if isinstance(self.prehooks[key], str):

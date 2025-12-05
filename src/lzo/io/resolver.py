@@ -26,7 +26,15 @@ else:
 
 def normalize_url(url: str) -> str:
     """
-    Normalizes the URL
+    Normalizes a URL string to a standard HTTPS format.
+
+    Handles various edge cases like missing schemes, 'www://', and malformed prefixes.
+
+    Args:
+        url: The URL string to normalize.
+
+    Returns:
+        The normalized URL starting with 'https://'.
     """
     url = url.lower()
     url = url.replace('http//', '').replace('https//', '').replace('htpps://', '').replace('htp://', '')
@@ -39,7 +47,13 @@ def normalize_url(url: str) -> str:
 @functools.lru_cache(500)
 def extract_registered_domain(url: str) -> str:
     """
-    Returns the domain
+    Extracts the registered domain (e.g., 'google.com' from 'sub.google.com') using tldextract.
+
+    Args:
+        url: The URL to extract the domain from.
+
+    Returns:
+        The registered domain string.
     """
     return tldextract.extract(url).registered_domain
 
@@ -47,7 +61,13 @@ def extract_clean_domain(
     url: str
 ) -> str:
     """
-    Extracts and cleans the domain
+    Extracts the registered domain and removes any leading 'www.'.
+
+    Args:
+        url: The URL to process.
+
+    Returns:
+        The cleaned domain string.
     """
     domain = extract_registered_domain(url.lower())
     if domain.startswith('www.'): domain = domain.replace('www.', '')
@@ -57,7 +77,12 @@ _http_download_headers: Optional[Dict[str, str]] = None
 
 def get_http_download_headers() -> Dict[str, str]:
     """
-    Returns the http download headers
+    Retrieves HTTP headers suitable for mimicking a real browser.
+
+    Uses `browserforge` if available; otherwise falls back to a hardcoded Chrome-like user agent.
+
+    Returns:
+        A dictionary of HTTP headers.
     """
     global _http_download_headers
     if _http_download_headers is None:
@@ -86,7 +111,15 @@ def validate_website_with_ping(
     count: Optional[int] = 4,
 ) -> bool:
     """
-    Validates a website
+    Validates a website's reachability using ICMP ping.
+
+    Args:
+        url: The URL or hostname to ping.
+        timeout: Timeout in seconds for each ping.
+        count: Number of ping attempts.
+
+    Returns:
+        True if the host is reachable (success count >= 3), False otherwise.
     """
     url = normalize_url(url)
     ping_results = pythonping.ping(url, count = count, timeout = timeout)
@@ -97,7 +130,13 @@ def validate_website_with_socket(
     url: str,
 ) -> bool:
     """
-    Validates a website
+    Validates a website's reachability by resolving its hostname via DNS.
+
+    Args:
+        url: The URL to validate.
+
+    Returns:
+        True if DNS resolution succeeds, False otherwise.
     """
     url = extract_clean_domain(url)
     with contextlib.suppress(Exception):
@@ -112,7 +151,16 @@ def validate_website_with_httpx(
     **kwargs,
 ) -> bool:
     """
-    Validates a website
+    Validates a website by sending an HTTP HEAD (or GET) request.
+
+    Args:
+        url: The URL to validate.
+        timeout: Connection timeout in seconds.
+        headers: Optional HTTP headers.
+        **kwargs: Additional arguments passed to the client.
+
+    Returns:
+        True if the server responds with a 2xx-4xx status (excluding 405 which triggers a GET retry), False on connection error.
     """
     url = normalize_url(url)
     try:
@@ -137,7 +185,16 @@ async def avalidate_website_with_httpx(
     **kwargs,
 ) -> bool:
     """
-    Validates a website
+    Asynchronously validates a website by sending an HTTP HEAD (or GET) request.
+
+    Args:
+        url: The URL to validate.
+        timeout: Connection timeout in seconds.
+        headers: Optional HTTP headers.
+        **kwargs: Additional arguments passed to the client.
+
+    Returns:
+        True if the server responds with a 2xx-4xx status, False on connection error.
     """
     url = normalize_url(url)
     try:
@@ -158,7 +215,13 @@ async def avalidate_website_with_httpx(
 @functools.lru_cache(maxsize=1200)
 def validate_hostname(url: str) -> bool:
     """
-    Validates the hostname
+    Validates that a hostname resolves to an IP address.
+
+    Args:
+        url: The URL or hostname.
+
+    Returns:
+        True if resolvable, False otherwise. Retries up to 5 times.
     """    
     hostname = urlparse(url).hostname if '://' in url else url
     for _attempts in range(5):
@@ -176,7 +239,16 @@ def validate_website_exists(
     soft_validate: Optional[bool] = False,
 ) -> bool:
     """
-    Validates the website exists
+    Comprehensive website validation checking ping first, then HTTP accessibility.
+
+    Args:
+        url: The URL to check.
+        timeout: Timeout for requests.
+        headers: Optional HTTP headers.
+        soft_validate: If True, only checks ping/DNS, skips HTTP check if ping succeeds.
+
+    Returns:
+        True if the website appears to exist and be reachable.
     """
     url = normalize_url(url)
     hn_valid = validate_website_with_ping(url)
@@ -191,7 +263,16 @@ async def avalidate_website_exists(
     soft_validate: Optional[bool] = False,
 ) -> bool:
     """
-    Validates the website exists
+    Async version of comprehensive website validation.
+
+    Args:
+        url: The URL to check.
+        timeout: Timeout for requests.
+        headers: Optional HTTP headers.
+        soft_validate: If True, only checks ping/DNS, skips HTTP check if ping succeeds.
+
+    Returns:
+        True if the website appears to exist and be reachable.
     """
     url = normalize_url(url)
     hn_valid = validate_website_with_ping(url)
@@ -207,7 +288,14 @@ Resolvers
 @functools.lru_cache()
 def resolve_domain(url: str, attempts: Optional[int] = None) -> str:
     """
-    Returns the root domain of a website after redirection
+    Resolves the final root URL of a website after following redirects.
+
+    Args:
+        url: The starting URL.
+        attempts: Recursion counter for retries (internal use).
+
+    Returns:
+        The final resolved URL, or the original if resolution fails.
     """
     if url.startswith('www://'): url = url.replace('www://', '')
     if not url.startswith('http'): url = f'https://{url}'
@@ -232,7 +320,14 @@ def resolve_domain(url: str, attempts: Optional[int] = None) -> str:
 @async_lru.alru_cache(maxsize=1200)
 async def aresolve_domain(url: str, attempts: Optional[int] = None) -> str:
     """
-    Returns the root domain after redirection
+    Asynchronously resolves the final root URL of a website after following redirects.
+
+    Args:
+        url: The starting URL.
+        attempts: Recursion counter for retries (internal use).
+
+    Returns:
+        The final resolved URL, or the original if resolution fails.
     """
     if url.startswith('www://'): url = url.replace('www://', '')
     if not url.startswith('http'): url = f'https://{url}'
@@ -257,7 +352,14 @@ def determine_invalid_domains(
     timeout: Optional[int] = 4,
 ) -> List[str]:
     """
-    Determines the invalid domains
+    Filters a list of URLs and returns those that are unreachable.
+
+    Args:
+        urls: List of URLs to check.
+        timeout: Timeout for each check.
+
+    Returns:
+        List of invalid/unreachable URLs.
     """
     if not urls: return []
     return [

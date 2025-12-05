@@ -14,16 +14,34 @@ from lzl.logging import logger
 T = t.TypeVar("T")
 
 class BaseDynamicLoader:
+    """
+    A utility class for dynamically discovering and loading classes from a module structure.
+    
+    This class recursively scans the directory of the specified `MODULE` for Python files,
+    imports them, and identifies classes that are subclasses of `class_to_find`.
+    
+    Attributes:
+        MODULE (str): The dotted module path to start the search from.
+    """
     MODULE: str
 
     def __init__(self, class_to_find: T):
+        """
+        Initialize the loader.
+
+        Args:
+            class_to_find: The base class type to search for.
+        """
         self.module = importlib.import_module(self.MODULE)
         self.class_to_find = class_to_find
         self._found_classes = self.__dynamic_class_loader()
 
     def __dynamic_class_loader(self) -> t.Dict[str, T]:
         """
-        Dynamically load all classes from the module.
+        Recursively finds and loads classes inheriting from `self.class_to_find` within `self.MODULE`.
+
+        Returns:
+            A dictionary mapping class names to the loaded class objects.
         """
         found_classes: t.Dict[str, T] = {}
         logger.info(
