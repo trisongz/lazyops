@@ -102,7 +102,10 @@ nav:
       - Types: api/lzl/types.md
     - lzo:
       - Overview: api/lzo/index.md
+      - Command Line: api/lzo/cmd.md
+      - IO: api/lzo/io.md
       - Registry: api/lzo/registry.md
+      - State: api/lzo/state.md
       - Types: api/lzo/types.md
       - Utils: api/lzo/utils.md
 

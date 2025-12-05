@@ -25,7 +25,18 @@ def download_url_to_bytes(
     **kwargs,
 ) -> Optional[Union[bytes, Tuple[bytes, 'Response']]]:
     """
-    Downloads the url to a tempfile
+    Synchronously downloads content from a URL into bytes.
+
+    Args:
+        url: The URL to download from.
+        follow_redirects: Whether to follow HTTP redirects.
+        verbose: If True, logs errors.
+        return_response: If True, returns a tuple of (content, response_object).
+        **kwargs: Additional arguments passed to `aiohttpx.Client.get`.
+
+    Returns:
+        The file content as bytes, or (bytes, Response) if return_response is True.
+        Returns None if the request fails.
     """
     from lzo.utils import logger
     url = normalize_url(url)
@@ -47,7 +58,18 @@ async def adownload_url_to_bytes(
     **kwargs,
 ) -> Optional[Union[bytes, Tuple[bytes, 'Response']]]:
     """
-    Downloads the url to a tempfile
+    Asynchronously downloads content from a URL into bytes.
+
+    Args:
+        url: The URL to download from.
+        follow_redirects: Whether to follow HTTP redirects.
+        verbose: If True, logs errors.
+        return_response: If True, returns a tuple of (content, response_object).
+        **kwargs: Additional arguments passed to `aiohttpx.Client.async_get`.
+
+    Returns:
+        The file content as bytes, or (bytes, Response) if return_response is True.
+        Returns None if the request fails.
     """
     from lzo.utils import logger
     url = normalize_url(url)
@@ -68,7 +90,16 @@ def download_url_to_tempfile(
     **kwargs,
 ) -> Optional[str]:
     """
-    Downloads the url to a tempfile
+    Synchronously downloads a URL and saves it to a temporary file.
+
+    Args:
+        url: The URL to download.
+        follow_redirects: Whether to follow redirects.
+        verbose: If True, logs success/failure messages.
+        **kwargs: Additional arguments passed to the download function.
+
+    Returns:
+        The absolute path to the temporary file, or None if download failed.
     """
     # from lzo.utils import logger
     from lazyops.utils import Timer, logger
@@ -93,7 +124,16 @@ async def adownload_url_to_tempfile(
     **kwargs,
 ) -> Optional[str]:
     """
-    Downloads the url to a tempfile
+    Asynchronously downloads a URL and saves it to a temporary file.
+
+    Args:
+        url: The URL to download.
+        follow_redirects: Whether to follow redirects.
+        verbose: If True, logs success/failure messages.
+        **kwargs: Additional arguments passed to the download function.
+
+    Returns:
+        The absolute path to the temporary file, or None if download failed.
     """
     # from lzo.utils import logger
     from lazyops.utils import Timer, logger

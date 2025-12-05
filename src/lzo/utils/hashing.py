@@ -25,16 +25,17 @@ def create_object_hash(
     _hash_length: Optional[int] = None,
 ) -> str:
     """
-    Creates a hash for the object
+    Creates a deterministic hash for a given object using xxhash.
 
-    obj:
-        the object to hash
-    _sep (str, optional):
-        the separator to use for the hash
-        Defaults to ':'.
-    _hash_length (int, optional):
-        the length of the hash
-        Defaults to None.
+    Supports dictionaries, lists, tuples, sets, and Pydantic models.
+
+    Args:
+        obj: The object to hash.
+        _sep: Separator used when joining iterable elements (default: ':').
+        _hash_length: Length/type of hash (8=32bit, 16=64bit, 32/None=128bit).
+
+    Returns:
+        The resulting hexadecimal hash string.
     """
     if _hash_length is None or _hash_length == 32: _hasher = xxhash.xxh3_128_hexdigest
     elif _hash_length == 16: _hasher = xxhash.xxh3_64_hexdigest
@@ -59,29 +60,22 @@ def create_hash_from_args_and_kwargs(
     **kwargs,
 ) -> str:
     """
-    Creates a hash from the args and kwargs
+    Creates a deterministic hash from function arguments and keyword arguments.
 
-    args:
-        the args to hash
-    _typed (bool, optional):
-        if True, it will hash the args and kwargs as a typed hash
-        if False, it will hash the args and kwargs as a non-typed hash
-        Defaults to False.
-    _key_base (tuple, optional):
-        the base key to use for the hash
-        Defaults to None.
-    _exclude (List[str], optional):
-        the keys to exclude from the hash
-        Defaults to None.
-    _exclude_none (bool, optional):
-        if True, it will exclude any None values from the hash
-        Defaults to True.
-    _sep (str, optional):
-        the separator to use for the hash
-        Defaults to ':'.
-    _hash_length (int, optional):
-        the length of the hash
-        Defaults to None.
+    Useful for caching mechanisms where the cache key depends on input arguments.
+
+    Args:
+        *args: Positional arguments to include in the hash.
+        _typed: If True, includes the type of positional arguments in the hash key.
+        _key_base: An optional initial tuple to prepend to the hash key.
+        _exclude: A list of keyword argument names to exclude from the hash.
+        _exclude_none: If True, excludes keyword arguments with None values.
+        _sep: Separator used for joining hash components.
+        _hash_length: Length/type of hash (8=32bit, 16=64bit, 32/None=128bit).
+        **kwargs: Keyword arguments to include in the hash.
+
+    Returns:
+        The resulting hexadecimal hash string.
     """
     hash_key = _key_base or ()
     if args: 
