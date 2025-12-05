@@ -68,7 +68,16 @@ class StrEnum(str, Enum, metaclass=StrEnumMeta):
     @classmethod
     def extend(cls, name: str, value: Any):
         """
-        Extends the enum with a new value
+        Dynamically extends the enum with a new member.
+        
+        Requires the `aenum` package to be installed.
+
+        Args:
+            name: The name of the new enum member.
+            value: The value of the new enum member.
+        
+        Raises:
+            ImportError: If `aenum` is not installed.
         """
         if not _EXTEND_SUPPORTED: raise ImportError('aenum is not installed. Please install it to use this feature')
         extend_enum(cls, name, value)
@@ -76,7 +85,19 @@ class StrEnum(str, Enum, metaclass=StrEnumMeta):
     @classmethod
     def __validate__(cls, value: Union[str, 'StrEnumT']) -> 'StrEnumT':
         """
-        Validates the value
+        Validates and converts a value to the corresponding Enum member.
+        
+        It attempts to match the value against member names (case-insensitive)
+        and values.
+
+        Args:
+            value: The value to validate.
+
+        Returns:
+            The matching Enum member.
+        
+        Raises:
+            ValueError: If the value cannot be mapped to any Enum member.
         """
         if hasattr(value, '__members__'): return value
         # return cls(value.__name__)
@@ -170,7 +191,16 @@ class AppEnv(str, Enum):
     @classmethod
     def from_env(cls, env_value: str) -> "AppEnv":
         """
-        Get the app environment from the environment variables
+        Determines the AppEnv from a string value, handling various formats and partial matches.
+        
+        Args:
+            env_value: The string value to parse (e.g., "production", "prod", "ci/cd").
+            
+        Returns:
+            The corresponding AppEnv member.
+            
+        Raises:
+            ValueError: If the value cannot be mapped to a known environment.
         """
         env_value = env_value.lower()
         if "cicd" in env_value or "ci/cd" in env_value: return cls.CICD

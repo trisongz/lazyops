@@ -87,13 +87,19 @@ nav:
   - API Reference:
     - lzl:
       - Overview: api/lzl/index.md
+      - API Clients: api/lzl/api.md
+      - Command Line: api/lzl/cmd.md
+      - Database: api/lzl/db.md
+      - Extensions: api/lzl/ext.md
       - IO: api/lzl/io.md
+      - Kubernetes: api/lzl/kops.md
       - Load: api/lzl/load.md
       - Logging: api/lzl/logging.md
       - Pool: api/lzl/pool.md
       - Proxied: api/lzl/proxied.md
       - Require: api/lzl/require.md
       - Sysmon: api/lzl/sysmon.md
+      - Types: api/lzl/types.md
     - lzo:
       - Overview: api/lzo/index.md
       - Registry: api/lzo/registry.md
