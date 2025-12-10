@@ -281,6 +281,13 @@ class FilePath(Path, FilePurePath, EnhancedAsyncMixin):
         Returns True if the path is a cloud object
         """
         return self.is_fsspec
+    
+    @property
+    def is_local_obj_(self) -> bool:
+        """
+        Returns True if the path is a local object
+        """
+        return not self.is_fsspec
 
     @property
     def parent(self) -> 'FilePath':

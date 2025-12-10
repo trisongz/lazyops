@@ -3,11 +3,11 @@ from __future__ import annotations
 import json
 from typing import TypeVar
 
-try:
-    import orjson
-    _orjson_available = True
-except ImportError:
-    _orjson_available = False
+# try:
+#     import orjson
+#     _orjson_available = True
+# except ImportError:
+#     _orjson_available = False
 
 try:
     import simdjson
@@ -37,8 +37,8 @@ if _simdjson_available:
 elif _cysimdjson_available:
     default_json = _cysimdjson
 
-elif _orjson_available:
-    default_json = orjson
+# elif _orjson_available:
+#     default_json = orjson
 
 elif _ujson_available:
     default_json = ujson
