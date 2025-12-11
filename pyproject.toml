@@ -8,21 +8,21 @@ authors = [{name = "Tri Songz", email = "ts@songzcorp.com"}]
 classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Libraries",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "loguru",
-    "pydantic",
-    "pydantic-settings",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
     "frozendict",
     "async_lru",
     "pyyaml",
     "filelock",
     "xxhash",
-    "typing_extensions; python_version < '3.8'",
-    "setuptools; python_version > '3.11'",
     "anyio>=3.7.1",
     "typer>=0.17.3",
 ]
@@ -113,4 +113,9 @@ builder-ci = [
     "pyyaml",
     "typing_extensions; python_version < '3.8'",
     "setuptools; python_version > '3.11'",
+]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov"
 ]
