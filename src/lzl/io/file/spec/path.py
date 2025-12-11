@@ -570,6 +570,29 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath, EnhancedAsyncMixin):
         dst = self.get_pathlike_(dest)
         if not overwrite and dst.exists():
             raise FileExistsError(f"Destination file {dst} exists and overwrite is False")
+        
+        if hasattr(self.filesys, 'copy') and self.is_fsspec and dst.is_fsspec:
+            try:
+                # Basic check if they share the same provider endpoint
+                # We need to handle different config types
+                def _get_ep(cfg):
+                    if hasattr(cfg, 'minio_endpoint'): return cfg.minio_endpoint
+                    if hasattr(cfg, 's3_endpoint'): return cfg.s3_endpoint
+                    if hasattr(cfg, 'r2_endpoint'): return cfg.r2_endpoint
+                    if hasattr(cfg, 's3c_endpoint'): return cfg.s3c_endpoint
+                    if hasattr(cfg, 'endpoint_url'): return cfg.endpoint_url
+                    return None
+                
+                src_ep = _get_ep(self.fsconfig)
+                dst_ep = _get_ep(dst.fsconfig)
+                
+                if src_ep and src_ep == dst_ep:
+                    self.filesys.copy(self.fspath_, dst.fspath_)
+                    return dst
+            except Exception:
+                # Fallback to streaming copy if server-side copy fails
+                pass
+
         with dst.open('wb') as f:
             for chunk in self.iter_raw(chunk_size = chunk_size):
                 f.write(chunk)
@@ -580,6 +603,33 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath, EnhancedAsyncMixin):
         Copies this file to the destination path.
         """
         dst = self.get_pathlike_(dest)
+
+        if not overwrite and await dst.aexists():
+            raise FileExistsError(f"Destination file {dst} exists and overwrite is False")
+
+        # Optimization for same-filesystem copies (e.g. S3->S3)
+        if hasattr(self.afilesys, 'copy') and self.is_fsspec and dst.is_fsspec:
+            try:
+                def _get_ep(cfg):
+                    if hasattr(cfg, 'minio_endpoint'): return cfg.minio_endpoint
+                    if hasattr(cfg, 's3_endpoint'): return cfg.s3_endpoint
+                    if hasattr(cfg, 'r2_endpoint'): return cfg.r2_endpoint
+                    if hasattr(cfg, 's3c_endpoint'): return cfg.s3c_endpoint
+                    if hasattr(cfg, 'endpoint_url'): return cfg.endpoint_url
+                    return None
+
+                src_ep = _get_ep(self.fsconfig)
+                dst_ep = _get_ep(dst.fsconfig)
+
+                if src_ep and src_ep == dst_ep:
+                    if asyncio.iscoroutinefunction(self.afilesys.copy):
+                        await self.afilesys.copy(self.fspath_, dst.fspath_)
+                    else:
+                        await to_thread(self.afilesys.copy, self.fspath_, dst.fspath_)
+                    return dst
+            except Exception:
+                # Fallback to streaming/optimized copy
+                pass
         
         if optimized is True:
             return await self.acopy_to_optimized(dst, overwrite=overwrite, chunk_size=chunk_size, **kwargs)
@@ -591,8 +641,6 @@ class CloudFileSystemPath(Path, CloudFileSystemPurePath, EnhancedAsyncMixin):
             except Exception:
                 pass
 
-        if not overwrite and await dst.aexists():
-            raise FileExistsError(f"Destination file {dst} exists and overwrite is False")
         async with dst.aopen('wb') as f:
             async for chunk in self.aiter_raw(chunk_size = chunk_size):
                 await f.write(chunk)
