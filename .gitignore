@@ -71,3 +71,6 @@ site/
 examples/file_performance_benchmark.py
 !src/lzl/io/file/spec/providers/cached.py
 !src/lzl/io/file/spec/paths/cached.py
+test_persistence.lock
+test_persistence.hash
+test_persistence.cache

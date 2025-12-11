@@ -545,11 +545,19 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
             if value is None:
                 autologger.info(f'tracked {func} {key}')
                 value = getattr(self.base, func)(key, *args, **kwargs)
-            yield value
-        finally:
+            
+            # Save the hash before yielding
             if key not in self._mutation_hashes:
                 self._mutation_hashes[key] = self.base.create_hash(value)
                 self._mutation_tracker[key] = value
+
+            yield value
+        finally:
+            if key not in self._mutation_hashes:
+                # Should have been set above, but just in case
+                self._mutation_hashes[key] = self.base.create_hash(value)
+                self._mutation_tracker[key] = value
+                
             if self.base.create_hash(value) != self._mutation_hashes[key]:
                 autologger.info(f'tracked {func} {key} (post-changed). Saving')
                 self._save_mutation_objects(key)
@@ -574,11 +582,19 @@ class PersistentDict(collections.abc.MutableMapping, MutableMapping[KT, VT]):
             if value is None:
                 autologger.info(f'tracked {func} {key}')
                 value = await getattr(self.base, func)(key, *args, **kwargs)
-            yield value
-        finally:
+            
+            # Save the hash before yielding
             if key not in self._mutation_hashes:
                 self._mutation_hashes[key] = self.base.create_hash(value)
                 self._mutation_tracker[key] = value
+
+            yield value
+        finally:
+            if key not in self._mutation_hashes:
+                # Should have been set above, but just in case
+                self._mutation_hashes[key] = self.base.create_hash(value)
+                self._mutation_tracker[key] = value
+
             if self.base.create_hash(value) != self._mutation_hashes[key]:
                 autologger.info(f'tracked {func} {key} (post-changed). Saving')
                 await self._asave_mutation_objects(key)
