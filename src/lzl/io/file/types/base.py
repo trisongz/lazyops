@@ -1,4 +1,3 @@
-from ast import Import
 from __future__ import annotations
 
 import io
@@ -10,6 +9,7 @@ import typing as t
 import datetime
 from lzl.types import eproperty
 from pydantic.types import ByteSize
+from ast import Import
 # from aiopath.selectors import _make_selector
 # from aiopath.scandir import EntryWrapper, scandir_async
 from stat import S_ISDIR, S_ISLNK, S_ISREG, S_ISSOCK, S_ISBLK, S_ISCHR, S_ISFIFO

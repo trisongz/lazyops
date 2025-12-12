@@ -86,7 +86,39 @@ def setup_test_env(check_services):
     """
     Ensures environment is ready for each test.
     """
-    pass
+
+    from lzl.io.file.spec.providers.main import MinioFileSystem, ProviderManager
+    
+    # Clear cached accessors to force reload (and patch application)
+    ProviderManager.accessors.clear()
+
+    
+    # Try to close existing session if possible to prevent loop mismatch
+    if MinioFileSystem.fs and hasattr(MinioFileSystem.fs, 'session'):
+        try:
+            # We can't await here as it's sync fixture, but s3fs session might have sync close?
+            # aiobotocore session close is async.
+            # If we just clear the cache, the session remains open but detached?
+            # The loop closure error happens when something TRIES to use it.
+            # If we clear it, nothing should use it.
+            pass
+        except Exception:
+            pass
+
+    try:
+        import s3fs
+        import fsspec
+        # Clear internal fsspec/s3fs instance caches to force new loop binding
+        s3fs.S3FileSystem.clear_instance_cache()
+        fsspec.clear_instance_cache()
+    except (ImportError, AttributeError):
+        pass
+
+    # Reset the filesystem state to ensure a fresh event loop binding
+    # This prevents 'Event loop is closed' errors when running multiple async tests
+    MinioFileSystem.fs = None
+    MinioFileSystem.fsa = None
+    MinioFileSystem.boto = None
 
 # Moved from test_io_file.py to share with test_persistence.py
 import uuid
@@ -94,16 +126,18 @@ from lzl.io import File
 
 pytest_plugins = ["pytest_asyncio"]
 
-@pytest.fixture(scope="module")
-async def random_bucket(minio_config):
+@pytest.fixture(scope="function")
+def random_bucket(minio_config):
     """
     Creates a random bucket for testing and cleans it up after.
+    Uses boto3 to avoid asyncio loop issues in fixtures.
     """
+    import boto3
+    from botocore.client import Config
+    
     bucket_name = f"test-bucket-{uuid.uuid4().hex}"
     
-    # Configure File.settings with MinIO creds
-    # Use fallback assignment if update_config fails/missing
-    # MinIO often returns error if LocationConstraint is 'us-east-1' (default)
+    # Configure File.settings with MinIO creds (still needed for the test to work)
     region = minio_config.get("region_name")
     if not region or region == "us-east-1":
         region = ""
@@ -126,21 +160,33 @@ async def random_bucket(minio_config):
     if hasattr(File.settings, 'update_fs'):
         File.settings.update_fs()
     
-    # Ensure bucket exists
+    # Use boto3 for bucket creation
+    s3_client = boto3.client(
+        's3',
+        endpoint_url=minio_config["endpoint_url"],
+        aws_access_key_id=minio_config["aws_access_key_id"],
+        aws_secret_access_key=minio_config["aws_secret_access_key"],
+        config=Config(signature_version='s3v4'),
+        region_name=region or 'us-east-1'
+    )
+    
     try:
-        path = File(f"mc://{bucket_name}/")
-        if not await path.aexists():
-            await path.amkdir(parents=True, exist_ok=True)
+        s3_client.create_bucket(Bucket=bucket_name)
     except Exception as e:
-        print(f"Error creating bucket {bucket_name}: {e}")
+        # Ignore if exists (rare with uuid)
+        print(f"Boto3 create bucket warning: {e}")
 
     yield bucket_name
     
     # Cleanup
     try:
-        path = File(f"mc://{bucket_name}/")
-        if await path.aexists():
-            await path.arm(recursive=True)
+        # Must rely on force delete or recursive delete
+        # boto3 doesn't have recursive delete easily, but we can list objects
+        response = s3_client.list_objects_v2(Bucket=bucket_name)
+        if 'Contents' in response:
+            for obj in response['Contents']:
+                s3_client.delete_object(Bucket=bucket_name, Key=obj['Key'])
+        s3_client.delete_bucket(Bucket=bucket_name)
     except Exception as e:
-        print(f"Error removing bucket {bucket_name}: {e}")
+        print(f"Boto3 cleanup error: {e}")
 

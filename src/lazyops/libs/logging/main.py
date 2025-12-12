@@ -142,7 +142,7 @@ def find_and_format_seps(msg: str) -> str:
       
     """
     # v2
-    for sep_match in re.finditer('\|\w+,(\w+,*)+\|', msg):
+    for sep_match in re.finditer(r'\|\w+,(\w+,*)+\|', msg):
         s = sep_match.group()
         if len(s) >= 10: continue
         msg = msg.replace(s, "||".join(s.split(",")))
@@ -278,13 +278,13 @@ class NullLogger(logging.Logger):
         if colored:
             # Add escape characters to prevent errors
             _message = _message.replace("<fg", ">|fg")
-            _message = _message.replace("<", "\</")
+            _message = _message.replace("<", r"\</")
             _message = find_and_format_seps(_message)
             # print(_message)
             for key, value in COLORED_MESSAGE_MAP.items():
                 _message = _message.replace(key, value)
             _message = _message.replace(">|fg", "<fg")
-            _message = _message.replace("\</", "\<")
+            _message = _message.replace(r"\</", r"\<")
             _message += RESET_COLOR
         return _message
     

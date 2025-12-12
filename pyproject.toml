@@ -35,7 +35,7 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.uv.sources]
-kvdb-py = { git = "https://github.com/trisongz/kvdb-py" }
+kvdb-py = { git = "https://github.com/trisongz/kvdb-py", branch = "copilot/refactor-support-for-redis-py-7-1-0"  }
 
 [project.scripts]
 lzl = "lzl.cmd:main"

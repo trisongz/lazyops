@@ -57,7 +57,7 @@ async def test_persistence_kvdb(kvdb_pd):
 
 
 @pytest.fixture
-def minio_pd(random_bucket):
+async def minio_pd(random_bucket):
     """
     Returns a PersistentDict backed by MinIO (ObjStore).
     """
@@ -70,38 +70,41 @@ def minio_pd(random_bucket):
         serializer='json',
     )
     yield pd
-    # Cleanup handled by random_bucket fixture? 
-    # Or explicitly clear
-    # pd.clear() # Clears all objects in prefix
-    pass 
+    
+    # Explicitly cleanup s3fs session to prevent event loop closed errors
+    try:
+        # Check if internal buffer or accessor has session
+        if hasattr(pd, 'backend') and hasattr(pd.backend, 'root'):
+             afilesys = pd.backend.root.afilesys
+             if afilesys and hasattr(afilesys, 'session'):
+                 await afilesys.session.close()
+    except Exception:
+        pass 
 
-def test_persistence_minio(minio_pd):
+@pytest.mark.asyncio
+async def test_persistence_minio(minio_pd):
     """
     Test PersistentDict with MinIO backend.
     """
-    async def _test():
-        key = "file_key"
-        value = {"file_data": 456}
-        
-        # Set
-        await minio_pd.aset(key, value)
-        assert await minio_pd.acontains(key)
-        
-        # Get
-        retrieved = await minio_pd.aget(key)
-        assert retrieved == value
-        
-        # Dict interface
-        minio_pd["sync_file"] = "data"
-        
-        # Verify it exists as file
-        # f_path = File(f"{minio_pd.base_key}/{key}")
-        # Serializer might wrap/change extension
-        # If using json serializer, maybe .json appended?
-        # Let's check via pd interface mainly.
-        
-        pd2 = PersistentDict(base_key=minio_pd.base_key, backend_type='objstore', serializer='json')
-        assert await pd2.aget(key) == value
-
-    import anyio
-    anyio.run(_test)
+    key = "file_key"
+    value = {"file_data": 456}
+    
+    # Set
+    await minio_pd.aset(key, value)
+    assert await minio_pd.acontains(key)
+    
+    # Get
+    retrieved = await minio_pd.aget(key)
+    assert retrieved == value
+    
+    # Dict interface
+    minio_pd["sync_file"] = "data"
+    
+    # Verify it exists as file
+    # f_path = File(f"{minio_pd.base_key}/{key}")
+    # Serializer might wrap/change extension
+    # If using json serializer, maybe .json appended?
+    # Let's check via pd interface mainly.
+    
+    pd2 = PersistentDict(base_key=minio_pd.base_key, backend_type='objstore', serializer='json')
+    assert await pd2.aget(key) == value

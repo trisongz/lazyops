@@ -58,7 +58,8 @@ class FileIOConfig(BaseSettings, RegisteredSettings.configure_registered(module 
         case_sensitive = False,
         extra = 'allow',
         populate_by_name = True,
-        allow_population_by_field_name = True,
+        validate_by_name= True,
+        # allow_population_by_field_name = True,
     )
 
     @eproperty

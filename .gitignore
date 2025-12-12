@@ -83,3 +83,4 @@ z_mcp.json
 *.lock
 *.hash
 !.github/workflows/tests.yml
+*.log
