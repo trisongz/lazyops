@@ -34,6 +34,8 @@ Homepage = "https://github.com/trisongz/lazyops"
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
+[tool.uv.sources]
+kvdb-py = { git = "https://github.com/trisongz/kvdb-py" }
 
 [project.scripts]
 lzl = "lzl.cmd:main"
@@ -92,6 +94,10 @@ docs = [
     "mkdocs-material>=9.0.0",
     "mkdocstrings[python]>=0.24.0",
     "pymdown-extensions>=10.0",
+]
+e2e = [
+    "lazyops[dev,file,fastapi,kops,openai]",
+    "kvdb-py",
 ]
 
 [tool.setuptools]

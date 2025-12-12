@@ -78,3 +78,8 @@ test_persistence.hash
 test_persistence.cache
 z_mcp.json
 !tests/conftest.py
+!tests/e2e/conftest.py
+*.cache
+*.lock
+*.hash
+!.github/workflows/tests.yml
