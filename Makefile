@@ -92,3 +92,18 @@ mkdocs-build:
 ## mkdocs-deploy: Deploy MkDocs documentation to GitHub Pages
 mkdocs-deploy:
 	$(MKDOCS) gh-deploy --force
+
+# Spin up e2e environment
+run-e2e-local: ## Run e2e tests locally
+	docker compose -f tests/docker-compose.e2e.yml up -d
+	uv sync --extra e2e
+	export MINIO_ENDPOINT=http://localhost:9000; \
+	export MINIO_ACCESS_KEY=minioadmin; \
+	export MINIO_SECRET_KEY=minioadmin; \
+	export MINIO2_ENDPOINT=http://localhost:9001; \
+	export MINIO2_ACCESS_KEY=minioadmin; \
+	export MINIO2_SECRET_KEY=minioadmin; \
+	export MINIO2_REGION=us-east-1; \
+	export REDIS_URL=redis://localhost:6389/0; \
+	uv run pytest tests/e2e -v -s
+	docker compose -f tests/docker-compose.e2e.yml down

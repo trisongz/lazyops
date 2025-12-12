@@ -4,7 +4,12 @@ import os
 import anyio
 import contextlib
 import typing as t
-from aiopath.wrap import func_to_async_method as func_as_method_coro, to_async_method
+
+# We'll try the latest method first, then fallback to the older one
+try:
+    from aiopath.wrap import func_as_method_coro, method_as_method_coro as to_async_method
+except ImportError:
+    from aiopath.wrap import func_to_async_method as func_as_method_coro, to_async_method
 from .static import ASYNC_SYNTAX_MAPPING
 from ..utils.logs import logger
 from ..utils.helpers import iscoroutinefunction

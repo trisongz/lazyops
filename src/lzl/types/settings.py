@@ -17,8 +17,9 @@ from .base import (
 from .properties import eproperty
 from typing import Optional, Dict, Any, List, TYPE_CHECKING
 
-if PYDANTIC_VERSION == 2:
+if PYDANTIC_VERSION >= 2:
     from pydantic import PrivateAttr
+    from pydantic_settings import SettingsConfigDict
 
 if TYPE_CHECKING:
     from lzo.types import AppEnv
@@ -28,16 +29,20 @@ class BaseSettings(_BaseSettings):
     Base Settings
     """
 
-    if PYDANTIC_VERSION == 2:
+    if PYDANTIC_VERSION >= 2:
         _extra: Dict[str, Any] = PrivateAttr(default_factory = dict)
+        model_config = SettingsConfigDict(
+            env_prefix = "",
+            extra = 'allow',
+            case_sensitive = False,
+        )
+
     else:
         _extra: Dict[str, Any] = Field(default_factory = dict, exclude = True, hidden = True)
-
-    
-    class Config:
-        env_prefix: str = ""
-        case_sensitive: bool = False
-        arbitrary_types_allowed: bool = True
+        class Config:
+            env_prefix: str = ""
+            case_sensitive: bool = False
+            arbitrary_types_allowed: bool = True
 
 
     @property

@@ -242,3 +242,19 @@ def get_filelike(path: PathLike) -> FileLike:
     if hasattr(path, 'file') and hasattr(getattr(path, 'file'), 'name'): 
         return get_pathlike(path.file.name)
     return get_pathlike(path.name) if hasattr(path, 'name') else path
+
+
+def register_path_protocol(
+    protocol: str, 
+    path_cls: t.Type[ProviderPathLike],
+    aliases: t.Optional[t.List[str]] = None,
+):
+    """
+    Registers a new path protocol
+    """
+    if not protocol.endswith('://'): protocol += '://'
+    PREFIXES_TO_FP[protocol] = path_cls
+    if aliases:
+        for alias in aliases:
+            if not alias.endswith('://'): alias += '://'
+            PREFIXES_TO_FP[alias] = path_cls

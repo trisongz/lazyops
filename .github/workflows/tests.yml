@@ -1,0 +1,96 @@
+name: E2E Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+    paths:
+      - 'src/version.py'
+      - 'src/lzl/version.py'
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: 
+          - "3.10"
+          - "3.11"
+          - "3.12"
+      fail-fast: false
+
+    services:
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      minio:
+        # image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+        image: minio/minio:edge-cicd
+        ports:
+          - 9000:9000
+          # - 9001:9001
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        options: >-
+          --health-cmd "curl --silent --fail http://localhost:9000/minio/health/live"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+        volumes:
+          - /tmp/minio_data:/data
+      
+      minio2:
+        # image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+        image: minio/minio:edge-cicd
+        ports:
+          - "9001:9000"
+          # - "9091:9090"
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        options: >-
+          --health-cmd "curl --silent --fail http://localhost:9000/minio/health/live"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+        volumes:
+          - /tmp/minio_data2:/data
+    
+    steps:
+    # Proceeding with file creation.
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+
+    - name: Install dependencies
+      run: |
+        uv sync --extra e2e
+
+    - name: Run E2E Tests
+      env:
+        MINIO_ENDPOINT: http://localhost:9000
+        MINIO_ACCESS_KEY: minioadmin
+        MINIO_SECRET_KEY: minioadmin
+        MINIO2_ENDPOINT: http://localhost:9001
+        MINIO2_ACCESS_KEY: minioadmin
+        MINIO2_SECRET_KEY: minioadmin
+        MINIO2_REGION: us-east-1
+        REDIS_URL: redis://localhost:6379/0
+      run: |
+        uv run pytest tests/e2e -v -s

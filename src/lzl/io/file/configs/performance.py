@@ -8,6 +8,7 @@ based on file size, operation type, and system resources.
 
 import typing as t
 from lzo.types import BaseSettings
+from pydantic_settings import SettingsConfigDict
 
 # Size thresholds for different optimization strategies
 SMALL_FILE_THRESHOLD = 1024 * 1024  # 1 MB
@@ -56,10 +57,19 @@ class PerformanceConfig(BaseSettings):
     retry_delay: float = 1.0  # seconds
     connection_timeout: int = 30  # seconds
     read_timeout: int = 300  # seconds (5 minutes for large files)
+
+    model_config = SettingsConfigDict(
+        env_prefix = "FILEIO_PERF_",
+        case_sensitive = False,
+        extra = 'allow',
+        populate_by_name = True,
+        validate_by_name = True,
+        # allow_population_by_field_name = True,
+    )
     
-    class Config:
-        env_prefix = "FILEIO_PERF_"
-        case_sensitive = False
+    # class Config:
+    #     env_prefix = "FILEIO_PERF_"
+    #     case_sensitive = False
     
     def get_optimal_chunk_size(self, file_size: t.Optional[int] = None) -> int:
         """Get optimal chunk size based on file size.

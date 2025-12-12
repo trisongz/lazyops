@@ -386,7 +386,7 @@ class BaseFileSystemAccessor(NormalAccessor):
         cls.amkdir: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'amkdir')
         cls.amakedirs: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'amakedirs')
         cls.aunlink: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'arm_file')
-        cls.arm_file: t.Callable = create_async_coro(cls.CloudFileSystem, 'arm_file')
+        cls.arm_file: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'arm_file')
         cls.armdir: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'armdir')
         cls.aremove: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'arm')
         cls.arm: t.Callable = create_async_method_fs(cls.CloudFileSystem, 'arm')

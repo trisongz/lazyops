@@ -218,10 +218,14 @@ def get_keydb_session(
     if not _keydb_sessions.get(name):
         try:
             from aiokeydb import KeyDBClient
-            _keydb_sessions[name] = KeyDBClient.get_session(name = name, verbose = False, **kwargs)
+            url = kwargs.pop('url', None)
+            if url:
+                _keydb_sessions[name] = KeyDBClient.get_session(url=url, name=name, verbose=False, **kwargs)
+            else:
+                _keydb_sessions[name] = KeyDBClient.get_session(name=name, verbose=False, **kwargs)
         except Exception as e:
             from .logs import logger
-            logger.warning('KeyDB is not available. Disabling')
+            logger.warning(f'KeyDB is not available. Disabling: {e}')
             _keydb_enabled = False
             return None
     if validate_active and _keydb_enabled is None:

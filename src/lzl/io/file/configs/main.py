@@ -5,6 +5,7 @@ import pathlib
 from lzl.logging import logger
 from lzl.proxied import ProxyObject
 from lzo.utils import load_env_vars
+from pydantic_settings import SettingsConfigDict
 from lzo.types import BaseSettings, eproperty, model_validator, field_validator
 from lzo.registry.mixins import RegisteredSettings
 from .providers import (
@@ -19,7 +20,21 @@ from .providers import (
 from .performance import PerformanceConfig
 from typing import Optional, Dict, Any, List, Union, Tuple, TYPE_CHECKING
 
+
 ProviderConfig = Union[AWSConfig, GCPConfig, MinioConfig, S3CompatConfig, CloudflareR2Config, SMBConfig]
+
+_KindToConfig: Dict[str, Type[ConfigMixin]] = {
+    'aws': AWSConfig,
+    's3': AWSConfig,
+    'gcp': GCPConfig, 
+    'gs': GCPConfig,
+    'minio': MinioConfig,
+    'mc': MinioConfig,
+    's3c': S3CompatConfig,
+    's3_compat': S3CompatConfig,
+    'r2': CloudflareR2Config,
+    'smb': SMBConfig,
+}
 
 class FileIOConfig(BaseSettings, RegisteredSettings.configure_registered(module = 'file')):
     """
@@ -33,11 +48,19 @@ class FileIOConfig(BaseSettings, RegisteredSettings.configure_registered(module 
     num_workers: Optional[int] = 12
     checksum_cache_ttl: Optional[int] = 60 * 60 * 24 * 1 # 1 days
     enable_progress_bar: Optional[bool] = False
+    enable_progress_bar: Optional[bool] = False
     tfio_enabled: Optional[bool] = False
+    
+    _custom_providers: Dict[str, ProviderConfig] = {}
 
-    class Config:
-        env_prefix = "FILEIO_"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_prefix = "FILEIO_",
+        case_sensitive = False,
+        extra = 'allow',
+        populate_by_name = True,
+        validate_by_name= True,
+        # allow_population_by_field_name = True,
+    )
 
     @eproperty
     def performance(self) -> PerformanceConfig:
@@ -171,13 +194,40 @@ class FileIOConfig(BaseSettings, RegisteredSettings.configure_registered(module 
         self.set_env()
 
 
+    def register_provider(
+        self,
+        name: str,
+        kind: str,
+        env_prefix: Optional[str] = None,
+        **kwargs
+    ):
+        """
+        Registers a new provider
+        """
+        if kind not in _KindToConfig:
+            raise ValueError(f"Invalid Provider Kind: {kind}")
+        
+        config_cls = _KindToConfig[kind]
+        if env_prefix:
+            config = config_cls.from_env_prefix(env_prefix, **kwargs)
+        else:
+            config = config_cls(**kwargs)
+        
+        # Set the env if needed
+        # config.set_env()
+        self._custom_providers[name] = config
+
     def get_provider_config(self, provider: str, update_fs: bool = False, **auth_config) -> Tuple[Dict[str, Any], ProviderConfig]:
         """
         Updates the auth settings for the specified provider
         and returns the provider config
         """
-        if not hasattr(self, provider): 
+        if provider in self._custom_providers:
+            provider_spec = self._custom_providers[provider]
+        elif hasattr(self, provider): 
+            provider_spec: ConfigMixin = getattr(self, provider)
+        else:
             raise ValueError(f"Provider {provider} not found")
-        provider_spec: ConfigMixin = getattr(self, provider)
+        
         if auth_config: provider_spec.update_auth(update_fs = update_fs, **auth_config)
         return provider_spec.build_fs_config(), provider_spec

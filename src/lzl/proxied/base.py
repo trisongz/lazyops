@@ -46,7 +46,15 @@ class ProxyObject(t.Generic[ProxyObjT]):
     _wrapped = None
 
     if t.TYPE_CHECKING:
-        def __new__(cls: t.Type[ProxyObjT], *args, **kwargs) -> ProxyObjT:
+        def __new__(
+            cls,
+            obj_cls: t.Optional[t.Union[t.Type[ProxyObjT], str]] = None,
+            obj_getter: t.Optional[t.Union[t.Callable[..., ProxyObjT], str]] = None,
+            obj_args: t.Optional[t.Union[str, t.Callable[..., t.Iterable[t.Any]], t.Iterable[t.Any]]] = None,
+            obj_kwargs: t.Optional[t.Union[str, t.Callable[..., t.Dict[str, t.Any]], t.Dict[str, t.Any]]] = None,
+            obj_initialize: t.Optional[bool] = True,
+            threadsafe: t.Optional[bool] = True,
+        ) -> ProxyObjT:
             ...
 
     def __init__(

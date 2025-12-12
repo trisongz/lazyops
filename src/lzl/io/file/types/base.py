@@ -9,17 +9,29 @@ import typing as t
 import datetime
 from lzl.types import eproperty
 from pydantic.types import ByteSize
+from ast import Import
 # from aiopath.selectors import _make_selector
 # from aiopath.scandir import EntryWrapper, scandir_async
 from stat import S_ISDIR, S_ISLNK, S_ISREG, S_ISSOCK, S_ISBLK, S_ISCHR, S_ISFIFO
 from aiopath.wrap import (
     func_to_async_func,
-    func_to_async_method as func_as_method_coro,
-    coro_to_async_method as coro_as_method_coro,
-    to_async_method,
-    method_to_async_method,
     to_thread,
 )
+try:
+    from aiopath.wrap import (
+        func_as_method_coro,
+        coro_as_method_coro,
+        method_as_method_coro as method_to_async_method,
+        method_as_method_coro as to_async_method,
+    )
+except ImportError:
+    from aiopath.wrap import (
+        func_to_async_method as func_as_method_coro,
+        coro_to_async_method as coro_as_method_coro,
+        to_async_method,
+        method_to_async_method,
+    )
+
 from aiopath.handle import (
     IterableAIOFile,
     get_handle,

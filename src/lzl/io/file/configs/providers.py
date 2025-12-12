@@ -5,7 +5,7 @@ import os
 import json
 import pathlib
 import multiprocessing as mp
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, ConfigDict
 from lzo.types import BaseSettings, eproperty, model_validator, field_validator, Literal
 
 from typing import Optional, Dict, Any, List, Union, TYPE_CHECKING
@@ -35,6 +35,20 @@ class ConfigMixin(BaseSettings):
     # if the object size is larger than this, it will use an alternate method
     read_chunking_large_size: Optional[int] = 1024 * 1024 * 50 # 50 MB
     read_chunking_manager_default: Optional[bool] = True
+
+    model_config = ConfigDict(
+        populate_by_name = True,
+        validate_by_name = True,
+        # allow_population_by_field_name = True,
+        extra = 'allow',
+        case_sensitive = False,
+    )
+
+    # class Config:
+    #     case_sensitive = False
+    #     extra = 'allow'
+    #     populate_by_name = True
+    #     allow_population_by_field_name = True
 
     @field_validator("authz_config_dir", mode = 'before')
     def validate_authz_config_dir(cls, value: Optional[pathlib.Path]) -> pathlib.Path:
@@ -144,9 +158,62 @@ class ConfigMixin(BaseSettings):
         """
         raise NotImplementedError
     
-    class Config:
-        case_sensitive = False
-        extra = 'allow'
+    
+
+    @classmethod
+    def from_env_prefix(cls, prefix: str, **kwargs):
+        """
+        Loads the config from the env prefix
+        """
+        if not prefix.endswith('_'): prefix += '_'
+        _env = {k: v for k, v in os.environ.items() if k.startswith(prefix)}
+        # print(f"DEBUG: from_env_prefix prefix={prefix} env={_env}")
+        if not _env: return cls(**kwargs)
+        
+        # We need to map the env vars to the fields
+        # This is a bit hacky, but it works
+        data = {}
+        
+        # Common mappings
+        _common_maps = {
+            'ENDPOINT': 'endpoint',
+            'ACCESS_KEY': 'access_key',
+            'SECRET_KEY': 'secret_key',
+            'ACCESS_KEY_ID': 'access_key',
+            'SECRET_ACCESS_KEY': 'secret_key',
+            'ACCESS_TOKEN': 'access_token',
+            'REGION': 'region',
+            'SECURE': 'secure',
+            'SIGNATURE_VER': 'signature_ver',
+        }
+        
+        for k, v in _env.items():
+            key = k.replace(prefix, '')
+            # print(f"DEBUG: Checking key={key} val={v}")
+            # Try to map to known suffixes
+            for suffix, field_suffix in _common_maps.items():
+                if key == suffix or key.endswith(f'_{suffix}'):
+                    # Try to find the matching field in the model
+                    # e.g. MINIO_ENDPOINT -> minio_endpoint
+                    # e.g. R2_ACCESS_KEY -> r2_access_key
+                    # default to just the field suffix if no prefix in field name
+                    
+                    found = False
+                    for model_field in cls.model_fields.keys():
+                        if model_field.endswith(f'_{field_suffix}'):
+                            data[model_field] = v
+                            found = True
+                            break
+                    
+                    if not found and field_suffix in cls.model_fields:
+                        data[field_suffix] = v
+            
+            # Also just try exact matches (case insensitive)
+            if key.lower() in cls.model_fields:
+                data[key.lower()] = v
+        
+        data.update(kwargs)
+        return cls(**data)
 
 class AWSConfig(ConfigMixin):
     """

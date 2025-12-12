@@ -40,7 +40,7 @@ class RedisStatefulBackend(BaseStatefulBackend):
         logger.warning('Redis Stateful Backend is deprecated. Please use `kvdb` instead.')
         _kdb_kwargs = {}
         if kwargs:
-            for key in kwargs:
+            for key in list(kwargs.keys()):
                 if key.startswith('redis_'):
                     _kdb_kwargs[key.replace('redis_', '')] = kwargs.pop(key)
                 elif key.startswith('keydb_'):

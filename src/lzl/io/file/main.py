@@ -126,6 +126,154 @@ else:
             from lzl.io.file.registry import register_loader
             register_loader(ext, loader, overwrite)
 
+        @classmethod
+        def register_protocol(
+            cls,
+            protocol: str,
+            kind: str,
+            env_prefix: t.Optional[str] = None,
+            **kwargs,
+        ):
+            """
+            Registers a new protocol
+            
+            :param protocol: The protocol to register (e.g. mc2://)
+            :param kind: The kind of provider (e.g. minio)
+            :param env_prefix: The env prefix to use (e.g. MINIO2_)
+            :param kwargs: Additional config kwargs
+            """
+            if protocol.endswith('://'): protocol = protocol[:-3]
+            name = protocol.replace('+', '_')
+            
+            # 1. Register the provider config
+            cls.settings.register_provider(name, kind, env_prefix = env_prefix, **kwargs)
+            
+            # 2. Create the Path Class
+            # We need to import the base classes
+            from .spec.main import register_path_protocol
+            from .spec.path import CloudFileSystemPath, PureCloudFileSystemPosixPath, PureCloudFileSystemWindowsPath
+            from .spec.paths.minio import FileMinioPath
+            from .spec.paths.aws import FileS3Path
+            from .spec.paths.r2 import FileR2Path
+            from .spec.paths.s3c import FileS3CPath
+
+            _BaseMap = {
+                'minio': FileMinioPath,
+                's3': FileS3Path,
+                'aws': FileS3Path,
+                'r2': FileR2Path,
+                's3c': FileS3CPath,
+                's3_compat': FileS3CPath,
+            }
+            if kind not in _BaseMap:
+                raise ValueError(f"Unsupported Provider Kind for Path Creation: {kind}")
+            
+            base_cls = _BaseMap[kind]
+            
+            # Create the dynamic path class
+            # This replicates logic in FileMinioPath etc
+            
+            _path_cls_name = f"File{name.title()}Path"
+            _pure_posix_name = f"PureFile{name.title()}PosixPath"
+            _pure_win_name = f"PureFile{name.title()}WindowsPath"
+            
+            def _resolve_cls(cls_attr, module_name):
+                import sys
+                if isinstance(cls_attr, str):
+                    return getattr(sys.modules[module_name], cls_attr)
+                return cls_attr
+            
+            _base_posix_pathz = _resolve_cls(base_cls._posix_pathz, base_cls.__module__)
+            _base_win_pathz = _resolve_cls(base_cls._win_pathz, base_cls.__module__)
+            
+            # Dynamic Pure Classes
+            class _DynamicPurePosixPath(PureCloudFileSystemPosixPath):
+                _flavour = _base_posix_pathz._flavour
+                _pathlike = _base_posix_pathz._pathlike
+                _prefix = name
+                _provider = kind.title()
+                __slots__ = ()
+
+            class _DynamicPureWindowsPath(PureCloudFileSystemWindowsPath):
+                _flavour = _base_win_pathz._flavour
+                _pathlike = _base_win_pathz._pathlike
+                _prefix = name
+                _provider = kind.title()
+                __slots__ = ()
+
+            # Dynamic Main Path Class
+            # We must override _prefix, _provider, _posix_pathz, _win_pathz
+            
+            # We need to set the module name for the pure classes to be found?
+            # Or we can just set them directly as classes if the base class supports it
+            # Checking CloudFileSystemPath:
+            # _win_pathz: t.ClassVar['CloudFileSystemWindowsPath'] = 'CloudFileSystemWindowsPath'
+            # __new__ uses globals()[cls] if string. 
+            # We should probably set them as classes if possible or register them in globals?
+            # Registering in globals of the MODULE defining the class is tricky here.
+            
+            # Let's look at CloudFileSystemPath.__new__:
+            # if cls is CloudFileSystemPath ... cls = globals()[cls]
+            # If we pass a subclass, it might skip that?
+            
+            # FileMinioPath.__new__:
+            # if cls is FileMinioPath or issubclass(cls, FileMinioPath): 
+            #    cls = cls._posix_pathz if os.name != 'nt' else cls._win_pathz
+            #    cls = globals()[cls]
+            
+            # This relies on the pure classes being in globals() of that module. 
+            # Since we are defining dynamically, we need to handle this.
+            
+            # Strategy: Define the class such that __new__ logic works or is overridden.
+            
+            _new_conf = {
+                '_prefix': name,
+                '_provider': kind.title(),
+                '_posix_prefix': kwargs.get('posix_prefix', 's3'),
+                # We can't easily rely on string lookups in globals() for dynamic classes
+                # unless we inject them into the module's globals where they are defined.
+                # But here we are defining them inside a function.
+            }
+            
+            # Override __new__ to pick the correct class directly
+            # Override __new__ to pick the correct class directly
+            # We need to define the concrete classes first or use a factory
+            # But _new_new needs to reference them.
+            
+            _DynamicPath = type(_path_cls_name, (base_cls,), _new_conf)
+
+            from .path import PosixPath, WindowsPath
+
+            class _DynamicPosixPath(PosixPath, _DynamicPath, _DynamicPurePosixPath):
+                __slots__ = ()
+            
+            class _DynamicWindowsPath(WindowsPath, _DynamicPath, _DynamicPureWindowsPath):
+                __slots__ = ()
+
+            def _new_new(cls, *parts, **kwargs):
+                if cls.__name__ == _path_cls_name:
+                    cls = _DynamicPosixPath if os.name != 'nt' else _DynamicWindowsPath
+                self = cls._from_parts(parts, init=False)
+                if hasattr(self, '_init'):
+                    self._init()
+                return self
+            
+            _DynamicPath.__new__ = _new_new
+            
+            # Also need to init
+            def _init_dynamic(self, template = None):
+                self._accessor = self._get_provider_accessor(self._prefix)
+                self._closed = False
+                self._fileio = None
+                self._extra: t.Dict[str, t.Any] = {}
+
+            _DynamicPath._init = _init_dynamic
+            
+            # 3. Register Protocol
+            register_path_protocol(protocol, _DynamicPath)
+            
+            return _DynamicPath
+
         # Pydantic methods
         if PYDANTIC_VERSION == 2:
             from pydantic_core import core_schema, SchemaSerializer
