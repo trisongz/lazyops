@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: ["main"]
+    paths:
+      - 'src/version.py'
+      - 'src/lzl/version.py'
   pull_request:
     branches: ["main"]
 

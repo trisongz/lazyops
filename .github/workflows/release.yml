@@ -2,14 +2,16 @@ name: Release LazyOps on PyPI
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'src/version.py'
-      - 'src/lzl/version.py'
-
+  workflow_run:
+    workflows: ["E2E Tests"]
+    branches: [main]
+    types:
+      - completed
 
 jobs:
   pypi:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
     name: Publish to PyPI
     runs-on: ubuntu-latest
     # Environment and permissions trusted publishing.
