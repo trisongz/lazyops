@@ -74,3 +74,4 @@ examples/file_performance_benchmark.py
 test_persistence.lock
 test_persistence.hash
 test_persistence.cache
+z_mcp.json
