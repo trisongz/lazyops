@@ -90,4 +90,4 @@ jobs:
         MINIO2_REGION: us-east-1
         REDIS_URL: redis://localhost:6379/0
       run: |
-        pytest tests/e2e -v
+        uv run pytest tests/e2e -v -s
