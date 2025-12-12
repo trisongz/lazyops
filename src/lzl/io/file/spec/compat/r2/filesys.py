@@ -1,6 +1,7 @@
 from .base import *
 from .utils import _log
 from .constants import bucket_format_list
+import contextlib
 
 with contextlib.suppress(ImportError):
     import s3fs
