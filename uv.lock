@@ -1221,8 +1221,8 @@ wheels = [
 
 [[package]]
 name = "kvdb-py"
-version = "0.0.6rc0"
-source = { git = "https://github.com/trisongz/kvdb-py?branch=copilot%2Frefactor-support-for-redis-py-7-1-0#96258ce61634ace4ecb38f0f97a0cd003483920b" }
+version = "0.0.7"
+source = { git = "https://github.com/trisongz/kvdb-py#d42d941dea464083490cbee779dd0c16b36db4eb" }
 dependencies = [
     { name = "aiopath", version = "0.6.11", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.12'" },
     { name = "aiopath", version = "0.7.7", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.12'" },
@@ -1253,6 +1253,7 @@ dependencies = [
     { name = "async-lru" },
     { name = "filelock" },
     { name = "frozendict" },
+    { name = "httpx" },
     { name = "loguru" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
@@ -1391,13 +1392,14 @@ requires-dist = [
     { name = "frozendict" },
     { name = "fsspec", marker = "extra == 'file'", specifier = ">=2024.10.0" },
     { name = "fsspec", marker = "extra == 'fileio'", specifier = ">=2024.10.0" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "httpx", marker = "extra == 'openai'" },
     { name = "jinja2", marker = "extra == 'openai'" },
     { name = "kopf", marker = "extra == 'kops'" },
     { name = "kr8s", marker = "extra == 'kops'" },
     { name = "kubernetes", marker = "extra == 'kops'" },
     { name = "kubernetes-asyncio", marker = "extra == 'kops'" },
-    { name = "kvdb-py", marker = "extra == 'e2e'", git = "https://github.com/trisongz/kvdb-py?branch=copilot%2Frefactor-support-for-redis-py-7-1-0" },
+    { name = "kvdb-py", marker = "extra == 'e2e'", git = "https://github.com/trisongz/kvdb-py" },
     { name = "lazyops", extras = ["dev", "fastapi", "file", "kops", "openai"], marker = "extra == 'e2e'" },
     { name = "loguru" },
     { name = "mkdocs", marker = "extra == 'docs'", specifier = ">=1.5.0" },
