@@ -30,38 +30,38 @@ jobs:
           --health-retries 5
 
       minio:
-        image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+        # image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+        image: minio/minio:edge-cicd
         ports:
           - 9000:9000
-          - 9001:9001
+          # - 9001:9001
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
         options: >-
-          --health-cmd "curl --fail http://localhost:9000/minio/health/live"
+          --health-cmd "curl --silent --fail http://localhost:9000/minio/health/live"
           --health-interval 30s
           --health-timeout 10s
           --health-retries 5
-        # Start command is essential for MinIO
         volumes:
           - /tmp/minio_data:/data
       
       minio2:
-        image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+        # image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+        image: minio/minio:edge-cicd
         ports:
           - "9001:9000"
-          - "9091:9090"
+          # - "9091:9090"
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
         options: >-
-          --health-cmd "curl --fail http://localhost:9000/minio/health/live"
+          --health-cmd "curl --silent --fail http://localhost:9000/minio/health/live"
           --health-interval 30s
           --health-timeout 10s
           --health-retries 5
-        # Start command is essential for MinIO
         volumes:
-          - /tmp/minio_data:/data
+          - /tmp/minio_data2:/data
     
     steps:
     # Proceeding with file creation.
