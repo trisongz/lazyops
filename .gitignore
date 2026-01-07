@@ -64,7 +64,7 @@ tests/out/lzl/api/qdrant/client_v2.pyi
 tests/out/lzl/api/qdrant/client_v3.pyi
 src/lzo/utils/.tmpdata
 .cursor/mcp.json
-.mcp.json
+# .mcp.json
 tests/_deprecated/lzl/file_08262025.py
 
 # MkDocs build artifacts

@@ -12,6 +12,11 @@ The `lzl.api` module contains clients and integrations for various external serv
 
 ## Service Integrations
 
+### Cloudflare
+::: lzl.api.cloudflare
+
+See the [Cloudflare Client Guide](cloudflare.md) for detailed documentation.
+
 ### OpenAI
 ::: lzl.api.openai
 

@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "cloudflare_docs": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://docs.mcp.cloudflare.com/mcp"
+      ],
+      "env": {}
+    },
+    "cloudflare": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://dns-analytics.mcp.cloudflare.com/mcp"
+      ],
+      "env": {}
+    }
+  }
+}
