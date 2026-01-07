@@ -457,6 +457,187 @@ for zone_result in result.results:
       show_root_heading: true
       show_source: false
 
+## Record Type-Specific Helpers
+
+Convenience methods for common record types that accept zone name or ID:
+
+```python
+# A record (IPv4)
+client.dns.add_a_record("example.com", "www", "192.0.2.1", proxied=True)
+
+# AAAA record (IPv6)
+client.dns.add_aaaa_record("example.com", "@", "2001:db8::1")
+
+# CNAME record
+client.dns.add_cname_record("example.com", "blog", "blog.example.net", proxied=True)
+
+# MX record
+client.dns.add_mx_record("example.com", "@", "mail.example.com", priority=10)
+
+# TXT record
+client.dns.add_txt_record("example.com", "@", "v=spf1 include:_spf.google.com ~all")
+```
+
+## Service Templates
+
+Pre-configured templates for common email providers:
+
+### Google Workspace
+
+```python
+# Add all Google Workspace MX records
+records = client.dns.add_google_workspace_mx("example.com")
+
+# Add SPF for Google
+client.dns.add_spf_record("example.com", providers=["google"])
+
+# Add DMARC
+client.dns.add_dmarc_record(
+    "example.com",
+    policy="quarantine",
+    rua="dmarc-reports@example.com",
+)
+```
+
+### Microsoft 365
+
+```python
+# Add Microsoft 365 MX record
+records = client.dns.add_microsoft_365_mx("example.com")
+
+# Add SPF for Microsoft
+client.dns.add_spf_record("example.com", providers=["microsoft"])
+```
+
+### Combined Setup
+
+```python
+# SPF for both Google and Microsoft
+client.dns.add_spf_record(
+    "example.com",
+    providers=["google", "microsoft"],
+    ip4=["203.0.113.1"],  # Additional IPs
+    policy="-all",  # Strict policy
+)
+
+# Full DMARC setup
+client.dns.add_dmarc_record(
+    "example.com",
+    policy="reject",
+    rua="dmarc-aggregate@example.com",
+    ruf="dmarc-forensic@example.com",
+    pct=100,
+)
+```
+
+## Export / Import
+
+### Exporting Records
+
+```python
+# Export to JSON
+json_data = client.dns.export_records("example.com", format="json")
+with open("dns_backup.json", "w") as f:
+    f.write(json_data)
+
+# Export to BIND zone file format
+bind_data = client.dns.export_records("example.com", format="bind")
+
+# Export as Python dict
+records = client.dns.export_records("example.com", format="dict")
+
+# Filter by record types
+mx_records = client.dns.export_records(
+    "example.com",
+    format="json",
+    record_types=["MX", "TXT"],
+)
+
+# Exclude certain types
+filtered = client.dns.export_records(
+    "example.com",
+    format="json",
+    exclude_types=["NS", "SOA"],
+)
+```
+
+### Importing Records
+
+```python
+# Import from JSON file
+with open("dns_backup.json") as f:
+    json_data = f.read()
+records = client.dns.import_records("example.com", json_data, format="json")
+
+# Import from dict (merge mode - upserts records)
+records_data = [
+    {"name": "www.example.com", "type": "A", "content": "192.0.2.1"},
+    {"name": "api.example.com", "type": "A", "content": "192.0.2.2"},
+]
+records = client.dns.import_records("example.com", records_data, format="dict", merge=True)
+
+# Import without merging (only creates new records)
+records = client.dns.import_records("example.com", records_data, format="dict", merge=False)
+```
+
+## Diff / Preview
+
+Preview changes before applying:
+
+```python
+# Preview changes without applying
+desired_records = [
+    {"dns_name": "www", "record_type": "A", "targets": ["192.0.2.1"]},
+    {"dns_name": "api", "record_type": "A", "targets": ["192.0.2.2"]},
+]
+
+diff = client.diff_dns_records(desired_records, root_domain="example.com")
+
+for zone_result in diff.results:
+    print(f"Zone: {zone_result.zone_name}")
+
+    print("To Create:")
+    for change in zone_result.to_create:
+        print(f"  + {change.name} {change.type} -> {change.content}")
+
+    print("To Update:")
+    for change in zone_result.to_update:
+        print(f"  ~ {change.name} {change.type} -> {change.content}")
+
+    print("To Delete:")
+    for change in zone_result.to_delete:
+        print(f"  - {change.name} {change.type} -> {change.content}")
+```
+
+### Comparing Zones
+
+Compare DNS records between two zones:
+
+```python
+comparison = client.compare_zones("example.com", "example.net")
+
+print(f"Records only in {comparison['source_zone']}:")
+for rec in comparison["only_in_source"]:
+    print(f"  {rec['name']} {rec['type']} {rec['content']}")
+
+print(f"Records only in {comparison['target_zone']}:")
+for rec in comparison["only_in_target"]:
+    print(f"  {rec['name']} {rec['type']} {rec['content']}")
+
+print("Different content:")
+for rec in comparison["different"]:
+    print(f"  {rec['name']} {rec['type']}")
+    print(f"    Source: {rec['source_content']}")
+    print(f"    Target: {rec['target_content']}")
+
+# Compare specific record types only
+comparison = client.compare_zones(
+    "example.com",
+    "example.net",
+    record_types=["A", "CNAME"],
+)
+```
+
 ## Async Support
 
 All methods have async counterparts with the `a` prefix:
@@ -479,6 +660,22 @@ records = await client.dns.aupsert_many(zone_id, [...])
 
 # Apply
 result = await client.aapply_dns_records(records, root_domain="example.com")
+
+# Record type helpers
+await client.dns.aadd_a_record("example.com", "www", "192.0.2.1")
+await client.dns.aadd_mx_record("example.com", "@", "mail.example.com", 10)
+
+# Service templates
+await client.dns.aadd_google_workspace_mx("example.com")
+await client.dns.aadd_spf_record("example.com", providers=["google"])
+
+# Export/Import
+json_data = await client.dns.aexport_records("example.com")
+await client.dns.aimport_records("example.com", json_data)
+
+# Diff/Compare
+diff = await client.adiff_dns_records(records, root_domain="example.com")
+comparison = await client.acompare_zones("example.com", "example.net")
 ```
 
 ## Context Manager

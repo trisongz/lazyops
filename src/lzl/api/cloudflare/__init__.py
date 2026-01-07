@@ -42,6 +42,12 @@ from .models import (
     RecordChange,
 )
 from .resources import DNSResource
+from .resources.dns import (
+    GOOGLE_WORKSPACE_MX,
+    SPF_GOOGLE,
+    SPF_MICROSOFT,
+    SPF_GOOGLE_AND_MICROSOFT,
+)
 
 __all__ = [
     # Settings
@@ -62,6 +68,11 @@ __all__ = [
     "RecordChange",
     # Resources
     "DNSResource",
+    # Constants
+    "GOOGLE_WORKSPACE_MX",
+    "SPF_GOOGLE",
+    "SPF_MICROSOFT",
+    "SPF_GOOGLE_AND_MICROSOFT",
     # Singletons
     "settings",
     "client",

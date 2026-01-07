@@ -201,6 +201,68 @@ print("To update:", result.results[0].to_update)
 print("To delete:", result.results[0].to_delete)
 ```
 
+## Record Type Helpers
+
+Convenience methods for common record types that accept zone name or ID:
+
+```python
+# Add records using zone name directly (no zone_id lookup needed)
+client.dns.add_a_record("example.com", "www", "192.0.2.1", proxied=True)
+client.dns.add_aaaa_record("example.com", "@", "2001:db8::1")
+client.dns.add_cname_record("example.com", "blog", "blog.example.net")
+client.dns.add_mx_record("example.com", "@", "mail.example.com", priority=10)
+client.dns.add_txt_record("example.com", "@", "v=spf1 include:_spf.google.com ~all")
+```
+
+## Service Templates
+
+Pre-configured templates for common email providers:
+
+```python
+# Google Workspace MX records
+client.dns.add_google_workspace_mx("example.com")
+
+# Microsoft 365 MX record
+client.dns.add_microsoft_365_mx("example.com")
+
+# SPF record with providers
+client.dns.add_spf_record("example.com", providers=["google", "microsoft"])
+
+# DMARC record
+client.dns.add_dmarc_record(
+    "example.com",
+    policy="quarantine",
+    rua="dmarc-reports@example.com",
+)
+```
+
+## Export / Import
+
+```python
+# Export to JSON
+json_data = client.dns.export_records("example.com", format="json")
+
+# Export to BIND format
+bind_data = client.dns.export_records("example.com", format="bind")
+
+# Import records (with merge)
+records = client.dns.import_records("example.com", json_data, merge=True)
+```
+
+## Diff / Preview
+
+```python
+# Preview changes without applying
+diff = client.diff_dns_records(records, root_domain="example.com")
+for zone_result in diff.results:
+    print(f"Create: {len(zone_result.to_create)}")
+    print(f"Update: {len(zone_result.to_update)}")
+    print(f"Delete: {len(zone_result.to_delete)}")
+
+# Compare two zones
+comparison = client.compare_zones("example.com", "example.net")
+```
+
 ## Async Support
 
 All methods have async counterparts with the `a` prefix:

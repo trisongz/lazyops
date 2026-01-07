@@ -683,6 +683,249 @@ class CloudflareClient:
         return result
 
     # ========================================================================
+    # Diff / Preview
+    # ========================================================================
+
+    def diff_dns_records(
+        self,
+        records: List[Union[Dict[str, Any], DNSRecordInput]],
+        *,
+        root_domain: Optional[str] = None,
+        sync_mode: SyncModeType = "upsert",
+    ) -> MultiZoneApplyResult:
+        """
+        Preview DNS record changes without applying them
+
+        Computes the diff between desired and current state without making changes.
+        This is a convenience wrapper around apply_dns_records with dry_run=True.
+
+        Args:
+            records: List of desired record definitions
+            root_domain: If set, treats dns_name as subdomain of this domain
+            sync_mode: "upsert" (add/update only) or "full" (delete missing)
+
+        Returns:
+            MultiZoneApplyResult with planned changes (to_create, to_update, to_delete)
+
+        Example:
+            >>> diff = client.diff_dns_records(records, root_domain="example.com")
+            >>> for zone_result in diff.results:
+            ...     print(f"Zone: {zone_result.zone_name}")
+            ...     print(f"  Create: {len(zone_result.to_create)}")
+            ...     print(f"  Update: {len(zone_result.to_update)}")
+            ...     print(f"  Delete: {len(zone_result.to_delete)}")
+        """
+        return self.apply_dns_records(
+            records,
+            root_domain=root_domain,
+            sync_mode=sync_mode,
+            dry_run=True,
+        )
+
+    async def adiff_dns_records(
+        self,
+        records: List[Union[Dict[str, Any], DNSRecordInput]],
+        *,
+        root_domain: Optional[str] = None,
+        sync_mode: SyncModeType = "upsert",
+    ) -> MultiZoneApplyResult:
+        """Async version of diff_dns_records()"""
+        return await self.aapply_dns_records(
+            records,
+            root_domain=root_domain,
+            sync_mode=sync_mode,
+            dry_run=True,
+        )
+
+    def compare_zones(
+        self,
+        source_zone: str,
+        target_zone: str,
+        *,
+        record_types: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Compare DNS records between two zones
+
+        Args:
+            source_zone: Source zone name or ID
+            target_zone: Target zone name or ID
+            record_types: Only compare these record types
+
+        Returns:
+            Dict with comparison results:
+            - only_in_source: Records only in source zone
+            - only_in_target: Records only in target zone
+            - different: Records with same name/type but different content
+            - identical: Records that match exactly
+        """
+        source_id = self.get_zone_id(source_zone)
+        target_id = self.get_zone_id(target_zone)
+
+        if not source_id or not target_id:
+            raise ValueError(f"Zone not found: {source_zone if not source_id else target_zone}")
+
+        source_records = self.dns.list_all(source_id)
+        target_records = self.dns.list_all(target_id)
+
+        if record_types:
+            source_records = [r for r in source_records if r.type in record_types]
+            target_records = [r for r in target_records if r.type in record_types]
+
+        # Build lookup maps (by relative name and type)
+        source_zone_name = self._get_zone_name(source_id)
+        target_zone_name = self._get_zone_name(target_id)
+
+        def get_relative_name(record: Any, zone_name: str) -> str:
+            if record.name == zone_name:
+                return "@"
+            elif record.name.endswith(f".{zone_name}"):
+                return record.name[:-len(f".{zone_name}") - 1]
+            return record.name
+
+        source_map = {}
+        for r in source_records:
+            rel_name = get_relative_name(r, source_zone_name)
+            key = (rel_name, r.type)
+            if key not in source_map:
+                source_map[key] = []
+            source_map[key].append(r)
+
+        target_map = {}
+        for r in target_records:
+            rel_name = get_relative_name(r, target_zone_name)
+            key = (rel_name, r.type)
+            if key not in target_map:
+                target_map[key] = []
+            target_map[key].append(r)
+
+        # Compare
+        only_in_source = []
+        only_in_target = []
+        different = []
+        identical = []
+
+        all_keys = set(source_map.keys()) | set(target_map.keys())
+
+        for key in all_keys:
+            source_recs = source_map.get(key, [])
+            target_recs = target_map.get(key, [])
+
+            if not target_recs:
+                only_in_source.extend([{"name": r.name, "type": r.type, "content": r.content} for r in source_recs])
+            elif not source_recs:
+                only_in_target.extend([{"name": r.name, "type": r.type, "content": r.content} for r in target_recs])
+            else:
+                source_contents = {r.content for r in source_recs}
+                target_contents = {r.content for r in target_recs}
+
+                if source_contents == target_contents:
+                    identical.extend([{"name": key[0], "type": key[1], "content": list(source_contents)}])
+                else:
+                    different.append({
+                        "name": key[0],
+                        "type": key[1],
+                        "source_content": list(source_contents),
+                        "target_content": list(target_contents),
+                    })
+
+        return {
+            "only_in_source": only_in_source,
+            "only_in_target": only_in_target,
+            "different": different,
+            "identical": identical,
+            "source_zone": source_zone,
+            "target_zone": target_zone,
+        }
+
+    async def acompare_zones(
+        self,
+        source_zone: str,
+        target_zone: str,
+        *,
+        record_types: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """Async version of compare_zones()"""
+        source_id = await self.aget_zone_id(source_zone)
+        target_id = await self.aget_zone_id(target_zone)
+
+        if not source_id or not target_id:
+            raise ValueError(f"Zone not found: {source_zone if not source_id else target_zone}")
+
+        source_records = await self.dns.alist_all(source_id)
+        target_records = await self.dns.alist_all(target_id)
+
+        if record_types:
+            source_records = [r for r in source_records if r.type in record_types]
+            target_records = [r for r in target_records if r.type in record_types]
+
+        # Build lookup maps
+        source_zone_name = self._get_zone_name(source_id)
+        target_zone_name = self._get_zone_name(target_id)
+
+        def get_relative_name(record: Any, zone_name: str) -> str:
+            if record.name == zone_name:
+                return "@"
+            elif record.name.endswith(f".{zone_name}"):
+                return record.name[:-len(f".{zone_name}") - 1]
+            return record.name
+
+        source_map = {}
+        for r in source_records:
+            rel_name = get_relative_name(r, source_zone_name)
+            key = (rel_name, r.type)
+            if key not in source_map:
+                source_map[key] = []
+            source_map[key].append(r)
+
+        target_map = {}
+        for r in target_records:
+            rel_name = get_relative_name(r, target_zone_name)
+            key = (rel_name, r.type)
+            if key not in target_map:
+                target_map[key] = []
+            target_map[key].append(r)
+
+        # Compare
+        only_in_source = []
+        only_in_target = []
+        different = []
+        identical = []
+
+        all_keys = set(source_map.keys()) | set(target_map.keys())
+
+        for key in all_keys:
+            source_recs = source_map.get(key, [])
+            target_recs = target_map.get(key, [])
+
+            if not target_recs:
+                only_in_source.extend([{"name": r.name, "type": r.type, "content": r.content} for r in source_recs])
+            elif not source_recs:
+                only_in_target.extend([{"name": r.name, "type": r.type, "content": r.content} for r in target_recs])
+            else:
+                source_contents = {r.content for r in source_recs}
+                target_contents = {r.content for r in target_recs}
+
+                if source_contents == target_contents:
+                    identical.extend([{"name": key[0], "type": key[1], "content": list(source_contents)}])
+                else:
+                    different.append({
+                        "name": key[0],
+                        "type": key[1],
+                        "source_content": list(source_contents),
+                        "target_content": list(target_contents),
+                    })
+
+        return {
+            "only_in_source": only_in_source,
+            "only_in_target": only_in_target,
+            "different": different,
+            "identical": identical,
+            "source_zone": source_zone,
+            "target_zone": target_zone,
+        }
+
+    # ========================================================================
     # Cleanup
     # ========================================================================
 
