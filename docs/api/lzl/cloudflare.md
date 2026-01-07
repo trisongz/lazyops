@@ -678,6 +678,55 @@ diff = await client.adiff_dns_records(records, root_domain="example.com")
 comparison = await client.acompare_zones("example.com", "example.net")
 ```
 
+## MCP Server
+
+The Cloudflare client includes an MCP (Model Context Protocol) server that exposes all DNS management functionality as tools for AI assistants.
+
+### Quick Start
+
+```bash
+# Install with MCP support
+uv pip install lazyops[cloudflare]
+
+# Set credentials
+export CLOUDFLARE_API_TOKEN="your-api-token"
+
+# Run the server
+uv run cloudflare-mcp
+```
+
+### Claude Desktop Configuration
+
+Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS):
+
+```json
+{
+  "mcpServers": {
+    "cloudflare": {
+      "command": "uv",
+      "args": ["run", "--with", "lazyops[cloudflare]", "cloudflare-mcp"],
+      "env": {
+        "CLOUDFLARE_API_TOKEN": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+### Available Tools
+
+The MCP server exposes 20+ tools including:
+
+- **Zone Management**: `cloudflare_list_zones`, `cloudflare_get_zone`
+- **DNS CRUD**: `cloudflare_list_records`, `cloudflare_create_record`, `cloudflare_update_record`, `cloudflare_delete_record`
+- **Record Helpers**: `cloudflare_add_a_record`, `cloudflare_add_cname_record`, `cloudflare_add_mx_record`, `cloudflare_add_txt_record`
+- **Service Templates**: `cloudflare_add_google_workspace_mx`, `cloudflare_add_microsoft_365_mx`, `cloudflare_add_spf_record`, `cloudflare_add_dmarc_record`
+- **Export/Import**: `cloudflare_export_records`, `cloudflare_import_records`
+- **Diff/Compare**: `cloudflare_diff_records`, `cloudflare_compare_zones`
+- **Declarative**: `cloudflare_apply_records`
+
+See the [MCP Server Guide](../../../src/lzl/api/cloudflare/MCP_SERVER.md) for full documentation.
+
 ## Context Manager
 
 The client supports context manager usage for proper resource cleanup:

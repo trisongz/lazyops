@@ -275,6 +275,43 @@ record = await client.dns.aupsert(zone_id, record_data)
 result = await client.aapply_dns_records(records, root_domain="example.com")
 ```
 
+## MCP Server
+
+An MCP server is included to expose Cloudflare DNS tools to AI assistants.
+
+### Quick Start
+
+```bash
+# Install with MCP support
+uv pip install lazyops[cloudflare]
+
+# Set credentials
+export CLOUDFLARE_API_TOKEN="your-api-token"
+
+# Run the server
+uv run cloudflare-mcp
+```
+
+### Claude Desktop Configuration
+
+Add to your Claude Desktop config:
+
+```json
+{
+  "mcpServers": {
+    "cloudflare": {
+      "command": "uv",
+      "args": ["run", "--with", "lazyops[cloudflare]", "cloudflare-mcp"],
+      "env": {
+        "CLOUDFLARE_API_TOKEN": "your-api-token"
+      }
+    }
+  }
+}
+```
+
+See [MCP_SERVER.md](mcp/README.md) for full documentation.
+
 ## Context Manager
 
 ```python

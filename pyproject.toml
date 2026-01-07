@@ -40,8 +40,15 @@ kvdb-py = { git = "https://github.com/trisongz/kvdb-py" }
 
 [project.scripts]
 lzl = "lzl.cmd:main"
+cloudflare-mcp = "lzl.api.cloudflare.mcp:main"
 
 [project.optional-dependencies]
+mcp = [
+    "mcp>=1.0.0",
+]
+cloudflare = [
+    "mcp>=1.0.0",
+]
 kops = [
     "kubernetes",
     "kubernetes_asyncio",
